@@ -3,7 +3,7 @@ local window = DrRayLibrary:Load("JO脚本", "Default")
 
 local tab = DrRayLibrary.newTab("通用", "ImageIdHere")
 
-tab.newSlider("修改速度", "正常为16", 9999999, false, function(Value)
+tab.newSlider("修改速度", "正常为16", 16，16，9999999, false, function(Value)
     game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value
 end)
 

@@ -316,9 +316,6 @@ end
         loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Aimlock-45467"))()
         end)
         
-        credits:Toggle("夜视", "", false, function(state)
-	spawn(function() while task.wait() do if Light then game.Lighting.Ambient = Color3.new(1, 1, 1) else game.Lighting.Ambient = Color3.new(0, 0, 0) end end end)
-end)
 
 credits:Button(
         "踏空行走",
@@ -794,11 +791,6 @@ local creds = window:Tab("整活脚本!", "992417778")
         end)
         
         
-        credits:Button(
-        "ac6音乐脚本(所有人可见，要自备音乐id，非常nb!!!",
-        function()
-        loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-FE-Ac6-Music-Vulnerability-25536"))()
-        end)
         
         credits:Button(
         "假延迟",

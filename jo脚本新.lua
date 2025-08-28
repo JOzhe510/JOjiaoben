@@ -3,15 +3,15 @@ local window = DrRayLibrary:Load("JO脚本", "Default")
 
 local tab = DrRayLibrary.newTab("通用", "ImageIdHere")
 
-tab.newSlider("修改速度", "正常为16", 16，9999999, false, function(Value)
+tab.newSlider("修改速度", "正常为16", 1000, false, function(Value)
     game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value
 end)
 
-tab.newSlider("跳跃高度", "正常为50", 9999999, false, function(Value)
+tab.newSlider("跳跃高度", "正常为50", 1000, false, function(Value)
     game.Players.LocalPlayer.Character.Humanoid.JumpPower = Value
 end)
 
-tab.newSlider("修改重力", "正常为90", 9999999, false, function(Value)
+tab.newSlider("修改重力", "正常为90", 1000, false, function(Value)
     game.Workspace.Gravity = Value
 end)
 

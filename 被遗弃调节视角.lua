@@ -3,16 +3,9 @@ local window = DrRayLibrary:Load("DrRay", "Default")
 
 local tab = DrRayLibrary.newTab("My Tab", "ImageIdHere")
 
-tab.newButton("Button", "Prints Hello!", function()
-    print('Hello!')
-end)
 
-tab.newToggle("Toggle", "Toggle! (prints the state)", true, function(toggleState)
+tab.newToggle("启用视角", "请输入文本", true, function(toggleState)
     if toggleState then
-        print("On")
-    else
-        print("Off")
-    end
     _env.FOV = v
         game:GetService("RunService").RenderStepped:Connect(function()
             if _env.FOV then
@@ -22,8 +15,6 @@ tab.newToggle("Toggle", "Toggle! (prints the state)", true, function(toggleState
 end)
 
 
-tab.newSlider("Slider", "Epic slider", 120, true, function(v)
+tab.newSlider("视角数值", "请输入文本", 120, false, function(v)
     _env.FovValue = v
 end)
-
-_G.FovValue = 70

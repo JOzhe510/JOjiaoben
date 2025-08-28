@@ -5,7 +5,7 @@ local tab = DrRayLibrary.newTab("My Tab", "ImageIdHere")
 
 
 
-tab.newToggle("启用视角", "请输入文本", true, function(v)
+tab.newToggle("启用视角", "请输入文本", false, function(v)
     _env.FOV = v
         game:GetService("RunService").RenderStepped:Connect(function()
             if _env.FOV then

@@ -1864,7 +1864,8 @@ local creds = window:Tab("其他脚本", "992417778")
         end)
         
         credits:Button(
-        "中二病是最强的",
+        "小月脚本破解版",
         function()
-        loadstring(game:HttpGet("https://github.com/user-attachments/files/16541230/default.txt"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/Syndromehsh/bypass-Script/refs/heads/main/xiaoyue/Main%20Script.lua"))()
         end)
+        

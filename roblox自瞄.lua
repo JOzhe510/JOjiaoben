@@ -17,6 +17,8 @@ local Enabled = true
 local LockedTarget = nil
 local LockSingleTarget = true
 local ESPEnabled = true
+local WallCheck = true
+local HighlightESP = true
 
 local ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 
@@ -31,6 +33,42 @@ Circle.NumSides = 64
 Circle.Filled = false
 
 local ESPObjects = {}
+local Highlights = {}
+
+-- 建筑检测函数
+local function isVisible(part)
+    if not WallCheck then return true end
+    local origin = Camera.CFrame.Position
+    local direction = (part.Position - origin)
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character, part.Parent}
+    local rayResult = workspace:Raycast(origin, direction, rayParams)
+    return not rayResult or rayResult.Instance:IsDescendantOf(part.Parent)
+end
+
+-- 创建高亮轮廓
+local function createHighlight(player)
+    if Highlights[player] then return end
+    
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = nil
+    highlight.FillTransparency = 0.8
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = game.CoreGui
+    
+    Highlights[player] = highlight
+end
+
+-- 移除高亮
+local function removeHighlight(player)
+    local highlight = Highlights[player]
+    if highlight then
+        highlight:Destroy()
+        Highlights[player] = nil
+    end
+end
 
 local function createESP(player)
     if ESPObjects[player] then return ESPObjects[player] end
@@ -39,7 +77,6 @@ local function createESP(player)
         player = player,
         nameText = Drawing.new("Text"),
         healthText = Drawing.new("Text"),
-        box = Drawing.new("Square"),
         visible = false
     }
     
@@ -56,11 +93,6 @@ local function createESP(player)
     esp.healthText.Color = Color3.fromRGB(255, 255, 255)
     esp.healthText.Visible = false
     
-    esp.box.Thickness = 1
-    esp.box.Filled = false
-    esp.box.Color = Color3.fromRGB(255, 255, 255)
-    esp.box.Visible = false
-    
     ESPObjects[player] = esp
     return esp
 end
@@ -71,10 +103,10 @@ local function removeESP(player)
         pcall(function()
             esp.nameText:Remove()
             esp.healthText:Remove()
-            esp.box:Remove()
         end)
         ESPObjects[player] = nil
     end
+    removeHighlight(player)
 end
 
 local function updateESP()
@@ -82,7 +114,9 @@ local function updateESP()
         for _, esp in pairs(ESPObjects) do
             esp.nameText.Visible = false
             esp.healthText.Visible = false
-            esp.box.Visible = false
+        end
+        for _, highlight in pairs(Highlights) do
+            highlight.Enabled = false
         end
         return 
     end
@@ -98,46 +132,50 @@ local function updateESP()
                 end)
                 
                 if success and screenPosition and screenPosition.Z > 0 then
-                    local characterSize = player.Character:GetExtentsSize()
-                    local scale = 100 / screenPosition.Z
-                    local width = scale * 2
-                    local height = characterSize.Y / screenPosition.Z * 2.5
-                    
-                    esp.box.Size = Vector2.new(width, height)
-                    esp.box.Position = Vector2.new(screenPosition.X - width/2, screenPosition.Y - height/2)
-                    esp.box.Visible = true
-                    
-                    esp.nameText.Position = Vector2.new(screenPosition.X, screenPosition.Y - height/2 - 20)
+                    -- 名字和血量文本
+                    esp.nameText.Position = Vector2.new(screenPosition.X, screenPosition.Y - 40)
                     esp.nameText.Visible = true
                     
                     esp.healthText.Text = "HP: " .. math.floor(humanoid.Health)
-                    esp.healthText.Position = Vector2.new(screenPosition.X, screenPosition.Y - height/2 - 40)
+                    esp.healthText.Position = Vector2.new(screenPosition.X, screenPosition.Y - 60)
                     esp.healthText.Visible = true
                     
                     local healthPercent = humanoid.Health / humanoid.MaxHealth
                     local color = Color3.fromRGB(255 * (1 - healthPercent), 255 * healthPercent, 0)
                     esp.healthText.Color = color
-                    esp.box.Color = color
                     esp.nameText.Color = color
+                    
+                    -- 高亮轮廓
+                    if HighlightESP then
+                        if not Highlights[player] then
+                            createHighlight(player)
+                        end
+                        local highlight = Highlights[player]
+                        highlight.Adornee = player.Character
+                        highlight.Enabled = true
+                        highlight.OutlineColor = color
+                    else
+                        removeHighlight(player)
+                    end
                     
                     esp.visible = true
                 else
                     esp.visible = false
                     esp.nameText.Visible = false
                     esp.healthText.Visible = false
-                    esp.box.Visible = false
+                    removeHighlight(player)
                 end
             else
                 esp.visible = false
                 esp.nameText.Visible = false
                 esp.healthText.Visible = false
-                esp.box.Visible = false
+                removeHighlight(player)
             end
         else
             esp.visible = false
             esp.nameText.Visible = false
             esp.healthText.Visible = false
-            esp.box.Visible = false
+            removeHighlight(player)
         end
     end
 end
@@ -149,7 +187,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 220, 0, 230)
+Frame.Size = UDim2.new(0, 220, 0, 280)
 Frame.Position = UDim2.new(0, 10, 0, 10)
 Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 Frame.BackgroundTransparency = 0.2
@@ -178,7 +216,7 @@ TitleCorner.Parent = Title
 
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0.8, 0, 0, 30)
-ToggleBtn.Position = UDim2.new(0.1, 0, 0.2, 0)
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.15, 0)
 ToggleBtn.Text = "🎯 自瞄: 开启"
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 ToggleBtn.BackgroundTransparency = 0.2
@@ -193,7 +231,7 @@ ToggleCorner.Parent = ToggleBtn
 
 local ESPToggleBtn = Instance.new("TextButton")
 ESPToggleBtn.Size = UDim2.new(0.8, 0, 0, 30)
-ESPToggleBtn.Position = UDim2.new(0.1, 0, 0.35, 0)
+ESPToggleBtn.Position = UDim2.new(0.1, 0, 0.3, 0)
 ESPToggleBtn.Text = "👁 ESP: 开启"
 ESPToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 ESPToggleBtn.BackgroundTransparency = 0.2
@@ -206,9 +244,39 @@ local ESPToggleCorner = Instance.new("UICorner")
 ESPToggleCorner.CornerRadius = UDim.new(0, 6)
 ESPToggleCorner.Parent = ESPToggleBtn
 
+local WallCheckBtn = Instance.new("TextButton")
+WallCheckBtn.Size = UDim2.new(0.8, 0, 0, 30)
+WallCheckBtn.Position = UDim2.new(0.1, 0, 0.45, 0)
+WallCheckBtn.Text = "🧱 建筑检测: 开启"
+WallCheckBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+WallCheckBtn.BackgroundTransparency = 0.2
+WallCheckBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+WallCheckBtn.BorderSizePixel = 0
+WallCheckBtn.Font = Enum.Font.Gotham
+WallCheckBtn.Parent = Frame
+
+local WallCheckCorner = Instance.new("UICorner")
+WallCheckCorner.CornerRadius = UDim.new(0, 6)
+WallCheckCorner.Parent = WallCheckBtn
+
+local HighlightBtn = Instance.new("TextButton")
+HighlightBtn.Size = UDim2.new(0.8, 0, 0, 30)
+HighlightBtn.Position = UDim2.new(0.1, 0, 0.6, 0)
+HighlightBtn.Text = "🌟 高亮轮廓: 开启"
+HighlightBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+HighlightBtn.BackgroundTransparency = 0.2
+HighlightBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+HighlightBtn.BorderSizePixel = 0
+HighlightBtn.Font = Enum.Font.Gotham
+HighlightBtn.Parent = Frame
+
+local HighlightCorner = Instance.new("UICorner")
+HighlightCorner.CornerRadius = UDim.new(0, 6)
+HighlightCorner.Parent = HighlightBtn
+
 local FOVInput = Instance.new("TextBox")
 FOVInput.Size = UDim2.new(0.8, 0, 0, 30)
-FOVInput.Position = UDim2.new(0.1, 0, 0.5, 0)
+FOVInput.Position = UDim2.new(0.1, 0, 0.75, 0)
 FOVInput.Text = tostring(FOV)
 FOVInput.PlaceholderText = "输入FOV值"
 FOVInput.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
@@ -224,7 +292,7 @@ FOVInputCorner.Parent = FOVInput
 
 local SingleTargetBtn = Instance.new("TextButton")
 SingleTargetBtn.Size = UDim2.new(0.8, 0, 0, 30)
-SingleTargetBtn.Position = UDim2.new(0.1, 0, 0.65, 0)
+SingleTargetBtn.Position = UDim2.new(0.1, 0, 0.9, 0)
 SingleTargetBtn.Text = "🔒 单锁一人: 开启"
 SingleTargetBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 SingleTargetBtn.BackgroundTransparency = 0.2
@@ -261,7 +329,7 @@ function IsTargetValid(target)
         return humanoid.Health
     end)
     
-    return success and health > 0
+    return success and health > 0 and isVisible(target)
 end
 
 function GetTarget()
@@ -349,6 +417,16 @@ ESPToggleBtn.MouseButton1Click:Connect(function()
     ESPToggleBtn.Text = "👁 ESP: " .. (ESPEnabled and "开启" or "关闭")
 end)
 
+WallCheckBtn.MouseButton1Click:Connect(function()
+    WallCheck = not WallCheck
+    WallCheckBtn.Text = "🧱 建筑检测: " .. (WallCheck and "开启" or "关闭")
+end)
+
+HighlightBtn.MouseButton1Click:Connect(function()
+    HighlightESP = not HighlightESP
+    HighlightBtn.Text = "🌟 高亮轮廓: " .. (HighlightESP and "开启" or "关闭")
+end)
+
 SingleTargetBtn.MouseButton1Click:Connect(function()
     LockSingleTarget = not LockSingleTarget
     SingleTargetBtn.Text = "🔒 单锁一人: " .. (LockSingleTarget and "开启" or "关闭")
@@ -372,6 +450,12 @@ UIS.InputBegan:Connect(function(input, processed)
     elseif input.KeyCode == Enum.KeyCode.V then
         ESPEnabled = not ESPEnabled
         ESPToggleBtn.Text = "👁 ESP: " .. (ESPEnabled and "开启" or "关闭")
+    elseif input.KeyCode == Enum.KeyCode.B then
+        WallCheck = not WallCheck
+        WallCheckBtn.Text = "🧱 建筑检测: " .. (WallCheck and "开启" or "关闭")
+    elseif input.KeyCode == Enum.KeyCode.H then
+        HighlightESP = not HighlightESP
+        HighlightBtn.Text = "🌟 高亮轮廓: " .. (HighlightESP and "开启" or "关闭")
     end
 end)
 
@@ -389,10 +473,14 @@ Players.PlayerRemoving:Connect(function(player)
             pcall(function()
                 esp.nameText:Remove()
                 esp.healthText:Remove()
-                esp.box:Remove()
             end)
         end
         ESPObjects = {}
+        
+        for _, highlight in pairs(Highlights) do
+            pcall(function() highlight:Destroy() end)
+        end
+        Highlights = {}
     else
         if LockedTarget and LockedTarget.Parent and LockedTarget.Parent:IsDescendantOf(workspace) then
             local targetPlayer = Players:GetPlayerFromCharacter(LockedTarget.Parent)
@@ -432,8 +520,11 @@ game:BindToClose(function()
         pcall(function()
             esp.nameText:Remove()
             esp.healthText:Remove()
-            esp.box:Remove()
         end)
+    end
+    
+    for _, highlight in pairs(Highlights) do
+        pcall(function() highlight:Destroy() end)
     end
 end)
 
@@ -442,3 +533,5 @@ print("FOV:", FOV)
 print("单锁模式:", LockSingleTarget)
 print("自瞄状态:", Enabled)
 print("ESP状态:", ESPEnabled)
+print("建筑检测:", WallCheck)
+print("高亮轮廓:", HighlightESP)

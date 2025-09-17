@@ -13,6 +13,7 @@ local Smoothness = 0.8
 local Enabled = true
 local LockedTarget = nil
 local LockSingleTarget = true
+local ESPEnabled = true -- 新增：ESP开关
 
 -- 屏幕中心
 local ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
@@ -27,6 +28,121 @@ Circle.Position = ScreenCenter
 Circle.Transparency = 1
 Circle.NumSides = 64
 
+-- 存储ESP对象的表
+local ESPObjects = {}
+
+-- ESP结构
+local function createESP(player)
+    if ESPObjects[player] then return end
+    
+    local esp = {
+        player = player,
+        nameText = Drawing.new("Text"),
+        healthText = Drawing.new("Text"),
+        box = Drawing.new("Square"),
+        visible = false
+    }
+    
+    -- 设置名字文本属性
+    esp.nameText.Text = player.Name
+    esp.nameText.Size = 16
+    esp.nameText.Center = true
+    esp.nameText.Outline = true
+    esp.nameText.Color = Color3.fromRGB(255, 255, 255)
+    esp.nameText.Visible = false
+    
+    -- 设置血量文本属性
+    esp.healthText.Size = 14
+    esp.healthText.Center = true
+    esp.healthText.Outline = true
+    esp.healthText.Color = Color3.fromRGB(255, 255, 255)
+    esp.healthText.Visible = false
+    
+    -- 设置方框属性
+    esp.box.Thickness = 1
+    esp.box.Filled = false
+    esp.box.Color = Color3.fromRGB(255, 255, 255)
+    esp.box.Visible = false
+    
+    ESPObjects[player] = esp
+    return esp
+end
+
+-- 移除ESP
+local function removeESP(player)
+    local esp = ESPObjects[player]
+    if esp then
+        pcall(function()
+            esp.nameText:Remove()
+            esp.healthText:Remove()
+            esp.box:Remove()
+        end)
+        ESPObjects[player] = nil
+    end
+end
+
+-- 更新ESP
+local function updateESP()
+    if not ESPEnabled then return end
+    
+    for player, esp in pairs(ESPObjects) do
+        if player ~= LocalPlayer and player.Character then
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            local head = player.Character:FindFirstChild("Head")
+            
+            if humanoid and head and humanoid.Health > 0 then
+                local success, screenPosition = pcall(function()
+                    return Camera:WorldToViewportPoint(head.Position)
+                end)
+                
+                if success and screenPosition.Z > 0 then
+                    -- 计算方框尺寸
+                    local characterSize = player.Character:GetExtentsSize()
+                    local width = 100 / screenPosition.Z * 2
+                    local height = characterSize.Y / screenPosition.Z * 2
+                    
+                    -- 更新方框
+                    esp.box.Size = Vector2.new(width, height)
+                    esp.box.Position = Vector2.new(screenPosition.X - width/2, screenPosition.Y - height/2)
+                    esp.box.Visible = true
+                    
+                    -- 更新名字
+                    esp.nameText.Position = Vector2.new(screenPosition.X, screenPosition.Y - height/2 - 20)
+                    esp.nameText.Visible = true
+                    
+                    -- 更新血量
+                    esp.healthText.Text = "HP: " .. math.floor(humanoid.Health)
+                    esp.healthText.Position = Vector2.new(screenPosition.X, screenPosition.Y - height/2 - 40)
+                    esp.healthText.Visible = true
+                    
+                    -- 根据血量设置颜色
+                    local healthPercent = humanoid.Health / humanoid.MaxHealth
+                    local color = Color3.fromRGB(255 * (1 - healthPercent), 255 * healthPercent, 0)
+                    esp.healthText.Color = color
+                    esp.box.Color = color
+                    
+                    esp.visible = true
+                else
+                    esp.visible = false
+                    esp.nameText.Visible = false
+                    esp.healthText.Visible = false
+                    esp.box.Visible = false
+                end
+            else
+                esp.visible = false
+                esp.nameText.Visible = false
+                esp.healthText.Visible = false
+                esp.box.Visible = false
+            end
+        else
+            esp.visible = false
+            esp.nameText.Visible = false
+            esp.healthText.Visible = false
+            esp.box.Visible = false
+        end
+    end
+end
+
 -- 创建UI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Parent = CoreGui
@@ -35,7 +151,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 220, 0, 200)
+Frame.Size = UDim2.new(0, 220, 0, 230) -- 增加高度以容纳ESP按钮
 Frame.Position = UDim2.new(0, 10, 0, 10)
 Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 Frame.BackgroundTransparency = 0.2
@@ -77,10 +193,26 @@ local ToggleCorner = Instance.new("UICorner")
 ToggleCorner.CornerRadius = UDim.new(0, 6)
 ToggleCorner.Parent = ToggleBtn
 
+-- ESP开关按钮
+local ESPToggleBtn = Instance.new("TextButton")
+ESPToggleBtn.Size = UDim2.new(0.8, 0, 0, 30)
+ESPToggleBtn.Position = UDim2.new(0.1, 0, 0.35, 0)
+ESPToggleBtn.Text = "👁 ESP: 开启"
+ESPToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+ESPToggleBtn.BackgroundTransparency = 0.2
+ESPToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPToggleBtn.BorderSizePixel = 0
+ESPToggleBtn.Font = Enum.Font.Gotham
+ESPToggleBtn.Parent = Frame
+
+local ESPToggleCorner = Instance.new("UICorner")
+ESPToggleCorner.CornerRadius = UDim.new(0, 6)
+ESPToggleCorner.Parent = ESPToggleBtn
+
 -- FOV控制
 local FOVFrame = Instance.new("Frame")
 FOVFrame.Size = UDim2.new(0.8, 0, 0, 40)
-FOVFrame.Position = UDim2.new(0.1, 0, 0.45, 0)
+FOVFrame.Position = UDim2.new(0.1, 0, 0.5, 0)
 FOVFrame.BackgroundTransparency = 1
 FOVFrame.BorderSizePixel = 0
 FOVFrame.Parent = Frame
@@ -128,7 +260,7 @@ FOVHandleCorner.Parent = FOVHandle
 
 local SingleTargetBtn = Instance.new("TextButton")
 SingleTargetBtn.Size = UDim2.new(0.8, 0, 0, 30)
-SingleTargetBtn.Position = UDim2.new(0.1, 0, 0.75, 0)
+SingleTargetBtn.Position = UDim2.new(0.1, 0, 0.8, 0)
 SingleTargetBtn.Text = "🔒 单锁一人: 开启"
 SingleTargetBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 SingleTargetBtn.BackgroundTransparency = 0.2
@@ -179,6 +311,7 @@ end
 -- 启动颜色动画
 startColorAnimation(Title, "TextColor3")
 startColorAnimation(ToggleBtn, "BackgroundColor3")
+startColorAnimation(ESPToggleBtn, "BackgroundColor3")
 startColorAnimation(SingleTargetBtn, "BackgroundColor3")
 startColorAnimation(Circle, "Color")
 startColorAnimation(FOVFill, "BackgroundColor3")
@@ -227,24 +360,31 @@ function IsTargetValid(target)
     if not target:IsA("BasePart") then return false end
     
     local humanoid = target.Parent:FindFirstChildOfClass("Humanoid")
-    return humanoid and humanoid.Health > 0 and humanoid:GetState() ~= Enum.HumanoidStateType.Dead
+    if not humanoid then return false end
+    
+    -- 直接检查Health属性
+    local success, health = pcall(function()
+        return humanoid.Health
+    end)
+    
+    return success and health > 0
 end
 
 -- 获取目标
 function GetTarget()
-    -- 单目标锁定模式：只检测锁定目标
+    -- 单目标锁定模式：优先检测锁定目标
     if LockSingleTarget and LockedTarget then
         if IsTargetValid(LockedTarget) then
             local success, screenPos = SafeWorldToViewportPoint(LockedTarget.Position)
-            if success and screenPos then
+            if success and screenPos and screenPos.Z > 0 then
                 return LockedTarget
             end
         else
-            LockedTarget = nil
+            LockedTarget = nil  -- 目标无效立即清除
         end
     end
     
-    -- 非锁定模式：寻找最近有效目标
+    -- 寻找最近有效目标
     local closest = nil
     local closestDist = FOV
     
@@ -262,6 +402,11 @@ function GetTarget()
                 end
             end
         end
+    end
+    
+    -- 单目标模式下锁定找到的目标
+    if LockSingleTarget and closest and not LockedTarget then
+        LockedTarget = closest
     end
     
     return closest
@@ -297,11 +442,28 @@ RunService:BindToRenderStep("AimBot", Enum.RenderPriority.Camera.Value, function
     end
 end)
 
+-- ESP更新循环
+RunService:BindToRenderStep("ESP", Enum.RenderPriority.Last.Value, function()
+    updateESP()
+end)
+
 -- UI控制
 ToggleBtn.MouseButton1Click:Connect(function()
     Enabled = not Enabled
     Circle.Visible = Enabled
     ToggleBtn.Text = "🎯 自瞄: " .. (Enabled and "开启" or "关闭")
+end)
+
+ESPToggleBtn.MouseButton1Click:Connect(function()
+    ESPEnabled = not ESPEnabled
+    ESPToggleBtn.Text = "👁 ESP: " .. (ESPEnabled and "开启" or "关闭")
+    
+    -- 隐藏所有ESP对象
+    for _, esp in pairs(ESPObjects) do
+        esp.nameText.Visible = false
+        esp.healthText.Visible = false
+        esp.box.Visible = false
+    end
 end)
 
 SingleTargetBtn.MouseButton1Click:Connect(function()
@@ -326,19 +488,51 @@ UIS.InputBegan:Connect(function(input, processed)
         if target then
             LockedTarget = target
         end
+    elseif input.KeyCode == Enum.KeyCode.V then
+        ESPEnabled = not ESPEnabled
+        ESPToggleBtn.Text = "👁 ESP: " .. (ESPEnabled and "开启" or "关闭")
+        
+        -- 隐藏所有ESP对象
+        for _, esp in pairs(ESPObjects) do
+            esp.nameText.Visible = false
+            esp.healthText.Visible = false
+            esp.box.Visible = false
+        end
     end
 end)
 
--- 玩家离开游戏时清理
+-- 玩家管理
+Players.PlayerAdded:Connect(function(player)
+    createESP(player)
+end)
+
 Players.PlayerRemoving:Connect(function(player)
+    removeESP(player)
     if player == LocalPlayer then
         for _, tween in pairs(colorTweens) do
             pcall(function() tween:Cancel() end)
         end
         pcall(function() Circle:Remove() end)
         pcall(function() ScreenGui:Destroy() end)
+        
+        -- 清理所有ESP对象
+        for _, esp in pairs(ESPObjects) do
+            pcall(function()
+                esp.nameText:Remove()
+                esp.healthText:Remove()
+                esp.box:Remove()
+            end)
+        end
+        ESPObjects = {}
     end
 end)
+
+-- 初始化现有玩家
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        createESP(player)
+    end
+end
 
 -- 更新FOV圈位置
 RunService.RenderStepped:Connect(function()
@@ -361,4 +555,20 @@ end)
 game:BindToClose(function()
     pcall(function() Circle:Remove() end)
     pcall(function() ScreenGui:Destroy() end)
+    
+    -- 清理所有ESP对象
+    for _, esp in pairs(ESPObjects) do
+        pcall(function()
+            esp.nameText:Remove()
+            esp.healthText:Remove()
+            esp.box:Remove()
+        end)
+    end
 end)
+
+-- 调试输出
+print("自瞄脚本加载完成")
+print("FOV:", FOV)
+print("单锁模式:", LockSingleTarget)
+print("自瞄状态:", Enabled)
+print("ESP状态:", ESPEnabled)

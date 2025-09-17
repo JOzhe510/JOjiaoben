@@ -1,3 +1,4 @@
+```lua
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -5,13 +6,11 @@ local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- 等待本地玩家加载
 while not LocalPlayer do
     Players.PlayerAdded:Wait()
     LocalPlayer = Players.LocalPlayer
 end
 
--- 配置参数
 local FOV = 80
 local Prediction = 0.15
 local Smoothness = 0.8
@@ -20,10 +19,8 @@ local LockedTarget = nil
 local LockSingleTarget = true
 local ESPEnabled = true
 
--- 屏幕中心
 local ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 
--- 画FOV圈
 local Circle = Drawing.new("Circle")
 Circle.Visible = true
 Circle.Radius = FOV
@@ -34,10 +31,8 @@ Circle.Transparency = 1
 Circle.NumSides = 64
 Circle.Filled = false
 
--- 存储ESP对象的表
 local ESPObjects = {}
 
--- ESP结构
 local function createESP(player)
     if ESPObjects[player] then return ESPObjects[player] end
     
@@ -49,7 +44,6 @@ local function createESP(player)
         visible = false
     }
     
-    -- 设置名字文本属性
     esp.nameText.Text = player.Name
     esp.nameText.Size = 16
     esp.nameText.Center = true
@@ -57,14 +51,12 @@ local function createESP(player)
     esp.nameText.Color = Color3.fromRGB(255, 255, 255)
     esp.nameText.Visible = false
     
-    -- 设置血量文本属性
     esp.healthText.Size = 14
     esp.healthText.Center = true
     esp.healthText.Outline = true
     esp.healthText.Color = Color3.fromRGB(255, 255, 255)
     esp.healthText.Visible = false
     
-    -- 设置方框属性
     esp.box.Thickness = 1
     esp.box.Filled = false
     esp.box.Color = Color3.fromRGB(255, 255, 255)
@@ -74,7 +66,6 @@ local function createESP(player)
     return esp
 end
 
--- 移除ESP
 local function removeESP(player)
     local esp = ESPObjects[player]
     if esp then
@@ -87,7 +78,6 @@ local function removeESP(player)
     end
 end
 
--- 更新ESP
 local function updateESP()
     if not ESPEnabled then 
         for _, esp in pairs(ESPObjects) do
@@ -109,27 +99,22 @@ local function updateESP()
                 end)
                 
                 if success and screenPosition and screenPosition.Z > 0 then
-                    -- 计算方框尺寸
                     local characterSize = player.Character:GetExtentsSize()
                     local scale = 100 / screenPosition.Z
                     local width = scale * 2
                     local height = characterSize.Y / screenPosition.Z * 2.5
                     
-                    -- 更新方框
                     esp.box.Size = Vector2.new(width, height)
                     esp.box.Position = Vector2.new(screenPosition.X - width/2, screenPosition.Y - height/2)
                     esp.box.Visible = true
                     
-                    -- 更新名字
                     esp.nameText.Position = Vector2.new(screenPosition.X, screenPosition.Y - height/2 - 20)
                     esp.nameText.Visible = true
                     
-                    -- 更新血量
                     esp.healthText.Text = "HP: " .. math.floor(humanoid.Health)
                     esp.healthText.Position = Vector2.new(screenPosition.X, screenPosition.Y - height/2 - 40)
                     esp.healthText.Visible = true
                     
-                    -- 根据血量设置颜色
                     local healthPercent = humanoid.Health / humanoid.MaxHealth
                     local color = Color3.fromRGB(255 * (1 - healthPercent), 255 * healthPercent, 0)
                     esp.healthText.Color = color
@@ -158,7 +143,6 @@ local function updateESP()
     end
 end
 
--- 创建UI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Parent = CoreGui
 ScreenGui.Name = "AimBotUI"
@@ -166,7 +150,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 220, 0, 230)
+Frame.Size = UDim2.new(0, 250, 0, 280)
 Frame.Position = UDim2.new(0, 10, 0, 10)
 Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 Frame.BackgroundTransparency = 0.2
@@ -195,7 +179,7 @@ TitleCorner.Parent = Title
 
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0.8, 0, 0, 30)
-ToggleBtn.Position = UDim2.new(0.1, 0, 0.2, 0)
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.15, 0)
 ToggleBtn.Text = "🎯 自瞄: 开启"
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 ToggleBtn.BackgroundTransparency = 0.2
@@ -208,10 +192,9 @@ local ToggleCorner = Instance.new("UICorner")
 ToggleCorner.CornerRadius = UDim.new(0, 6)
 ToggleCorner.Parent = ToggleBtn
 
--- ESP开关按钮
 local ESPToggleBtn = Instance.new("TextButton")
 ESPToggleBtn.Size = UDim2.new(0.8, 0, 0, 30)
-ESPToggleBtn.Position = UDim2.new(0.1, 0, 0.35, 0)
+ESPToggleBtn.Position = UDim2.new(0.1, 0, 0.3, 0)
 ESPToggleBtn.Text = "👁 ESP: 开启"
 ESPToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 ESPToggleBtn.BackgroundTransparency = 0.2
@@ -224,58 +207,25 @@ local ESPToggleCorner = Instance.new("UICorner")
 ESPToggleCorner.CornerRadius = UDim.new(0, 6)
 ESPToggleCorner.Parent = ESPToggleBtn
 
--- FOV控制
-local FOVFrame = Instance.new("Frame")
-FOVFrame.Size = UDim2.new(0.8, 0, 0, 40)
-FOVFrame.Position = UDim2.new(0.1, 0, 0.5, 0)
-FOVFrame.BackgroundTransparency = 1
-FOVFrame.BorderSizePixel = 0
-FOVFrame.Parent = Frame
+local FOVInput = Instance.new("TextBox")
+FOVInput.Size = UDim2.new(0.8, 0, 0, 30)
+FOVInput.Position = UDim2.new(0.1, 0, 0.45, 0)
+FOVInput.Text = tostring(FOV)
+FOVInput.PlaceholderText = "输入FOV值"
+FOVInput.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+FOVInput.BackgroundTransparency = 0.2
+FOVInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+FOVInput.BorderSizePixel = 0
+FOVInput.Font = Enum.Font.Gotham
+FOVInput.Parent = Frame
 
-local FOVLabel = Instance.new("TextLabel")
-FOVLabel.Size = UDim2.new(1, 0, 0, 20)
-FOVLabel.Text = "🔍 FOV大小: " .. FOV
-FOVLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-FOVLabel.BackgroundTransparency = 1
-FOVLabel.Font = Enum.Font.Gotham
-FOVLabel.Parent = FOVFrame
-
-local FOVSlider = Instance.new("Frame")
-FOVSlider.Size = UDim2.new(1, 0, 0, 6)
-FOVSlider.Position = UDim2.new(0, 0, 0.5, 0)
-FOVSlider.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-FOVSlider.BorderSizePixel = 0
-FOVSlider.Parent = FOVFrame
-
-local FOVSliderCorner = Instance.new("UICorner")
-FOVSliderCorner.CornerRadius = UDim.new(0, 3)
-FOVSliderCorner.Parent = FOVSlider
-
-local FOVFill = Instance.new("Frame")
-FOVFill.Size = UDim2.new((FOV - 20) / 180, 0, 1, 0)
-FOVFill.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-FOVFill.BorderSizePixel = 0
-FOVFill.Parent = FOVSlider
-
-local FOVFillCorner = Instance.new("UICorner")
-FOVFillCorner.CornerRadius = UDim.new(0, 3)
-FOVFillCorner.Parent = FOVFill
-
-local FOVHandle = Instance.new("TextButton")
-FOVHandle.Size = UDim2.new(0, 16, 0, 16)
-FOVHandle.Position = UDim2.new((FOV - 20) / 180, -8, 0.5, -8)
-FOVHandle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-FOVHandle.Text = ""
-FOVHandle.BorderSizePixel = 0
-FOVHandle.Parent = FOVSlider
-
-local FOVHandleCorner = Instance.new("UICorner")
-FOVHandleCorner.CornerRadius = UDim.new(1, 0)
-FOVHandleCorner.Parent = FOVHandle
+local FOVInputCorner = Instance.new("UICorner")
+FOVInputCorner.CornerRadius = UDim.new(0, 6)
+FOVInputCorner.Parent = FOVInput
 
 local SingleTargetBtn = Instance.new("TextButton")
 SingleTargetBtn.Size = UDim2.new(0.8, 0, 0, 30)
-SingleTargetBtn.Position = UDim2.new(0.1, 0, 0.8, 0)
+SingleTargetBtn.Position = UDim2.new(0.1, 0, 0.6, 0)
 SingleTargetBtn.Text = "🔒 单锁一人: 开启"
 SingleTargetBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 SingleTargetBtn.BackgroundTransparency = 0.2
@@ -288,45 +238,29 @@ local SingleCorner = Instance.new("UICorner")
 SingleCorner.CornerRadius = UDim.new(0, 6)
 SingleCorner.Parent = SingleTargetBtn
 
--- FOV滑块拖动功能
-local dragging = false
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(0.8, 0, 0, 40)
+StatusLabel.Position = UDim2.new(0.1, 0, 0.75, 0)
+StatusLabel.Text = "状态: 等待目标"
+StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.TextWrapped = true
+StatusLabel.Parent = Frame
 
-FOVHandle.MouseButton1Down:Connect(function()
-    dragging = true
-end)
-
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
+FOVInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local newFOV = tonumber(FOVInput.Text)
+        if newFOV and newFOV >= 20 and newFOV <= 200 then
+            FOV = newFOV
+            Circle.Radius = FOV
+            FOVInput.Text = tostring(FOV)
+        else
+            FOVInput.Text = tostring(FOV)
+        end
     end
 end)
 
-UIS.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local mousePos = UIS:GetMouseLocation()
-        local sliderAbsolutePos = FOVSlider.AbsolutePosition
-        local sliderAbsoluteSize = FOVSlider.AbsoluteSize
-        
-        local relativeX = math.clamp((mousePos.X - sliderAbsolutePos.X) / sliderAbsoluteSize.X, 0, 1)
-        local newFOV = math.floor(20 + relativeX * 180)
-        
-        FOV = newFOV
-        Circle.Radius = FOV
-        FOVLabel.Text = "🔍 FOV大小: " .. FOV
-        FOVFill.Size = UDim2.new(relativeX, 0, 1, 0)
-        FOVHandle.Position = UDim2.new(relativeX, -8, 0.5, -8)
-    end
-end)
-
--- 安全检查函数
-function SafeWorldToViewportPoint(position)
-    local success, result = pcall(function()
-        return Camera:WorldToViewportPoint(position)
-    end)
-    return success, result
-end
-
--- 检查目标是否有效
 function IsTargetValid(target)
     if not target or not target.Parent then return false end
     if not target:IsA("BasePart") then return false end
@@ -334,7 +268,6 @@ function IsTargetValid(target)
     local humanoid = target.Parent:FindFirstChildOfClass("Humanoid")
     if not humanoid then return false end
     
-    -- 直接检查Health属性
     local success, health = pcall(function()
         return humanoid.Health
     end)
@@ -342,21 +275,22 @@ function IsTargetValid(target)
     return success and health > 0
 end
 
--- 获取目标
 function GetTarget()
-    -- 单目标锁定模式：优先检测锁定目标
     if LockSingleTarget and LockedTarget then
         if IsTargetValid(LockedTarget) then
-            local success, screenPos = SafeWorldToViewportPoint(LockedTarget.Position)
+            local success, screenPos = pcall(function()
+                return Camera:WorldToViewportPoint(LockedTarget.Position)
+            end)
             if success and screenPos and screenPos.Z > 0 then
+                StatusLabel.Text = "状态: 锁定目标中"
                 return LockedTarget
             end
         else
-            LockedTarget = nil  -- 目标无效立即清除
+            LockedTarget = nil
+            StatusLabel.Text = "状态: 目标失效"
         end
     end
     
-    -- 寻找最近有效目标
     local closest = nil
     local closestDist = FOV
     
@@ -364,7 +298,9 @@ function GetTarget()
         if player ~= LocalPlayer and player.Character then
             local head = player.Character:FindFirstChild("Head")
             if head and IsTargetValid(head) then
-                local success, screenPos = SafeWorldToViewportPoint(head.Position)
+                local success, screenPos = pcall(function()
+                    return Camera:WorldToViewportPoint(head.Position)
+                end)
                 if success and screenPos and screenPos.Z > 0 then
                     local dist = (Vector2.new(screenPos.X, screenPos.Y) - ScreenCenter).Magnitude
                     if dist < closestDist then
@@ -376,16 +312,15 @@ function GetTarget()
         end
     end
     
-    -- 单目标模式下锁定找到的目标
     if LockSingleTarget and closest and not LockedTarget then
         LockedTarget = closest
     end
     
+    StatusLabel.Text = closest and "状态: 发现目标" or "状态: 无目标"
     return closest
 end
 
--- 安全瞄准函数
-local function SafeAimToHead(target)
+local function AimToTarget(target)
     if not target or not target:IsA("BasePart") then return false end
     
     local success, targetPos = pcall(function()
@@ -403,23 +338,20 @@ local function SafeAimToHead(target)
     return true
 end
 
--- 主循环
 RunService:BindToRenderStep("AimBot", Enum.RenderPriority.Camera.Value, function()
     if not Enabled then return end
     if not LocalPlayer or not LocalPlayer.Character then return end
     
     local target = GetTarget()
     if target then
-        SafeAimToHead(target)
+        AimToTarget(target)
     end
 end)
 
--- ESP更新循环
 RunService:BindToRenderStep("ESP", Enum.RenderPriority.Last.Value, function()
     updateESP()
 end)
 
--- UI控制
 ToggleBtn.MouseButton1Click:Connect(function()
     Enabled = not Enabled
     Circle.Visible = Enabled
@@ -437,7 +369,6 @@ SingleTargetBtn.MouseButton1Click:Connect(function()
     LockedTarget = nil
 end)
 
--- 键盘控制
 UIS.InputBegan:Connect(function(input, processed)
     if processed then return end
     
@@ -447,10 +378,12 @@ UIS.InputBegan:Connect(function(input, processed)
         ToggleBtn.Text = "🎯 自瞄: " .. (Enabled and "开启" or "关闭")
     elseif input.KeyCode == Enum.KeyCode.T then
         LockedTarget = nil
+        StatusLabel.Text = "状态: 取消锁定"
     elseif input.KeyCode == Enum.KeyCode.F then
         local target = GetTarget()
         if target then
             LockedTarget = target
+            StatusLabel.Text = "状态: 手动锁定目标"
         end
     elseif input.KeyCode == Enum.KeyCode.V then
         ESPEnabled = not ESPEnabled
@@ -458,7 +391,6 @@ UIS.InputBegan:Connect(function(input, processed)
     end
 end)
 
--- 玩家管理
 Players.PlayerAdded:Connect(function(player)
     createESP(player)
 end)
@@ -469,7 +401,6 @@ Players.PlayerRemoving:Connect(function(player)
         pcall(function() Circle:Remove() end)
         pcall(function() ScreenGui:Destroy() end)
         
-        -- 清理所有ESP对象
         for _, esp in pairs(ESPObjects) do
             pcall(function()
                 esp.nameText:Remove()
@@ -478,24 +409,29 @@ Players.PlayerRemoving:Connect(function(player)
             end)
         end
         ESPObjects = {}
+    else
+        if LockedTarget and LockedTarget.Parent and LockedTarget.Parent:IsDescendantOf(workspace) then
+            local targetPlayer = Players:GetPlayerFromCharacter(LockedTarget.Parent)
+            if targetPlayer == player then
+                LockedTarget = nil
+                StatusLabel.Text = "状态: 目标退出"
+            end
+        end
     end
 end)
 
--- 初始化现有玩家
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then
         createESP(player)
     end
 end
 
--- 更新FOV圈位置
 RunService.RenderStepped:Connect(function()
     if Circle then
         Circle.Position = ScreenCenter
     end
 end)
 
--- 窗口大小改变时更新
 Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
     if Camera and Camera.ViewportSize then
         ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
@@ -505,12 +441,10 @@ Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
     end
 end)
 
--- 游戏关闭时清理
 game:BindToClose(function()
     pcall(function() Circle:Remove() end)
     pcall(function() ScreenGui:Destroy() end)
     
-    -- 清理所有ESP对象
     for _, esp in pairs(ESPObjects) do
         pcall(function()
             esp.nameText:Remove()
@@ -520,9 +454,9 @@ game:BindToClose(function()
     end
 end)
 
--- 调试输出
 print("自瞄脚本加载完成")
 print("FOV:", FOV)
 print("单锁模式:", LockSingleTarget)
 print("自瞄状态:", Enabled)
 print("ESP状态:", ESPEnabled)
+```

@@ -2,7 +2,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
-local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -289,49 +288,6 @@ local SingleCorner = Instance.new("UICorner")
 SingleCorner.CornerRadius = UDim.new(0, 6)
 SingleCorner.Parent = SingleTargetBtn
 
--- 颜色变换效果
-local colorTweens = {}
-local colors = {
-    Color3.fromRGB(255, 50, 50),
-    Color3.fromRGB(50, 255, 50),
-    Color3.fromRGB(50, 50, 255),
-    Color3.fromRGB(255, 255, 50),
-    Color3.fromRGB(255, 50, 255),
-    Color3.fromRGB(50, 255, 255)
-}
-
-local function startColorAnimation(instance, property)
-    if colorTweens[instance] then
-        colorTweens[instance]:Cancel()
-    end
-    
-    local currentColorIndex = 1
-    local function animate()
-        local targetColor = colors[currentColorIndex]
-        local tweenInfo = TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
-        local tween = TweenService:Create(instance, tweenInfo, {[property] = targetColor})
-        tween:Play()
-        
-        colorTweens[instance] = tween
-        currentColorIndex = currentColorIndex % #colors + 1
-        
-        tween.Completed:Connect(function()
-            if instance.Parent then
-                animate()
-            end
-        end)
-    end
-    animate()
-end
-
--- 启动颜色动画
-startColorAnimation(Title, "TextColor3")
-startColorAnimation(ToggleBtn, "BackgroundColor3")
-startColorAnimation(ESPToggleBtn, "BackgroundColor3")
-startColorAnimation(SingleTargetBtn, "BackgroundColor3")
-startColorAnimation(Circle, "Color")
-startColorAnimation(FOVFill, "BackgroundColor3")
-
 -- FOV滑块拖动功能
 local dragging = false
 
@@ -510,9 +466,6 @@ end)
 Players.PlayerRemoving:Connect(function(player)
     removeESP(player)
     if player == LocalPlayer then
-        for _, tween in pairs(colorTweens) do
-            pcall(function() tween:Cancel() end)
-        end
         pcall(function() Circle:Remove() end)
         pcall(function() ScreenGui:Destroy() end)
         

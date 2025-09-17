@@ -1,4 +1,3 @@
-```lua
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -443,4 +442,3 @@ print("FOV:", FOV)
 print("单锁模式:", LockSingleTarget)
 print("自瞄状态:", Enabled)
 print("ESP状态:", ESPEnabled)
-```

@@ -18,7 +18,6 @@ local LockedTarget = nil
 local LockSingleTarget = true
 local ESPEnabled = true
 local WallCheck = true
-local HighlightESP = true
 
 local ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 
@@ -145,8 +144,8 @@ local function updateESP()
                     esp.healthText.Color = color
                     esp.nameText.Color = color
                     
-                    -- 高亮轮廓
-                    if HighlightESP then
+                    -- 高亮轮廓（与ESP同步启用）
+                    if ESPEnabled then
                         if not Highlights[player] then
                             createHighlight(player)
                         end
@@ -200,6 +199,26 @@ local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = Frame
 
+-- 添加展开/收起按钮
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0, 30, 0, 20)
+ToggleButton.Position = UDim2.new(1, -30, 0, 0)
+ToggleButton.Text = "▲"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ToggleButton.BackgroundTransparency = 0.3
+ToggleButton.BorderSizePixel = 0
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.Parent = Frame
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(0, 4)
+ToggleCorner.Parent = ToggleButton
+
+-- 存储UI元素引用以便控制显示/隐藏
+local UIElements = {}
+local isExpanded = true
+
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.Text = "🔥 自瞄面板 🔥"
@@ -209,6 +228,7 @@ Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.BorderSizePixel = 0
 Title.Font = Enum.Font.GothamBold
 Title.Parent = Frame
+table.insert(UIElements, Title)
 
 local TitleCorner = Instance.new("UICorner")
 TitleCorner.CornerRadius = UDim.new(0, 8)
@@ -224,6 +244,7 @@ ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleBtn.BorderSizePixel = 0
 ToggleBtn.Font = Enum.Font.Gotham
 ToggleBtn.Parent = Frame
+table.insert(UIElements, ToggleBtn)
 
 local ToggleCorner = Instance.new("UICorner")
 ToggleCorner.CornerRadius = UDim.new(0, 6)
@@ -239,6 +260,7 @@ ESPToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 ESPToggleBtn.BorderSizePixel = 0
 ESPToggleBtn.Font = Enum.Font.Gotham
 ESPToggleBtn.Parent = Frame
+table.insert(UIElements, ESPToggleBtn)
 
 local ESPToggleCorner = Instance.new("UICorner")
 ESPToggleCorner.CornerRadius = UDim.new(0, 6)
@@ -254,29 +276,15 @@ WallCheckBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 WallCheckBtn.BorderSizePixel = 0
 WallCheckBtn.Font = Enum.Font.Gotham
 WallCheckBtn.Parent = Frame
+table.insert(UIElements, WallCheckBtn)
 
 local WallCheckCorner = Instance.new("UICorner")
 WallCheckCorner.CornerRadius = UDim.new(0, 6)
 WallCheckCorner.Parent = WallCheckBtn
 
-local HighlightBtn = Instance.new("TextButton")
-HighlightBtn.Size = UDim2.new(0.8, 0, 0, 30)
-HighlightBtn.Position = UDim2.new(0.1, 0, 0.6, 0)
-HighlightBtn.Text = "🌟 高亮轮廓: 开启"
-HighlightBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-HighlightBtn.BackgroundTransparency = 0.2
-HighlightBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-HighlightBtn.BorderSizePixel = 0
-HighlightBtn.Font = Enum.Font.Gotham
-HighlightBtn.Parent = Frame
-
-local HighlightCorner = Instance.new("UICorner")
-HighlightCorner.CornerRadius = UDim.new(0, 6)
-HighlightCorner.Parent = HighlightBtn
-
 local FOVInput = Instance.new("TextBox")
 FOVInput.Size = UDim2.new(0.8, 0, 0, 30)
-FOVInput.Position = UDim2.new(0.1, 0, 0.75, 0)
+FOVInput.Position = UDim2.new(0.1, 0, 0.6, 0)
 FOVInput.Text = tostring(FOV)
 FOVInput.PlaceholderText = "输入FOV值"
 FOVInput.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
@@ -285,6 +293,7 @@ FOVInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 FOVInput.BorderSizePixel = 0
 FOVInput.Font = Enum.Font.Gotham
 FOVInput.Parent = Frame
+table.insert(UIElements, FOVInput)
 
 local FOVInputCorner = Instance.new("UICorner")
 FOVInputCorner.CornerRadius = UDim.new(0, 6)
@@ -292,7 +301,7 @@ FOVInputCorner.Parent = FOVInput
 
 local SingleTargetBtn = Instance.new("TextButton")
 SingleTargetBtn.Size = UDim2.new(0.8, 0, 0, 30)
-SingleTargetBtn.Position = UDim2.new(0.1, 0, 0.9, 0)
+SingleTargetBtn.Position = UDim2.new(0.1, 0, 0.75, 0)
 SingleTargetBtn.Text = "🔒 单锁一人: 开启"
 SingleTargetBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 SingleTargetBtn.BackgroundTransparency = 0.2
@@ -300,10 +309,39 @@ SingleTargetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 SingleTargetBtn.BorderSizePixel = 0
 SingleTargetBtn.Font = Enum.Font.Gotham
 SingleTargetBtn.Parent = Frame
+table.insert(UIElements, SingleTargetBtn)
 
 local SingleCorner = Instance.new("UICorner")
 SingleCorner.CornerRadius = UDim.new(0, 6)
 SingleCorner.Parent = SingleTargetBtn
+
+-- 展开/收起功能实现
+local function toggleUI()
+    isExpanded = not isExpanded
+    
+    if isExpanded then
+        -- 展开UI
+        Frame.Size = UDim2.new(0, 220, 0, 280)
+        ToggleButton.Text = "▲"
+        
+        for _, element in pairs(UIElements) do
+            element.Visible = true
+        end
+    else
+        -- 收起UI
+        Frame.Size = UDim2.new(0, 220, 0, 30)
+        ToggleButton.Text = "▼"
+        
+        for _, element in pairs(UIElements) do
+            if element ~= Title then
+                element.Visible = false
+            end
+        end
+    end
+end
+
+-- 绑定展开/收起按钮事件
+ToggleButton.MouseButton1Click:Connect(toggleUI)
 
 FOVInput.FocusLost:Connect(function(enterPressed)
     if enterPressed then
@@ -422,11 +460,6 @@ WallCheckBtn.MouseButton1Click:Connect(function()
     WallCheckBtn.Text = "🧱 建筑检测: " .. (WallCheck and "开启" or "关闭")
 end)
 
-HighlightBtn.MouseButton1Click:Connect(function()
-    HighlightESP = not HighlightESP
-    HighlightBtn.Text = "🌟 高亮轮廓: " .. (HighlightESP and "开启" or "关闭")
-end)
-
 SingleTargetBtn.MouseButton1Click:Connect(function()
     LockSingleTarget = not LockSingleTarget
     SingleTargetBtn.Text = "🔒 单锁一人: " .. (LockSingleTarget and "开启" or "关闭")
@@ -453,9 +486,8 @@ UIS.InputBegan:Connect(function(input, processed)
     elseif input.KeyCode == Enum.KeyCode.B then
         WallCheck = not WallCheck
         WallCheckBtn.Text = "🧱 建筑检测: " .. (WallCheck and "开启" or "关闭")
-    elseif input.KeyCode == Enum.KeyCode.H then
-        HighlightESP = not HighlightESP
-        HighlightBtn.Text = "🌟 高亮轮廓: " .. (HighlightESP and "开启" or "关闭")
+    elseif input.KeyCode == Enum.KeyCode.U then
+        toggleUI()
     end
 end)
 
@@ -534,4 +566,4 @@ print("单锁模式:", LockSingleTarget)
 print("自瞄状态:", Enabled)
 print("ESP状态:", ESPEnabled)
 print("建筑检测:", WallCheck)
-print("高亮轮廓:", HighlightESP)
+print("按U键展开/收起UI")

@@ -266,7 +266,7 @@ game.DescendantAdded:Connect(function(descendant)
     if TranslationEnabled and (descendant:IsA("TextLabel") or descendant:IsA("TextButton") or descendant:IsA("TextBox")) then
         task.delay(0.3, function()
             pcall(translateTextElement, descendant)
-        end
+        end)
     end
 end)
 

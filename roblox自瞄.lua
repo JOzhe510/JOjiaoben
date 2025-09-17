@@ -9,9 +9,10 @@ local Camera = workspace.CurrentCamera
 local FOV = 80
 local Prediction = 0.15
 local Smoothness = 0.8
-local WallCheck = true
+local WallCheck = false
 local Enabled = true
 local LockedTarget = nil
+local LockSingleTarget = true  -- 单目标锁定模式默认开启
 
 -- 屏幕中心
 local ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
@@ -33,12 +34,12 @@ ScreenGui.Name = "AimBotUI"
 ScreenGui.ResetOnSpawn = false
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 200, 0, 150)
+Frame.Size = UDim2.new(0, 200, 0, 180)
 Frame.Position = UDim2.new(0, 10, 0, 10)
 Frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 Frame.BorderSizePixel = 0
 Frame.Active = true
-Frame.Draggable = true  -- 使UI可拖动
+Frame.Draggable = true
 Frame.Parent = ScreenGui
 
 local Title = Instance.new("TextLabel")
@@ -51,7 +52,7 @@ Title.Parent = Frame
 
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0.8, 0, 0, 30)
-ToggleBtn.Position = UDim2.new(0.1, 0, 0.3, 0)
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.2, 0)
 ToggleBtn.Text = "Enabled: ON"
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -60,17 +61,26 @@ ToggleBtn.Parent = Frame
 
 local WallCheckBtn = Instance.new("TextButton")
 WallCheckBtn.Size = UDim2.new(0.8, 0, 0, 30)
-WallCheckBtn.Position = UDim2.new(0.1, 0, 0.6, 0)
-WallCheckBtn.Text = "WallCheck: ON"
+WallCheckBtn.Position = UDim2.new(0.1, 0, 0.45, 0)
+WallCheckBtn.Text = "WallCheck: OFF"
 WallCheckBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 WallCheckBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 WallCheckBtn.BorderSizePixel = 0
 WallCheckBtn.Parent = Frame
 
+local SingleTargetBtn = Instance.new("TextButton")
+SingleTargetBtn.Size = UDim2.new(0.8, 0, 0, 30)
+SingleTargetBtn.Position = UDim2.new(0.1, 0, 0.7, 0)
+SingleTargetBtn.Text = "SingleTarget: ON"  -- 默认显示开启
+SingleTargetBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+SingleTargetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SingleTargetBtn.BorderSizePixel = 0
+SingleTargetBtn.Parent = Frame
+
 -- 优化性能的变量
 local lastTarget = nil
 local lastTargetTime = 0
-local targetCacheDuration = 0.1 -- 缓存目标0.1秒
+local targetCacheDuration = 0.1
 
 -- 墙壁检测函数
 function CheckWall(target)
@@ -88,6 +98,19 @@ end
 
 -- 获取目标头部
 function GetTarget()
+    -- 单目标锁定模式下，如果已有锁定目标且目标有效，直接返回
+    if LockSingleTarget and LockedTarget then
+        if LockedTarget.Parent and LockedTarget.Parent:FindFirstChild("Humanoid") and 
+           LockedTarget.Parent.Humanoid.Health > 0 then
+            local screenPos, onScreen = Camera:WorldToViewportPoint(LockedTarget.Position)
+            if onScreen and CheckWall(LockedTarget) then
+                return LockedTarget
+            end
+        else
+            LockedTarget = nil  -- 目标无效则清除锁定
+        end
+    end
+    
     -- 使用缓存的目标以减少计算量
     if lastTarget and tick() - lastTargetTime < targetCacheDuration then
         if lastTarget.Parent and lastTarget.Parent:FindFirstChild("Humanoid") and lastTarget.Parent.Humanoid.Health > 0 then
@@ -118,6 +141,10 @@ function GetTarget()
     if closest then
         lastTarget = closest
         lastTargetTime = tick()
+        -- 单目标模式下锁定第一个找到的目标
+        if LockSingleTarget and not LockedTarget then
+            LockedTarget = closest
+        end
     end
     
     return closest
@@ -155,6 +182,15 @@ WallCheckBtn.MouseButton1Click:Connect(function()
     WallCheckBtn.Text = "WallCheck: " .. (WallCheck and "ON" or "OFF")
 end)
 
+SingleTargetBtn.MouseButton1Click:Connect(function()
+    LockSingleTarget = not LockSingleTarget
+    SingleTargetBtn.Text = "SingleTarget: " .. (LockSingleTarget and "ON" or "OFF")
+    -- 切换模式时清除锁定目标
+    if not LockSingleTarget then
+        LockedTarget = nil
+    end
+end)
+
 -- 键盘开关
 UIS.InputBegan:Connect(function(input, processed)
     if processed then return end
@@ -163,6 +199,9 @@ UIS.InputBegan:Connect(function(input, processed)
         Enabled = not Enabled
         Circle.Visible = Enabled
         ToggleBtn.Text = "Enabled: " .. (Enabled and "ON" or "OFF")
+    elseif input.KeyCode == Enum.KeyCode.T then
+        -- T键切换锁定目标
+        LockedTarget = nil
     end
 end)
 

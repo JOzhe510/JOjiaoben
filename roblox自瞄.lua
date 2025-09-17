@@ -150,7 +150,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 250, 0, 280)
+Frame.Size = UDim2.new(0, 220, 0, 230)
 Frame.Position = UDim2.new(0, 10, 0, 10)
 Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 Frame.BackgroundTransparency = 0.2
@@ -179,7 +179,7 @@ TitleCorner.Parent = Title
 
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0.8, 0, 0, 30)
-ToggleBtn.Position = UDim2.new(0.1, 0, 0.15, 0)
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.2, 0)
 ToggleBtn.Text = "🎯 自瞄: 开启"
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 ToggleBtn.BackgroundTransparency = 0.2
@@ -194,7 +194,7 @@ ToggleCorner.Parent = ToggleBtn
 
 local ESPToggleBtn = Instance.new("TextButton")
 ESPToggleBtn.Size = UDim2.new(0.8, 0, 0, 30)
-ESPToggleBtn.Position = UDim2.new(0.1, 0, 0.3, 0)
+ESPToggleBtn.Position = UDim2.new(0.1, 0, 0.35, 0)
 ESPToggleBtn.Text = "👁 ESP: 开启"
 ESPToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 ESPToggleBtn.BackgroundTransparency = 0.2
@@ -209,7 +209,7 @@ ESPToggleCorner.Parent = ESPToggleBtn
 
 local FOVInput = Instance.new("TextBox")
 FOVInput.Size = UDim2.new(0.8, 0, 0, 30)
-FOVInput.Position = UDim2.new(0.1, 0, 0.45, 0)
+FOVInput.Position = UDim2.new(0.1, 0, 0.5, 0)
 FOVInput.Text = tostring(FOV)
 FOVInput.PlaceholderText = "输入FOV值"
 FOVInput.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
@@ -225,7 +225,7 @@ FOVInputCorner.Parent = FOVInput
 
 local SingleTargetBtn = Instance.new("TextButton")
 SingleTargetBtn.Size = UDim2.new(0.8, 0, 0, 30)
-SingleTargetBtn.Position = UDim2.new(0.1, 0, 0.6, 0)
+SingleTargetBtn.Position = UDim2.new(0.1, 0, 0.65, 0)
 SingleTargetBtn.Text = "🔒 单锁一人: 开启"
 SingleTargetBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 SingleTargetBtn.BackgroundTransparency = 0.2
@@ -237,16 +237,6 @@ SingleTargetBtn.Parent = Frame
 local SingleCorner = Instance.new("UICorner")
 SingleCorner.CornerRadius = UDim.new(0, 6)
 SingleCorner.Parent = SingleTargetBtn
-
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(0.8, 0, 0, 40)
-StatusLabel.Position = UDim2.new(0.1, 0, 0.75, 0)
-StatusLabel.Text = "状态: 等待目标"
-StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.TextWrapped = true
-StatusLabel.Parent = Frame
 
 FOVInput.FocusLost:Connect(function(enterPressed)
     if enterPressed then
@@ -282,12 +272,10 @@ function GetTarget()
                 return Camera:WorldToViewportPoint(LockedTarget.Position)
             end)
             if success and screenPos and screenPos.Z > 0 then
-                StatusLabel.Text = "状态: 锁定目标中"
                 return LockedTarget
             end
         else
             LockedTarget = nil
-            StatusLabel.Text = "状态: 目标失效"
         end
     end
     
@@ -316,7 +304,6 @@ function GetTarget()
         LockedTarget = closest
     end
     
-    StatusLabel.Text = closest and "状态: 发现目标" or "状态: 无目标"
     return closest
 end
 
@@ -378,12 +365,10 @@ UIS.InputBegan:Connect(function(input, processed)
         ToggleBtn.Text = "🎯 自瞄: " .. (Enabled and "开启" or "关闭")
     elseif input.KeyCode == Enum.KeyCode.T then
         LockedTarget = nil
-        StatusLabel.Text = "状态: 取消锁定"
     elseif input.KeyCode == Enum.KeyCode.F then
         local target = GetTarget()
         if target then
             LockedTarget = target
-            StatusLabel.Text = "状态: 手动锁定目标"
         end
     elseif input.KeyCode == Enum.KeyCode.V then
         ESPEnabled = not ESPEnabled
@@ -414,7 +399,6 @@ Players.PlayerRemoving:Connect(function(player)
             local targetPlayer = Players:GetPlayerFromCharacter(LockedTarget.Parent)
             if targetPlayer == player then
                 LockedTarget = nil
-                StatusLabel.Text = "状态: 目标退出"
             end
         end
     end

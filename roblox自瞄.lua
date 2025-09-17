@@ -44,7 +44,7 @@ Frame.Parent = ScreenGui
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Text = "AimBot Control"
+Title.Text = "自瞄面板"
 Title.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.BorderSizePixel = 0
@@ -53,7 +53,7 @@ Title.Parent = Frame
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0.8, 0, 0, 30)
 ToggleBtn.Position = UDim2.new(0.1, 0, 0.2, 0)
-ToggleBtn.Text = "Enabled: ON"
+ToggleBtn.Text = "自瞄: 开启"
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleBtn.BorderSizePixel = 0
@@ -62,7 +62,7 @@ ToggleBtn.Parent = Frame
 local WallCheckBtn = Instance.new("TextButton")
 WallCheckBtn.Size = UDim2.new(0.8, 0, 0, 30)
 WallCheckBtn.Position = UDim2.new(0.1, 0, 0.45, 0)
-WallCheckBtn.Text = "WallCheck: OFF"
+WallCheckBtn.Text = "墙壁检测: 未开启"
 WallCheckBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 WallCheckBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 WallCheckBtn.BorderSizePixel = 0
@@ -71,7 +71,7 @@ WallCheckBtn.Parent = Frame
 local SingleTargetBtn = Instance.new("TextButton")
 SingleTargetBtn.Size = UDim2.new(0.8, 0, 0, 30)
 SingleTargetBtn.Position = UDim2.new(0.1, 0, 0.7, 0)
-SingleTargetBtn.Text = "SingleTarget: ON"  -- 默认显示开启
+SingleTargetBtn.Text = "单锁一人直至死亡: 开启"  -- 默认显示开启
 SingleTargetBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
 SingleTargetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 SingleTargetBtn.BorderSizePixel = 0
@@ -174,17 +174,17 @@ end)
 ToggleBtn.MouseButton1Click:Connect(function()
     Enabled = not Enabled
     Circle.Visible = Enabled
-    ToggleBtn.Text = "Enabled: " .. (Enabled and "ON" or "OFF")
+    ToggleBtn.Text = "自瞄: " .. (Enabled and "开启" or "未开启")
 end)
 
 WallCheckBtn.MouseButton1Click:Connect(function()
     WallCheck = not WallCheck
-    WallCheckBtn.Text = "WallCheck: " .. (WallCheck and "ON" or "OFF")
+    WallCheckBtn.Text = "墙壁检测: " .. (WallCheck and "ON" or "未开启")
 end)
 
 SingleTargetBtn.MouseButton1Click:Connect(function()
     LockSingleTarget = not LockSingleTarget
-    SingleTargetBtn.Text = "SingleTarget: " .. (LockSingleTarget and "ON" or "OFF")
+    SingleTargetBtn.Text = "单锁一人直至死亡: " .. (LockSingleTarget and "开启" or "未开启")
     -- 切换模式时清除锁定目标
     if not LockSingleTarget then
         LockedTarget = nil
@@ -198,7 +198,7 @@ UIS.InputBegan:Connect(function(input, processed)
     if input.KeyCode == Enum.KeyCode.Q then
         Enabled = not Enabled
         Circle.Visible = Enabled
-        ToggleBtn.Text = "Enabled: " .. (Enabled and "ON" or "OFF")
+        ToggleBtn.Text = "自瞄: " .. (Enabled and "开启" or "未开启")
     elseif input.KeyCode == Enum.KeyCode.T then
         -- T键切换锁定目标
         LockedTarget = nil

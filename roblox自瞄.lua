@@ -18,6 +18,7 @@ local LockedTarget = nil
 local LockSingleTarget = true
 local ESPEnabled = true
 local WallCheck = true
+local PredictionEnabled = true -- 新增：预判开关
 
 local ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 
@@ -33,6 +34,10 @@ Circle.Filled = false
 
 local ESPObjects = {}
 local Highlights = {}
+
+-- 存储目标历史位置用于预判计算
+local TargetHistory = {}
+local MAX_HISTORY = 10 -- 存储最近10帧的位置数据
 
 -- 建筑检测函数
 local function isVisible(part)
@@ -186,7 +191,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 220, 0, 280)
+Frame.Size = UDim2.new(0, 220, 0, 310) -- 增加高度以容纳新按钮
 Frame.Position = UDim2.new(0, 10, 0, 10)
 Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 Frame.BackgroundTransparency = 0.2
@@ -221,7 +226,7 @@ local isExpanded = true
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Text = "🔥 自瞄面板 🔥"
+Title.Text = "🔥 预判自瞄面板 🔥"
 Title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 Title.BackgroundTransparency = 0.3
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -236,7 +241,7 @@ TitleCorner.Parent = Title
 
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0.8, 0, 0, 30)
-ToggleBtn.Position = UDim2.new(0.1, 0, 0.15, 0)
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.12, 0)
 ToggleBtn.Text = "🎯 自瞄: 开启"
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 ToggleBtn.BackgroundTransparency = 0.2
@@ -252,7 +257,7 @@ ToggleCorner.Parent = ToggleBtn
 
 local ESPToggleBtn = Instance.new("TextButton")
 ESPToggleBtn.Size = UDim2.new(0.8, 0, 0, 30)
-ESPToggleBtn.Position = UDim2.new(0.1, 0, 0.3, 0)
+ESPToggleBtn.Position = UDim2.new(0.1, 0, 0.24, 0)
 ESPToggleBtn.Text = "👁 ESP: 开启"
 ESPToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 ESPToggleBtn.BackgroundTransparency = 0.2
@@ -268,7 +273,7 @@ ESPToggleCorner.Parent = ESPToggleBtn
 
 local WallCheckBtn = Instance.new("TextButton")
 WallCheckBtn.Size = UDim2.new(0.8, 0, 0, 30)
-WallCheckBtn.Position = UDim2.new(0.1, 0, 0.45, 0)
+WallCheckBtn.Position = UDim2.new(0.1, 0, 0.36, 0)
 WallCheckBtn.Text = "🧱 建筑检测: 开启"
 WallCheckBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 WallCheckBtn.BackgroundTransparency = 0.2
@@ -281,6 +286,23 @@ table.insert(UIElements, WallCheckBtn)
 local WallCheckCorner = Instance.new("UICorner")
 WallCheckCorner.CornerRadius = UDim.new(0, 6)
 WallCheckCorner.Parent = WallCheckBtn
+
+-- 新增预判开关按钮
+local PredictionBtn = Instance.new("TextButton")
+PredictionBtn.Size = UDim2.new(0.8, 0, 0, 30)
+PredictionBtn.Position = UDim2.new(0.1, 0, 0.48, 0)
+PredictionBtn.Text = "🚀 预判模式: 开启"
+PredictionBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+PredictionBtn.BackgroundTransparency = 0.2
+PredictionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+PredictionBtn.BorderSizePixel = 0
+PredictionBtn.Font = Enum.Font.Gotham
+PredictionBtn.Parent = Frame
+table.insert(UIElements, PredictionBtn)
+
+local PredictionCorner = Instance.new("UICorner")
+PredictionCorner.CornerRadius = UDim.new(0, 6)
+PredictionCorner.Parent = PredictionBtn
 
 local FOVInput = Instance.new("TextBox")
 FOVInput.Size = UDim2.new(0.8, 0, 0, 30)
@@ -299,9 +321,26 @@ local FOVInputCorner = Instance.new("UICorner")
 FOVInputCorner.CornerRadius = UDim.new(0, 6)
 FOVInputCorner.Parent = FOVInput
 
+local PredictionInput = Instance.new("TextBox")
+PredictionInput.Size = UDim2.new(0.8, 0, 0, 30)
+PredictionInput.Position = UDim2.new(0.1, 0, 0.72, 0)
+PredictionInput.Text = tostring(Prediction)
+PredictionInput.PlaceholderText = "预判系数 (0.1-0.5)"
+PredictionInput.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+PredictionInput.BackgroundTransparency = 0.2
+PredictionInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+PredictionInput.BorderSizePixel = 0
+PredictionInput.Font = Enum.Font.Gotham
+PredictionInput.Parent = Frame
+table.insert(UIElements, PredictionInput)
+
+local PredictionInputCorner = Instance.new("UICorner")
+PredictionInputCorner.CornerRadius = UDim.new(0, 6)
+PredictionInputCorner.Parent = PredictionInput
+
 local SingleTargetBtn = Instance.new("TextButton")
 SingleTargetBtn.Size = UDim2.new(0.8, 0, 0, 30)
-SingleTargetBtn.Position = UDim2.new(0.1, 0, 0.75, 0)
+SingleTargetBtn.Position = UDim2.new(0.1, 0, 0.84, 0)
 SingleTargetBtn.Text = "🔒 单锁一人: 开启"
 SingleTargetBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 SingleTargetBtn.BackgroundTransparency = 0.2
@@ -321,7 +360,7 @@ local function toggleUI()
     
     if isExpanded then
         -- 展开UI
-        Frame.Size = UDim2.new(0, 220, 0, 280)
+        Frame.Size = UDim2.new(0, 220, 0, 310)
         ToggleButton.Text = "▲"
         
         for _, element in pairs(UIElements) do
@@ -356,6 +395,18 @@ FOVInput.FocusLost:Connect(function(enterPressed)
     end
 end)
 
+PredictionInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local newPrediction = tonumber(PredictionInput.Text)
+        if newPrediction and newPrediction >= 0.1 and newPrediction <= 0.5 then
+            Prediction = newPrediction
+            PredictionInput.Text = tostring(Prediction)
+        else
+            PredictionInput.Text = tostring(Prediction)
+        end
+    end
+end)
+
 function IsTargetValid(target)
     if not target or not target.Parent then return false end
     if not target:IsA("BasePart") then return false end
@@ -368,6 +419,60 @@ function IsTargetValid(target)
     end)
     
     return success and health > 0 and isVisible(target)
+end
+
+-- 计算预判位置
+local function CalculatePredictedPosition(target)
+    if not target or not PredictionEnabled then
+        return target and target.Position or nil
+    end
+    
+    local player = Players:GetPlayerFromCharacter(target.Parent)
+    if not player then return target.Position end
+    
+    -- 获取目标历史位置
+    if not TargetHistory[player] then
+        TargetHistory[player] = {}
+    end
+    
+    local history = TargetHistory[player]
+    table.insert(history, {
+        position = target.Position,
+        time = tick()
+    })
+    
+    -- 保持历史记录长度
+    while #history > MAX_HISTORY do
+        table.remove(history, 1)
+    end
+    
+    -- 如果有足够的历史数据来计算速度
+    if #history >= 2 then
+        local latest = history[#history]
+        local previous = history[#history - 1]
+        
+        local timeDiff = latest.time - previous.time
+        if timeDiff > 0 then
+            -- 计算速度向量
+            local velocity = (latest.position - previous.position) / timeDiff
+            
+            -- 计算到目标的距离
+            local distance = (target.Position - Camera.CFrame.Position).Magnitude
+            
+            -- 根据距离和预判系数计算预判位置
+            local predictedPosition = target.Position + (velocity * Prediction * distance)
+            
+            return predictedPosition
+        end
+    end
+    
+    -- 如果没有足够的历史数据，使用简单的速度预测
+    if target.Velocity.Magnitude > 0 then
+        local distance = (target.Position - Camera.CFrame.Position).Magnitude
+        return target.Position + (target.Velocity * Prediction * distance)
+    end
+    
+    return target.Position
 end
 
 function GetTarget()
@@ -415,8 +520,11 @@ end
 local function AimToTarget(target)
     if not target or not target:IsA("BasePart") then return false end
     
+    -- 计算预判位置
+    local predictedPosition = CalculatePredictedPosition(target)
+    
     local success, targetPos = pcall(function()
-        return target.Position + (target.Velocity * Prediction)
+        return predictedPosition
     end)
     if not success then return false end
     
@@ -460,6 +568,11 @@ WallCheckBtn.MouseButton1Click:Connect(function()
     WallCheckBtn.Text = "🧱 建筑检测: " .. (WallCheck and "开启" or "关闭")
 end)
 
+PredictionBtn.MouseButton1Click:Connect(function()
+    PredictionEnabled = not PredictionEnabled
+    PredictionBtn.Text = "🚀 预判模式: " .. (PredictionEnabled and "开启" or "关闭")
+end)
+
 SingleTargetBtn.MouseButton1Click:Connect(function()
     LockSingleTarget = not LockSingleTarget
     SingleTargetBtn.Text = "🔒 单锁一人: " .. (LockSingleTarget and "开启" or "关闭")
@@ -486,6 +599,9 @@ UIS.InputBegan:Connect(function(input, processed)
     elseif input.KeyCode == Enum.KeyCode.B then
         WallCheck = not WallCheck
         WallCheckBtn.Text = "🧱 建筑检测: " .. (WallCheck and "开启" or "关闭")
+    elseif input.KeyCode == Enum.KeyCode.P then
+        PredictionEnabled = not PredictionEnabled
+        PredictionBtn.Text = "🚀 预判模式: " .. (PredictionEnabled and "开启" or "关闭")
     elseif input.KeyCode == Enum.KeyCode.U then
         toggleUI()
     end
@@ -520,6 +636,8 @@ Players.PlayerRemoving:Connect(function(player)
                 LockedTarget = nil
             end
         end
+        -- 移除历史数据
+        TargetHistory[player] = nil
     end
 end)
 
@@ -560,10 +678,13 @@ game:BindToClose(function()
     end
 end)
 
-print("自瞄脚本加载完成")
+print("预判自瞄脚本加载完成")
 print("FOV:", FOV)
+print("预判系数:", Prediction)
+print("预判模式:", PredictionEnabled)
 print("单锁模式:", LockSingleTarget)
 print("自瞄状态:", Enabled)
 print("ESP状态:", ESPEnabled)
 print("建筑检测:", WallCheck)
+print("按P键切换预判模式")
 print("按U键展开/收起UI")

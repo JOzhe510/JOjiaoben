@@ -6,6 +6,12 @@ local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
+-- 等待本地玩家加载
+while not LocalPlayer do
+    Players.PlayerAdded:Wait()
+    LocalPlayer = Players.LocalPlayer
+end
+
 -- 配置参数
 local FOV = 80
 local Prediction = 0.15
@@ -13,7 +19,7 @@ local Smoothness = 0.8
 local Enabled = true
 local LockedTarget = nil
 local LockSingleTarget = true
-local ESPEnabled = true -- 新增：ESP开关
+local ESPEnabled = true
 
 -- 屏幕中心
 local ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
@@ -27,13 +33,14 @@ Circle.Thickness = 2
 Circle.Position = ScreenCenter
 Circle.Transparency = 1
 Circle.NumSides = 64
+Circle.Filled = false
 
 -- 存储ESP对象的表
 local ESPObjects = {}
 
 -- ESP结构
 local function createESP(player)
-    if ESPObjects[player] then return end
+    if ESPObjects[player] then return ESPObjects[player] end
     
     local esp = {
         player = player,
@@ -83,7 +90,14 @@ end
 
 -- 更新ESP
 local function updateESP()
-    if not ESPEnabled then return end
+    if not ESPEnabled then 
+        for _, esp in pairs(ESPObjects) do
+            esp.nameText.Visible = false
+            esp.healthText.Visible = false
+            esp.box.Visible = false
+        end
+        return 
+    end
     
     for player, esp in pairs(ESPObjects) do
         if player ~= LocalPlayer and player.Character then
@@ -95,11 +109,12 @@ local function updateESP()
                     return Camera:WorldToViewportPoint(head.Position)
                 end)
                 
-                if success and screenPosition.Z > 0 then
+                if success and screenPosition and screenPosition.Z > 0 then
                     -- 计算方框尺寸
                     local characterSize = player.Character:GetExtentsSize()
-                    local width = 100 / screenPosition.Z * 2
-                    local height = characterSize.Y / screenPosition.Z * 2
+                    local scale = 100 / screenPosition.Z
+                    local width = scale * 2
+                    local height = characterSize.Y / screenPosition.Z * 2.5
                     
                     -- 更新方框
                     esp.box.Size = Vector2.new(width, height)
@@ -120,6 +135,7 @@ local function updateESP()
                     local color = Color3.fromRGB(255 * (1 - healthPercent), 255 * healthPercent, 0)
                     esp.healthText.Color = color
                     esp.box.Color = color
+                    esp.nameText.Color = color
                     
                     esp.visible = true
                 else
@@ -151,7 +167,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 220, 0, 230) -- 增加高度以容纳ESP按钮
+Frame.Size = UDim2.new(0, 220, 0, 230)
 Frame.Position = UDim2.new(0, 10, 0, 10)
 Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 Frame.BackgroundTransparency = 0.2
@@ -457,13 +473,6 @@ end)
 ESPToggleBtn.MouseButton1Click:Connect(function()
     ESPEnabled = not ESPEnabled
     ESPToggleBtn.Text = "👁 ESP: " .. (ESPEnabled and "开启" or "关闭")
-    
-    -- 隐藏所有ESP对象
-    for _, esp in pairs(ESPObjects) do
-        esp.nameText.Visible = false
-        esp.healthText.Visible = false
-        esp.box.Visible = false
-    end
 end)
 
 SingleTargetBtn.MouseButton1Click:Connect(function()
@@ -475,7 +484,6 @@ end)
 -- 键盘控制
 UIS.InputBegan:Connect(function(input, processed)
     if processed then return end
-    if not LocalPlayer or not LocalPlayer.Character then return end
     
     if input.KeyCode == Enum.KeyCode.Q then
         Enabled = not Enabled
@@ -491,13 +499,6 @@ UIS.InputBegan:Connect(function(input, processed)
     elseif input.KeyCode == Enum.KeyCode.V then
         ESPEnabled = not ESPEnabled
         ESPToggleBtn.Text = "👁 ESP: " .. (ESPEnabled and "开启" or "关闭")
-        
-        -- 隐藏所有ESP对象
-        for _, esp in pairs(ESPObjects) do
-            esp.nameText.Visible = false
-            esp.healthText.Visible = false
-            esp.box.Visible = false
-        end
     end
 end)
 

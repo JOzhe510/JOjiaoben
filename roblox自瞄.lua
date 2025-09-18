@@ -90,49 +90,6 @@ local function ClearESP()
     ESPConnections = {}
 end
 
--- ==================== ESP功能 ====================
-local function UpdateESP()
-    -- 先清理现有的ESP
-    ClearESP()
-    
-    if not ESPEnabled then return end
-
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and IsEnemy(player) then
-            -- 为每个玩家创建连接来监听角色变化
-            local connections = {}
-            
-            -- 监听玩家角色添加
-            local characterAddedConn = player.CharacterAdded:Connect(function(character)
-                task.wait(0.5) -- 等待角色完全加载
-                if ESPEnabled then
-                    CreateESPForCharacter(player, character)
-                end
-            end)
-            
-            table.insert(connections, characterAddedConn)
-            
-            -- 监听玩家角色移除
-            local characterRemovingConn = player.CharacterRemoving:Connect(function()
-                if ESPEnabled then
-                    ClearESP()
-                    UpdateESP() -- 重新创建ESP
-                end
-            end)
-            
-            table.insert(connections, characterRemovingConn)
-            
-            -- 存储连接
-            ESPConnections[player] = connections
-            
-            -- 如果玩家已经有角色，立即创建ESP
-            if player.Character then
-                CreateESPForCharacter(player, player.Character)
-            end
-        end
-    end
-end
-
 -- ==================== 为角色创建ESP ====================
 local function CreateESPForCharacter(player, character)
     local humanoid = character:WaitForChild("Humanoid", 5)
@@ -158,27 +115,6 @@ local function CreateESPForCharacter(player, character)
     label.Outline = true
     label.OutlineColor = Color3.fromRGB(0, 0, 0)
     label.ZIndex = 2
-    
-    -- 监听人类状态变化
-    local humanoidDiedConn = humanoid.Died:Connect(function()
-        box.Visible = false
-        label.Visible = false
-    end)
-    
-    local humanoidSpawnedConn
-    if humanoid:GetState() == Enum.HumanoidStateType.Dead then
-        box.Visible = false
-        label.Visible = false
-    else
-        humanoidSpawnedConn = humanoid:GetPropertyChangedSignal("Health"):Connect(function()
-            if humanoid.Health > 0 then
-                label.Text = player.Name .. " [" .. math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth) .. "]"
-            else
-                box.Visible = false
-                label.Visible = false
-            end
-        end)
-    end
     
     -- 更新函数
     local function updateESP()
@@ -212,19 +148,82 @@ local function CreateESPForCharacter(player, character)
     end
     
     -- 存储ESP对象
-    local espId = player.UserId .. "_" .. os.clock()
+    local espId = player.UserId
     ESPBoxes[espId] = {box = box, update = updateESP, player = player}
     ESPLabels[espId] = {label = label, update = updateESP, player = player}
     
     -- 初始更新
     updateESP()
     
-    -- 存储人类状态连接
-    if humanoidDiedConn then
-        table.insert(ESPConnections[player] or {}, humanoidDiedConn)
+    -- 监听人类状态变化
+    local humanoidDiedConn = humanoid.Died:Connect(function()
+        box.Visible = false
+        label.Visible = false
+    end)
+    
+    local humanoidHealthConn = humanoid:GetPropertyChangedSignal("Health"):Connect(function()
+        if humanoid.Health > 0 then
+            updateESP()
+        else
+            box.Visible = false
+            label.Visible = false
+        end
+    end)
+    
+    -- 存储连接
+    if not ESPConnections[player] then
+        ESPConnections[player] = {}
     end
-    if humanoidSpawnedConn then
-        table.insert(ESPConnections[player] or {}, humanoidSpawnedConn)
+    table.insert(ESPConnections[player], humanoidDiedConn)
+    table.insert(ESPConnections[player], humanoidHealthConn)
+end
+
+-- ==================== ESP功能 ====================
+local function UpdateESP()
+    -- 先清理现有的ESP
+    ClearESP()
+    
+    if not ESPEnabled then return end
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and IsEnemy(player) then
+            -- 为每个玩家创建连接来监听角色变化
+            local connections = {}
+            
+            -- 监听玩家角色添加
+            local characterAddedConn = player.CharacterAdded:Connect(function(character)
+                task.wait(0.5) -- 等待角色完全加载
+                if ESPEnabled and IsEnemy(player) then
+                    CreateESPForCharacter(player, character)
+                end
+            end)
+            
+            table.insert(connections, characterAddedConn)
+            
+            -- 监听玩家角色移除
+            local characterRemovingConn = player.CharacterRemoving:Connect(function()
+                -- 只移除该玩家的ESP，而不是全部
+                local espId = player.UserId
+                if ESPBoxes[espId] then
+                    pcall(function() ESPBoxes[espId].box:Remove() end)
+                    ESPBoxes[espId] = nil
+                end
+                if ESPLabels[espId] then
+                    pcall(function() ESPLabels[espId].label:Remove() end)
+                    ESPLabels[espId] = nil
+                end
+            end)
+            
+            table.insert(connections, characterRemovingConn)
+            
+            -- 存储连接
+            ESPConnections[player] = connections
+            
+            -- 如果玩家已经有角色，立即创建ESP
+            if player.Character and ESPEnabled and IsEnemy(player) then
+                CreateESPForCharacter(player, player.Character)
+            end
+        end
     end
 end
 
@@ -614,18 +613,14 @@ end)
 
 Players.PlayerRemoving:Connect(function(player)
     -- 清理该玩家的ESP资源
-    for id, espData in pairs(ESPBoxes) do
-        if espData.player == player then
-            pcall(function() espData.box:Remove() end)
-            ESPBoxes[id] = nil
-        end
+    local espId = player.UserId
+    if ESPBoxes[espId] then
+        pcall(function() ESPBoxes[espId].box:Remove() end)
+        ESPBoxes[espId] = nil
     end
-    
-    for id, labelData in pairs(ESPLabels) do
-        if labelData.player == player then
-            pcall(function() labelData.label:Remove() end)
-            ESPLabels[id] = nil
-        end
+    if ESPLabels[espId] then
+        pcall(function() ESPLabels[espId].label:Remove() end)
+        ESPLabels[espId] = nil
     end
     
     -- 清理连接

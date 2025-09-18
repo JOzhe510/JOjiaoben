@@ -13,7 +13,7 @@ end
 -- ==================== 参数设置 ====================
 local FOV = 90
 local Prediction = 0.15
-local Smoothness = 0.7
+local Smoothness = 0.9
 local Enabled = true
 local LockedTarget = nil
 local LockSingleTarget = false

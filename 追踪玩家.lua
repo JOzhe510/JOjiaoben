@@ -32,7 +32,7 @@ end
 -- 主框架
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 320, 0, 60) -- 初始高度较小
-mainFrame.Position = UDim2.new(0, 10, 0.5, -30)
+mainFrame.Position = UDim2.new(0, 10, 0, 10)
 mainFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 mainFrame.BorderSizePixel = 0
 mainFrame.ClipsDescendants = true
@@ -40,7 +40,24 @@ mainFrame.Parent = screenGui
 createCorner(mainFrame, 12)
 createStroke(mainFrame)
 
--- 标题栏（可点击展开/收起）
+-- 拖动功能变量
+local dragging = false
+local dragInput
+local dragStart
+local startPos
+
+-- 拖动功能
+local function updateInput(input)
+    local delta = input.Position - dragStart
+    mainFrame.Position = UDim2.new(
+        startPos.X.Scale, 
+        startPos.X.Offset + delta.X,
+        startPos.Y.Scale, 
+        startPos.Y.Offset + delta.Y
+    )
+end
+
+-- 标题栏（可点击展开/收起和拖动）
 local titleBar = Instance.new("TextButton")
 titleBar.Size = UDim2.new(1, 0, 0, 40)
 titleBar.Position = UDim2.new(0, 0, 0, 0)
@@ -49,6 +66,36 @@ titleBar.Text = ""
 titleBar.AutoButtonColor = false
 titleBar.Parent = mainFrame
 createCorner(titleBar, 12)
+
+-- 拖动开始事件
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+        
+        -- 捕获鼠标移动
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+-- 拖动事件
+titleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+-- 更新拖动位置
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        updateInput(input)
+    end
+end)
 
 -- 标题
 local title = Instance.new("TextLabel")
@@ -392,8 +439,10 @@ closeButton.MouseButton1Click:Connect(function()
     screenGui.Enabled = not screenGui.Enabled
 end)
 
-titleBar.MouseButton1Click:Connect(function()
-    toggleExpand()
+titleBar.MouseButton1Click:Connect(function(input)
+    if not dragging then -- 只有当不是拖动时才切换展开状态
+        toggleExpand()
+    end
 end)
 
 teleportModeButton.MouseButton1Click:Connect(function()

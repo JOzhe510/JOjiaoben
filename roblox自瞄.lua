@@ -11,15 +11,16 @@ while not LocalPlayer do
 end
 
 -- ==================== 极致预判参数 ====================
-local FOV = 120  -- 扩大FOV范围
-local Prediction = 0.42  -- 激进预判系数
-local Smoothness = 0.85  -- 更平滑的瞄准
+local FOV = 120
+local Prediction = 0.42
+local Smoothness = 0.85
 local Enabled = true
 local LockedTarget = nil
 local LockSingleTarget = true
 local ESPEnabled = true
 local WallCheck = true
 local PredictionEnabled = true
+local AimMode = "Camera"  -- Camera 或 Viewport
 
 local ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 
@@ -38,7 +39,7 @@ local Highlights = {}
 local TargetHistory = {}
 local MAX_HISTORY = 16
 
--- ==================== 极致预判算法 ====================
+-- ==================== 修复预判算法 ====================
 local function CalculatePredictedPosition(target)
     if not target or not PredictionEnabled then
         return target and target.Position or nil
@@ -54,14 +55,12 @@ local function CalculatePredictedPosition(target)
     local history = TargetHistory[player]
     local currentTime = tick()
     
-    -- 清理历史数据
     for i = #history, 1, -1 do
         if currentTime - history[i].time > 0.5 then
             table.remove(history, i)
         end
     end
     
-    -- 记录当前帧
     local currentData = {
         position = target.Position,
         time = currentTime,
@@ -69,14 +68,12 @@ local function CalculatePredictedPosition(target)
     }
     table.insert(history, currentData)
     
-    -- 激进预判：即使数据不足也强制预判
     if #history < 2 then
         local distance = (target.Position - Camera.CFrame.Position).Magnitude
         local dynamicPrediction = Prediction * (1.3 + distance / 80)
         return target.Position + (target.Velocity * dynamicPrediction)
     end
     
-    -- 计算加权速度和加速度
     local totalWeight = 0
     local weightedVelocity = Vector3.zero
     local weightedAcceleration = Vector3.zero
@@ -112,7 +109,6 @@ local function CalculatePredictedPosition(target)
         local distance = (target.Position - Camera.CFrame.Position).Magnitude
         local dynamicPrediction = Prediction * (1.4 + distance / 70)
         
-        -- 极致预判公式
         local predictedPos = target.Position + 
                             (weightedVelocity * dynamicPrediction * 1.4) +
                             (weightedAcceleration * dynamicPrediction * dynamicPrediction * 2.0)
@@ -124,18 +120,28 @@ local function CalculatePredictedPosition(target)
     return target.Position + (target.Velocity * Prediction * (1.5 + distance / 60))
 end
 
--- ==================== 死锁瞄准函数 ====================
+-- ==================== 双模式瞄准系统 ====================
 local function AimAtPosition(position)
     if not position then return end
     
     local cameraPos = Camera.CFrame.Position
-    local direction = (position - cameraPos).Unit
     
-    -- 死锁级别的平滑瞄准
-    local currentDirection = Camera.CFrame.LookVector
-    local newDirection = (currentDirection * (1 - Smoothness) + direction * Smoothness).Unit
-    
-    Camera.CFrame = CFrame.new(cameraPos, cameraPos + newDirection)
+    if AimMode == "Camera" then
+        -- 相机视角锁定
+        local direction = (position - cameraPos).Unit
+        local currentDirection = Camera.CFrame.LookVector
+        local newDirection = (currentDirection * (1 - Smoothness) + direction * Smoothness).Unit
+        Camera.CFrame = CFrame.new(cameraPos, cameraPos + newDirection)
+    else
+        -- 视角锁定（修复版）
+        local screenPos, visible = Camera:WorldToViewportPoint(position)
+        if visible then
+            local mousePos = UIS:GetMouseLocation()
+            local targetPos = Vector2.new(screenPos.X, screenPos.Y)
+            local delta = (targetPos - mousePos) * Smoothness
+            mousemoverel(delta.X, delta.Y)
+        end
+    end
 end
 
 -- ==================== 目标选择逻辑 ====================
@@ -149,7 +155,6 @@ local function FindBestTarget()
             local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
             
             if humanoid and humanoid.Health > 0 and rootPart then
-                -- 穿墙检测
                 if WallCheck then
                     local raycastParams = RaycastParams.new()
                     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
@@ -184,6 +189,22 @@ local function FindBestTarget()
     return bestTarget
 end
 
+-- ==================== 名字锁定功能 ====================
+local function LockTargetByName(playerName)
+    for _, player in pairs(Players:GetPlayers()) do
+        if player.Name:lower():find(playerName:lower()) or player.DisplayName:lower():find(playerName:lower()) then
+            if player.Character then
+                local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
+                if rootPart then
+                    LockedTarget = rootPart
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
 -- ==================== UI美化 ====================
 local Theme = {
     Background = Color3.fromRGB(28, 28, 38),
@@ -203,7 +224,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 250, 0, 350)
+Frame.Size = UDim2.new(0, 250, 0, 400)
 Frame.Position = UDim2.new(0, 10, 0, 10)
 Frame.BackgroundColor3 = Theme.Background
 Frame.BackgroundTransparency = 0.1
@@ -221,7 +242,6 @@ UIStroke.Color = Color3.fromRGB(60, 60, 80)
 UIStroke.Thickness = 2
 UIStroke.Parent = Frame
 
--- 展开/收起按钮
 local ToggleButton = Instance.new("TextButton")
 ToggleButton.Size = UDim2.new(0, 32, 0, 22)
 ToggleButton.Position = UDim2.new(1, -32, 0, 0)
@@ -241,7 +261,6 @@ ToggleCorner.Parent = ToggleButton
 local UIElements = {}
 local isExpanded = true
 
--- 标题
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 32)
 Title.Text = "🔮 死锁预判自瞄 🔮"
@@ -258,7 +277,6 @@ local TitleCorner = Instance.new("UICorner")
 TitleCorner.CornerRadius = UDim.new(0, 12)
 TitleCorner.Parent = Title
 
--- 按钮创建函数
 local function CreateStyledButton(name, positionY, text)
     local button = Instance.new("TextButton")
     button.Name = name
@@ -288,7 +306,6 @@ local function CreateStyledButton(name, positionY, text)
     return button
 end
 
--- 输入框创建函数
 local function CreateStyledTextBox(positionY, text, placeholder)
     local textBox = Instance.new("TextBox")
     textBox.Size = UDim2.new(0.9, 0, 0, 36)
@@ -311,15 +328,17 @@ local function CreateStyledTextBox(positionY, text, placeholder)
     return textBox
 end
 
--- 创建UI元素
-local ToggleBtn = CreateStyledButton("ToggleBtn", 0.12, "🎯 自瞄: 开启")
-local ESPToggleBtn = CreateStyledButton("ESPToggleBtn", 0.24, "👁️ ESP: 开启")
-local WallCheckBtn = CreateStyledButton("WallCheckBtn", 0.36, "🧱 穿墙检测: 开启")
-local PredictionBtn = CreateStyledButton("PredictionBtn", 0.48, "⚡ 预判模式: 开启")
+-- 新增瞄准模式按钮
+local AimModeBtn = CreateStyledButton("AimModeBtn", 0.12, "🎯 瞄准模式: 相机")
+local ToggleBtn = CreateStyledButton("ToggleBtn", 0.24, "🔥 自瞄: 开启")
+local ESPToggleBtn = CreateStyledButton("ESPToggleBtn", 0.36, "👁️ ESP: 开启")
+local WallCheckBtn = CreateStyledButton("WallCheckBtn", 0.48, "🧱 穿墙检测: 开启")
+local PredictionBtn = CreateStyledButton("PredictionBtn", 0.60, "⚡ 预判模式: 开启")
 local SingleTargetBtn = CreateStyledButton("SingleTargetBtn", 0.84, "🔒 单锁模式: 开启")
 
-local FOVInput = CreateStyledTextBox(0.60, tostring(FOV), "FOV范围")
-local PredictionInput = CreateStyledTextBox(0.72, tostring(Prediction), "预判系数")
+local FOVInput = CreateStyledTextBox(0.72, tostring(FOV), "FOV范围")
+local PredictionInput = CreateStyledTextBox(0.78, tostring(Prediction), "预判系数")
+local TargetNameInput = CreateStyledTextBox(0.90, "", "输入玩家名字锁定")
 
 -- ==================== UI功能实现 ====================
 local function UpdateButtonText(button, text, state)
@@ -327,17 +346,26 @@ local function UpdateButtonText(button, text, state)
     button.BackgroundColor3 = state and Theme.Success or Theme.Warning
 end
 
--- 初始化按钮状态
-UpdateButtonText(ToggleBtn, "🎯 自瞄: ", Enabled)
+UpdateButtonText(ToggleBtn, "🔥 自瞄: ", Enabled)
 UpdateButtonText(ESPToggleBtn, "👁️ ESP: ", ESPEnabled)
 UpdateButtonText(WallCheckBtn, "🧱 穿墙检测: ", WallCheck)
 UpdateButtonText(PredictionBtn, "⚡ 预判模式: ", PredictionEnabled)
 UpdateButtonText(SingleTargetBtn, "🔒 单锁模式: ", LockSingleTarget)
 
--- 按钮事件绑定
+-- 新增瞄准模式切换
+AimModeBtn.MouseButton1Click:Connect(function()
+    if AimMode == "Camera" then
+        AimMode = "Viewport"
+        AimModeBtn.Text = "🎯 瞄准模式: 视角"
+    else
+        AimMode = "Camera"
+        AimModeBtn.Text = "🎯 瞄准模式: 相机"
+    end
+end)
+
 ToggleBtn.MouseButton1Click:Connect(function()
     Enabled = not Enabled
-    UpdateButtonText(ToggleBtn, "🎯 自瞄: ", Enabled)
+    UpdateButtonText(ToggleBtn, "🔥 自瞄: ", Enabled)
 end)
 
 ESPToggleBtn.MouseButton1Click:Connect(function()
@@ -363,7 +391,6 @@ SingleTargetBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- 输入框事件
 FOVInput.FocusLost:Connect(function()
     local newFOV = tonumber(FOVInput.Text)
     if newFOV and newFOV > 0 then
@@ -383,12 +410,22 @@ PredictionInput.FocusLost:Connect(function()
     end
 end)
 
--- 展开/收起功能
+-- 名字锁定功能
+TargetNameInput.FocusLost:Connect(function()
+    if TargetNameInput.Text ~= "" then
+        if LockTargetByName(TargetNameInput.Text) then
+            TargetNameInput.BackgroundColor3 = Theme.Success
+        else
+            TargetNameInput.BackgroundColor3 = Theme.Warning
+        end
+    end
+end)
+
 local function toggleUI()
     isExpanded = not isExpanded
     
     if isExpanded then
-        Frame.Size = UDim2.new(0, 250, 0, 350)
+        Frame.Size = UDim2.new(0, 250, 0, 400)
         ToggleButton.Text = "▲"
         for _, element in pairs(UIElements) do
             element.Visible = true
@@ -432,16 +469,19 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- 按键绑定
 UIS.InputBegan:Connect(function(input)
     if input.KeyCode == Enum.KeyCode.U then
         toggleUI()
     elseif input.KeyCode == Enum.KeyCode.F then
         Enabled = not Enabled
-        UpdateButtonText(ToggleBtn, "🎯 自瞄: ", Enabled)
+        UpdateButtonText(ToggleBtn, "🔥 自瞄: ", Enabled)
+    elseif input.KeyCode == Enum.KeyCode.T then
+        if TargetNameInput.Text ~= "" then
+            LockTargetByName(TargetNameInput.Text)
+        end
     end
 end)
 
-print("💀 死锁预判自瞄加载完成 - 按F键切换自瞄，U键控制UI")
+print("💀 死锁预判自瞄加载完成 - 按F键切换自瞄，U键控制UI，T键锁定输入名字的玩家")
 print("当前预判系数:", Prediction)
 print("死锁模式已启用")

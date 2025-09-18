@@ -36,7 +36,7 @@ Circle.NumSides = 64
 Circle.Filled = false
 
 local TargetHistory = {}
-local ESPBoxes = {}
+local ESPHighlights = {} -- 改为高亮轮廓
 local ESPLabels = {}
 local ESPConnections = {} -- 存储玩家连接
 
@@ -66,17 +66,21 @@ end
 
 -- ==================== 清理ESP资源 ====================
 local function ClearESP()
-    -- 清理所有ESP绘图对象
-    for _, espData in pairs(ESPBoxes) do
-        if espData and espData.box then
-            pcall(function() espData.box:Remove() end)
+    -- 清理所有高亮轮廓
+    for _, highlight in pairs(ESPHighlights) do
+        if highlight then
+            pcall(function() highlight:Destroy() end)
         end
     end
-    ESPBoxes = {}
+    ESPHighlights = {}
     
+    -- 清理所有标签
     for _, espData in pairs(ESPLabels) do
-        if espData and espData.label then
-            pcall(function() espData.label:Remove() end)
+        if espData and espData.nameLabel then
+            pcall(function() espData.nameLabel:Remove() end)
+        end
+        if espData and espData.healthLabel then
+            pcall(function() espData.healthLabel:Remove() end)
         end
     end
     ESPLabels = {}
@@ -94,79 +98,102 @@ end
 local function CreateESPForCharacter(player, character)
     local humanoid = character:WaitForChild("Humanoid", 5)
     local head = character:FindFirstChild("Head")
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
     
-    if not humanoid or not head or not rootPart then return end
+    if not humanoid or not head then return end
     
-    -- 创建ESP方框
-    local box = Drawing.new("Square")
-    box.Visible = false
-    box.Color = Color3.fromRGB(255, 0, 0)
-    box.Thickness = 2
-    box.Filled = false
-    box.ZIndex = 1
+    -- 创建高亮轮廓
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = character
+    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+    highlight.FillTransparency = 0.8
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineTransparency = 0
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = CoreGui
     
-    -- 创建名字和血量标签
-    local label = Drawing.new("Text")
-    label.Visible = false
-    label.Color = Color3.fromRGB(255, 255, 255)
-    label.Size = 16
-    label.Center = true
-    label.Outline = true
-    label.OutlineColor = Color3.fromRGB(0, 0, 0)
-    label.ZIndex = 2
+    -- 创建名字和血量标签（分开上下排列）
+    local nameLabel = Drawing.new("Text")
+    nameLabel.Visible = false
+    nameLabel.Color = Color3.fromRGB(255, 255, 255)
+    nameLabel.Size = 14 -- 减小字体大小
+    nameLabel.Center = true
+    nameLabel.Outline = true
+    nameLabel.OutlineColor = Color3.fromRGB(0, 0, 0)
+    nameLabel.ZIndex = 2
+    
+    local healthLabel = Drawing.new("Text")
+    healthLabel.Visible = false
+    healthLabel.Color = Color3.fromRGB(255, 100, 100)
+    healthLabel.Size = 12 -- 减小字体大小
+    healthLabel.Center = true
+    healthLabel.Outline = true
+    healthLabel.OutlineColor = Color3.fromRGB(0, 0, 0)
+    healthLabel.ZIndex = 2
     
     -- 更新函数
     local function updateESP()
         if not character:IsDescendantOf(workspace) or humanoid.Health <= 0 then
-            box.Visible = false
-            label.Visible = false
+            highlight.Enabled = false
+            nameLabel.Visible = false
+            healthLabel.Visible = false
             return
         end
         
         local headPos, headVisible = Camera:WorldToViewportPoint(head.Position)
-        local rootPos, rootVisible = Camera:WorldToViewportPoint(rootPart.Position)
         
-        if headVisible and rootVisible then
-            -- 计算方框尺寸
-            local height = (headPos.Y - rootPos.Y) * 2
-            local width = height * 0.6
-            
-            -- 更新方框
-            box.Size = Vector2.new(width, height)
-            box.Position = Vector2.new(headPos.X - width/2, rootPos.Y - height/2)
-            box.Visible = true
+        if headVisible then
+            -- 更新高亮轮廓颜色（根据血量变化）
+            local healthPercent = humanoid.Health / humanoid.MaxHealth
+            highlight.FillColor = Color3.fromRGB(
+                255 * (1 - healthPercent),
+                255 * healthPercent,
+                0
+            )
+            highlight.Enabled = true
             
             -- 更新标签
-            label.Text = player.Name .. " [" .. math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth) .. "]"
-            label.Position = Vector2.new(headPos.X, headPos.Y - height/2 - 20)
-            label.Visible = true
+            nameLabel.Text = player.Name
+            nameLabel.Position = Vector2.new(headPos.X, headPos.Y - 30) -- 名字在上
+            
+            healthLabel.Text = math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth)
+            healthLabel.Position = Vector2.new(headPos.X, headPos.Y - 15) -- 血量在下
+            
+            nameLabel.Visible = true
+            healthLabel.Visible = true
         else
-            box.Visible = false
-            label.Visible = false
+            highlight.Enabled = false
+            nameLabel.Visible = false
+            healthLabel.Visible = false
         end
     end
     
     -- 存储ESP对象
     local espId = player.UserId
-    ESPBoxes[espId] = {box = box, update = updateESP, player = player}
-    ESPLabels[espId] = {label = label, update = updateESP, player = player}
+    ESPHighlights[espId] = highlight
+    ESPLabels[espId] = {
+        nameLabel = nameLabel, 
+        healthLabel = healthLabel, 
+        update = updateESP, 
+        player = player
+    }
     
     -- 初始更新
     updateESP()
     
     -- 监听人类状态变化
     local humanoidDiedConn = humanoid.Died:Connect(function()
-        box.Visible = false
-        label.Visible = false
+        highlight.Enabled = false
+        nameLabel.Visible = false
+        healthLabel.Visible = false
     end)
     
     local humanoidHealthConn = humanoid:GetPropertyChangedSignal("Health"):Connect(function()
         if humanoid.Health > 0 then
             updateESP()
         else
-            box.Visible = false
-            label.Visible = false
+            highlight.Enabled = false
+            nameLabel.Visible = false
+            healthLabel.Visible = false
         end
     end)
     
@@ -204,12 +231,15 @@ local function UpdateESP()
             local characterRemovingConn = player.CharacterRemoving:Connect(function()
                 -- 只移除该玩家的ESP，而不是全部
                 local espId = player.UserId
-                if ESPBoxes[espId] then
-                    pcall(function() ESPBoxes[espId].box:Remove() end)
-                    ESPBoxes[espId] = nil
+                if ESPHighlights[espId] then
+                    pcall(function() ESPHighlights[espId]:Destroy() end)
+                    ESPHighlights[espId] = nil
                 end
                 if ESPLabels[espId] then
-                    pcall(function() ESPLabels[espId].label:Remove() end)
+                    pcall(function() 
+                        ESPLabels[espId].nameLabel:Remove()
+                        ESPLabels[espId].healthLabel:Remove()
+                    end)
                     ESPLabels[espId] = nil
                 end
             end)
@@ -275,44 +305,46 @@ local function AimAtPosition(position)
     end
 end
 
--- ==================== 修复穿墙检测 ====================
-local function FindBestTarget()
+-- ==================== 改为视角对准的目标选择 ====================
+local function FindTargetInView()
     local bestTarget = nil
-    local closestDistance = math.huge
+    local closestAngle = math.rad(FOV / 2) -- FOV范围内的角度
     
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and IsEnemy(player) then
             local humanoid = player.Character:FindFirstChild("Humanoid")
-            local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
+            local head = player.Character:FindFirstChild("Head")
             
-            if humanoid and humanoid.Health > 0 and rootPart then
-                local rayOrigin = Camera.CFrame.Position
-                local rayDirection = (rootPart.Position - rayOrigin).Unit * 200
+            if humanoid and humanoid.Health > 0 and head then
+                -- 计算视角角度
+                local cameraDirection = Camera.CFrame.LookVector
+                local targetDirection = (head.Position - Camera.CFrame.Position).Unit
+                local dotProduct = cameraDirection:Dot(targetDirection)
+                local angle = math.acos(math.clamp(dotProduct, -1, 1))
                 
-                -- 修复穿墙检测
-                if WallCheck then
-                    local raycastParams = RaycastParams.new()
-                    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-                    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
-                    raycastParams.IgnoreWater = true
-                    
-                    local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-                    if raycastResult then
-                        local hitPart = raycastResult.Instance
-                        if not hitPart:IsDescendantOf(player.Character) then
-                            continue  -- 被墙壁阻挡，跳过
+                -- 检查是否在FOV范围内
+                if angle <= closestAngle then
+                    -- 穿墙检测
+                    if WallCheck then
+                        local rayOrigin = Camera.CFrame.Position
+                        local rayDirection = (head.Position - rayOrigin).Unit * (head.Position - rayOrigin).Magnitude
+                        
+                        local raycastParams = RaycastParams.new()
+                        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+                        raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                        raycastParams.IgnoreWater = true
+                        
+                        local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+                        if raycastResult then
+                            local hitPart = raycastResult.Instance
+                            if not hitPart:IsDescendantOf(player.Character) then
+                                continue  -- 被墙壁阻挡，跳过
+                            end
                         end
                     end
-                end
-                
-                local screenPosition, visible = Camera:WorldToViewportPoint(rootPart.Position)
-                
-                if visible then
-                    local distance = (rootPart.Position - Camera.CFrame.Position).Magnitude
-                    if distance < closestDistance then
-                        closestDistance = distance
-                        bestTarget = rootPart
-                    end
+                    
+                    closestAngle = angle
+                    bestTarget = head -- 瞄准头部
                 end
             end
         end
@@ -326,9 +358,9 @@ local function LockTargetByName(playerName)
     for _, player in pairs(Players:GetPlayers()) do
         if (player.Name:lower():find(playerName:lower()) or player.DisplayName:lower():find(playerName:lower())) and IsEnemy(player) then
             if player.Character then
-                local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
-                if rootPart then
-                    LockedTarget = rootPart
+                local head = player.Character:FindFirstChild("Head")
+                if head then
+                    LockedTarget = head
                     return true
                 end
             end
@@ -580,15 +612,9 @@ RunService.RenderStepped:Connect(function()
     Circle.Radius = FOV
     
     -- 更新ESP
-    for _, espData in pairs(ESPBoxes) do
+    for _, espData in pairs(ESPLabels) do
         if espData and espData.update then
             espData.update()
-        end
-    end
-    
-    for _, labelData in pairs(ESPLabels) do
-        if labelData and labelData.update then
-            labelData.update()
         end
     end
     
@@ -596,7 +622,7 @@ RunService.RenderStepped:Connect(function()
     if not Enabled then return end
     
     if not LockedTarget or not LockSingleTarget then
-        LockedTarget = FindBestTarget()
+        LockedTarget = FindTargetInView() -- 改为使用视角对准的目标选择
     end
     
     if LockedTarget then
@@ -614,12 +640,15 @@ end)
 Players.PlayerRemoving:Connect(function(player)
     -- 清理该玩家的ESP资源
     local espId = player.UserId
-    if ESPBoxes[espId] then
-        pcall(function() ESPBoxes[espId].box:Remove() end)
-        ESPBoxes[espId] = nil
+    if ESPHighlights[espId] then
+        pcall(function() ESPHighlights[espId]:Destroy() end)
+        ESPHighlights[espId] = nil
     end
     if ESPLabels[espId] then
-        pcall(function() ESPLabels[espId].label:Remove() end)
+        pcall(function() 
+            ESPLabels[espId].nameLabel:Remove()
+            ESPLabels[espId].healthLabel:Remove()
+        end)
         ESPLabels[espId] = nil
     end
     

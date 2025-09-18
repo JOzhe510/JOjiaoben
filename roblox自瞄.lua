@@ -36,6 +36,7 @@ Circle.Filled = false
 
 local TargetHistory = {}
 local ESPBoxes = {}
+local ESPLabels = {}
 
 -- ==================== ESP功能 ====================
 local function UpdateESP()
@@ -45,41 +46,103 @@ local function UpdateESP()
         end
     end
     ESPBoxes = {}
+    
+    for _, label in pairs(ESPLabels) do
+        if label then
+            label:Remove()
+        end
+    end
+    ESPLabels = {}
 
     if not ESPEnabled then return end
 
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             local humanoid = player.Character:FindFirstChild("Humanoid")
+            local head = player.Character:FindFirstChild("Head")
             local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
             
-            if humanoid and humanoid.Health > 0 and rootPart then
-                local box = Instance.new("BoxHandleAdornment")
-                box.Name = "ESP_" .. player.Name
-                box.Adornee = rootPart
-                box.AlwaysOnTop = true
-                box.ZIndex = 5
-                box.Size = Vector3.new(4, 6, 4)
-                box.Color3 = Color3.fromRGB(255, 0, 0)
-                box.Transparency = 0.3
-                box.Parent = rootPart
+            if humanoid and humanoid.Health > 0 and rootPart and head then
+                -- 创建ESP方框
+                local box = Drawing.new("Square")
+                box.Visible = true
+                box.Color = Color3.fromRGB(255, 0, 0)
+                box.Thickness = 2
+                box.Filled = false
+                box.ZIndex = 1
                 
-                table.insert(ESPBoxes, box)
+                -- 创建名字和血量标签
+                local label = Drawing.new("Text")
+                label.Visible = true
+                label.Color = Color3.fromRGB(255, 255, 255)
+                label.Size = 16
+                label.Center = true
+                label.Outline = true
+                label.OutlineColor = Color3.fromRGB(0, 0, 0)
+                label.ZIndex = 2
+                
+                -- 更新函数
+                local function updateESP()
+                    if not player.Character or not humanoid or humanoid.Health <= 0 then
+                        box.Visible = false
+                        label.Visible = false
+                        return
+                    end
+                    
+                    local headPos, headVisible = Camera:WorldToViewportPoint(head.Position)
+                    local rootPos, rootVisible = Camera:WorldToViewportPoint(rootPart.Position)
+                    
+                    if headVisible and rootVisible then
+                        -- 计算方框尺寸
+                        local height = (headPos.Y - rootPos.Y) * 2
+                        local width = height * 0.6
+                        
+                        -- 更新方框
+                        box.Size = Vector2.new(width, height)
+                        box.Position = Vector2.new(headPos.X - width/2, rootPos.Y - height/2)
+                        box.Visible = true
+                        
+                        -- 更新标签
+                        label.Text = player.Name .. " [" .. math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth) .. "]"
+                        label.Position = Vector2.new(headPos.X, headPos.Y - height/2 - 20)
+                        label.Visible = true
+                    else
+                        box.Visible = false
+                        label.Visible = false
+                    end
+                end
+                
+                -- 存储对象
+                table.insert(ESPBoxes, {box = box, update = updateESP})
+                table.insert(ESPLabels, {label = label, update = updateESP})
+                
+                -- 初始更新
+                updateESP()
             end
         end
     end
 end
 
--- ==================== 修复预判算法 ====================
+-- ==================== 改进预判算法 ====================
 local function CalculatePredictedPosition(target)
     if not target or not PredictionEnabled then
         return target and target.Position or nil
     end
     
-    local distance = (target.Position - Camera.CFrame.Position).Magnitude
+    -- 获取目标头部
+    local head = target.Parent:FindFirstChild("Head")
+    if not head then
+        return target.Position
+    end
+    
+    -- 计算距离和飞行时间
+    local distance = (head.Position - Camera.CFrame.Position).Magnitude
     local travelTime = distance / 1000
     
-    return target.Position + (target.Velocity * travelTime * Prediction * 2)
+    -- 计算预判位置 - 将头部位置按速度方向偏移
+    local predictedHeadPosition = head.Position + (target.Velocity * travelTime * Prediction)
+    
+    return predictedHeadPosition
 end
 
 -- ==================== 双模式瞄准系统 ====================
@@ -375,10 +438,35 @@ TargetNameInput.FocusLost:Connect(function()
     end
 end)
 
+-- 修复展开/收起功能
+ToggleButton.MouseButton1Click:Connect(function()
+    isExpanded = not isExpanded
+    for _, element in pairs(UIElements) do
+        if element ~= Title then
+            element.Visible = isExpanded
+        end
+    end
+    ToggleButton.Text = isExpanded and "▲" or "▼"
+    Frame.Size = isExpanded and UDim2.new(0, 280, 0, 420) or UDim2.new(0, 280, 0, 32)
+end)
+
 -- ==================== 主循环 ====================
 RunService.RenderStepped:Connect(function()
     Circle.Position = ScreenCenter
     Circle.Radius = FOV
+    
+    -- 更新ESP
+    for _, espItem in pairs(ESPBoxes) do
+        if espItem and espItem.update then
+            espItem.update()
+        end
+    end
+    
+    for _, labelItem in pairs(ESPLabels) do
+        if labelItem and labelItem.update then
+            labelItem.update()
+        end
+    end
     
     if not Enabled then return end
     
@@ -405,8 +493,13 @@ end)
 UIS.InputBegan:Connect(function(input)
     if input.KeyCode == Enum.KeyCode.U then
         isExpanded = not isExpanded
-        Frame.Visible = isExpanded
+        for _, element in pairs(UIElements) do
+            if element ~= Title then
+                element.Visible = isExpanded
+            end
+        end
         ToggleButton.Text = isExpanded and "▲" or "▼"
+        Frame.Size = isExpanded and UDim2.new(0, 280, 0, 420) or UDim2.new(0, 280, 0, 32)
     elseif input.KeyCode == Enum.KeyCode.F then
         Enabled = not Enabled
         UpdateButtonText(ToggleBtn, "🎯 自瞄: ", Enabled)

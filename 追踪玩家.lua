@@ -12,62 +12,118 @@ local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "FollowerUI"
 screenGui.Parent = playerGui
 
+-- 添加圆角函数
+local function createCorner(parent, radius)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, radius or 8)
+    corner.Parent = parent
+    return corner
+end
+
+-- 添加描边函数
+local function createStroke(parent, color, thickness)
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = color or Color3.fromRGB(80, 80, 80)
+    stroke.Thickness = thickness or 2
+    stroke.Parent = parent
+    return stroke
+end
+
 -- 主框架
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 300, 0, 400)
-mainFrame.Position = UDim2.new(0, 10, 0.5, -200)
-mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+mainFrame.Size = UDim2.new(0, 320, 0, 60) -- 初始高度较小
+mainFrame.Position = UDim2.new(0, 10, 0.5, -30)
+mainFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 mainFrame.BorderSizePixel = 0
 mainFrame.ClipsDescendants = true
 mainFrame.Parent = screenGui
+createCorner(mainFrame, 12)
+createStroke(mainFrame)
+
+-- 标题栏（可点击展开/收起）
+local titleBar = Instance.new("TextButton")
+titleBar.Size = UDim2.new(1, 0, 0, 40)
+titleBar.Position = UDim2.new(0, 0, 0, 0)
+titleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+titleBar.Text = ""
+titleBar.AutoButtonColor = false
+titleBar.Parent = mainFrame
+createCorner(titleBar, 12)
 
 -- 标题
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 40)
-title.Position = UDim2.new(0, 0, 0, 0)
-title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+title.Size = UDim2.new(0, 150, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
 title.Text = "玩家跟随系统"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Font = Enum.Font.GothamBold
-title.TextSize = 18
-title.Parent = mainFrame
+title.TextSize = 16
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
+
+-- 展开/收起指示器
+local expandIndicator = Instance.new("TextLabel")
+expandIndicator.Size = UDim2.new(0, 20, 0, 20)
+expandIndicator.Position = UDim2.new(1, -30, 0.5, -10)
+expandIndicator.BackgroundTransparency = 1
+expandIndicator.Text = "▼"
+expandIndicator.TextColor3 = Color3.fromRGB(200, 200, 200)
+expandIndicator.Font = Enum.Font.GothamBold
+expandIndicator.TextSize = 14
+expandIndicator.Parent = titleBar
 
 -- 关闭按钮
 local closeButton = Instance.new("TextButton")
 closeButton.Size = UDim2.new(0, 30, 0, 30)
-closeButton.Position = UDim2.new(1, -30, 0, 5)
+closeButton.Position = UDim2.new(1, -30, 0.5, -15)
 closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 closeButton.Text = "X"
 closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeButton.Font = Enum.Font.GothamBold
 closeButton.TextSize = 16
-closeButton.Parent = title
+closeButton.Parent = titleBar
+createCorner(closeButton)
+
+-- 内容区域（可展开/收起）
+local contentFrame = Instance.new("Frame")
+contentFrame.Size = UDim2.new(1, 0, 0, 360)
+contentFrame.Position = UDim2.new(0, 0, 0, 40)
+contentFrame.BackgroundTransparency = 1
+contentFrame.Visible = false -- 初始隐藏
+contentFrame.Parent = mainFrame
 
 -- 玩家列表框架
 local playersFrame = Instance.new("ScrollingFrame")
 playersFrame.Size = UDim2.new(1, -20, 0, 200)
-playersFrame.Position = UDim2.new(0, 10, 0, 50)
-playersFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+playersFrame.Position = UDim2.new(0, 10, 0, 10)
+playersFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 playersFrame.BorderSizePixel = 0
 playersFrame.ScrollBarThickness = 5
+playersFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
 playersFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-playersFrame.Parent = mainFrame
+playersFrame.Parent = contentFrame
+createCorner(playersFrame, 8)
+createStroke(playersFrame)
 
 local playersListLayout = Instance.new("UIListLayout")
+playersListLayout.Padding = UDim.new(0, 5)
 playersListLayout.Parent = playersFrame
 
 -- 控制面板
 local controlsFrame = Instance.new("Frame")
 controlsFrame.Size = UDim2.new(1, -20, 0, 130)
-controlsFrame.Position = UDim2.new(0, 10, 0, 260)
-controlsFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+controlsFrame.Position = UDim2.new(0, 10, 0, 220)
+controlsFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 controlsFrame.BorderSizePixel = 0
-controlsFrame.Parent = mainFrame
+controlsFrame.Parent = contentFrame
+createCorner(controlsFrame, 8)
+createStroke(controlsFrame)
 
 -- 当前跟随标签
 local currentFollowLabel = Instance.new("TextLabel")
-currentFollowLabel.Size = UDim2.new(1, 0, 0, 30)
-currentFollowLabel.Position = UDim2.new(0, 0, 0, 10)
+currentFollowLabel.Size = UDim2.new(1, -10, 0, 30)
+currentFollowLabel.Position = UDim2.new(0, 5, 0, 10)
 currentFollowLabel.BackgroundTransparency = 1
 currentFollowLabel.Text = "当前跟随: 无"
 currentFollowLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -77,8 +133,8 @@ currentFollowLabel.Parent = controlsFrame
 
 -- 模式选择
 local modeLabel = Instance.new("TextLabel")
-modeLabel.Size = UDim2.new(1, 0, 0, 20)
-modeLabel.Position = UDim2.new(0, 0, 0, 45)
+modeLabel.Size = UDim2.new(1, -10, 0, 20)
+modeLabel.Position = UDim2.new(0, 5, 0, 45)
 modeLabel.BackgroundTransparency = 1
 modeLabel.Text = "跟随模式:"
 modeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -95,6 +151,7 @@ teleportModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 teleportModeButton.Font = Enum.Font.Gotham
 teleportModeButton.TextSize = 14
 teleportModeButton.Parent = controlsFrame
+createCorner(teleportModeButton)
 
 local smoothModeButton = Instance.new("TextButton")
 smoothModeButton.Size = UDim2.new(0.45, 0, 0, 30)
@@ -105,6 +162,7 @@ smoothModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 smoothModeButton.Font = Enum.Font.Gotham
 smoothModeButton.TextSize = 14
 smoothModeButton.Parent = controlsFrame
+createCorner(smoothModeButton)
 
 -- 停止按钮
 local stopButton = Instance.new("TextButton")
@@ -116,6 +174,7 @@ stopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 stopButton.Font = Enum.Font.GothamBold
 stopButton.TextSize = 14
 stopButton.Parent = controlsFrame
+createCorner(stopButton)
 
 -- 全局变量
 local targetPlayer = nil
@@ -123,6 +182,38 @@ local isFollowing = false
 local isTeleporting = false
 local follower = nil
 local connection = nil
+local isExpanded = false
+
+-- 展开/收起动画
+local function toggleExpand()
+    isExpanded = not isExpanded
+    
+    if isExpanded then
+        -- 展开
+        contentFrame.Visible = true
+        mainFrame.Size = UDim2.new(0, 320, 0, 400)
+        expandIndicator.Text = "▲"
+        
+        -- 更新玩家列表
+        updatePlayersList()
+    else
+        -- 收起
+        local tween = TweenService:Create(
+            mainFrame,
+            TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            {Size = UDim2.new(0, 320, 0, 40)}
+        )
+        tween:Play()
+        
+        tween.Completed:Connect(function()
+            if not isExpanded then
+                contentFrame.Visible = false
+            end
+        end)
+        
+        expandIndicator.Text = "▼"
+    end
+end
 
 -- 创建跟随部件
 function createFollower()
@@ -175,15 +266,25 @@ function updatePlayersList()
             local playerButton = Instance.new("TextButton")
             playerButton.Size = UDim2.new(1, -10, 0, 40)
             playerButton.Position = UDim2.new(0, 5, 0, (playerCount - 1) * 45)
-            playerButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            playerButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
             playerButton.Text = player.Name
             playerButton.TextColor3 = Color3.fromRGB(255, 255, 255)
             playerButton.Font = Enum.Font.Gotham
             playerButton.TextSize = 14
             playerButton.Parent = playersFrame
+            createCorner(playerButton)
             
             playerButton.MouseButton1Click:Connect(function()
                 startFollowing(player)
+            end)
+            
+            -- 添加鼠标悬停效果
+            playerButton.MouseEnter:Connect(function()
+                playerButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+            end)
+            
+            playerButton.MouseLeave:Connect(function()
+                playerButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
             end)
         end
     end
@@ -291,6 +392,10 @@ closeButton.MouseButton1Click:Connect(function()
     screenGui.Enabled = not screenGui.Enabled
 end)
 
+titleBar.MouseButton1Click:Connect(function()
+    toggleExpand()
+end)
+
 teleportModeButton.MouseButton1Click:Connect(function()
     setTeleportMode(true)
 end)
@@ -314,5 +419,7 @@ Players.PlayerRemoving:Connect(updatePlayersList)
 -- 每10秒更新一次玩家列表（防止漏掉）
 while true do
     wait(10)
-    updatePlayersList()
+    if isExpanded then
+        updatePlayersList()
+    end
 end

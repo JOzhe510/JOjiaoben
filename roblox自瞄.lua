@@ -22,6 +22,7 @@ local WallCheck = true   -- 穿墙检测默认开启
 local PredictionEnabled = true
 local AimMode = "Camera"
 local TeamCheck = true   -- 队友检测默认开启
+local NearestAim = false -- 近距离自瞄模式
 
 local ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 
@@ -357,6 +358,51 @@ local function FindTargetInView()
     return bestTarget
 end
 
+-- ==================== 近距离目标选择 ====================
+local function FindNearestTarget()
+    local nearestTarget = nil
+    local minDistance = math.huge
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and IsEnemy(player) then
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            local head = player.Character:FindFirstChild("Head")
+            
+            if humanoid and humanoid.Health > 0 and head then
+                -- 计算距离
+                local distance = (head.Position - Camera.CFrame.Position).Magnitude
+                
+                -- 检查是否更近
+                if distance < minDistance then
+                    -- 穿墙检测
+                    if WallCheck then
+                        local rayOrigin = Camera.CFrame.Position
+                        local rayDirection = (head.Position - rayOrigin).Unit * (head.Position - rayOrigin).Magnitude
+                        
+                        local raycastParams = RaycastParams.new()
+                        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+                        raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                        raycastParams.IgnoreWater = true
+                        
+                        local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+                        if raycastResult then
+                            local hitPart = raycastResult.Instance
+                            if not hitPart:IsDescendantOf(player.Character) then
+                                continue  -- 被墙壁阻挡，跳过
+                            end
+                        end
+                    end
+                    
+                    minDistance = distance
+                    nearestTarget = head -- 瞄准头部
+                end
+            end
+        end
+    end
+    
+    return nearestTarget
+end
+
 -- ==================== 名字锁定功能 ====================
 local function LockTargetByName(playerName)
     for _, player in pairs(Players:GetPlayers()) do
@@ -420,7 +466,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 280, 0, 420)
+Frame.Size = UDim2.new(0, 280, 0, 460) -- 增加高度以容纳新按钮
 Frame.Position = UDim2.new(0, 10, 0, 10)
 Frame.BackgroundColor3 = Theme.Background
 Frame.BackgroundTransparency = 0.1
@@ -446,7 +492,7 @@ ScrollFrame.BackgroundTransparency = 1
 ScrollFrame.BorderSizePixel = 0
 ScrollFrame.ScrollBarThickness = 6
 ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 120)
-ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 650) -- 增加画布大小
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 690) -- 增加画布大小
 ScrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
 ScrollFrame.VerticalScrollBarInset = Enum.ScrollBarInset.Always
 ScrollFrame.Parent = Frame
@@ -535,6 +581,7 @@ local TeamCheckBtn = CreateStyledButton("TeamCheckBtn", "🎯 队友检测: 开�
 local PredictionBtn = CreateStyledButton("PredictionBtn", "⚡ 预判模式: 开启")
 local SingleTargetBtn = CreateStyledButton("SingleTargetBtn", "🔒 单锁模式: 关闭")
 local FOVCircleBtn = CreateStyledButton("FOVCircleBtn", "⭕ FOV圆圈: 开启")
+local NearestAimBtn = CreateStyledButton("NearestAimBtn", "📏 近距离自瞄: 关闭") -- 新增近距离自瞄按钮
 
 local FOVInput = CreateStyledTextBox(tostring(FOV), "FOV范围")
 local PredictionInput = CreateStyledTextBox(tostring(Prediction), "预判系数")
@@ -554,6 +601,7 @@ UpdateButtonText(TeamCheckBtn, "🎯 队友检测: ", TeamCheck)
 UpdateButtonText(PredictionBtn, "⚡ 预判模式: ", PredictionEnabled)
 UpdateButtonText(SingleTargetBtn, "🔒 单锁模式: ", LockSingleTarget)
 UpdateButtonText(FOVCircleBtn, "⭕ FOV圆圈: ", Circle.Visible)
+UpdateButtonText(NearestAimBtn, "📏 近距离自瞄: ", NearestAim) -- 更新新按钮状态
 
 -- 按钮事件
 ToggleBtn.MouseButton1Click:Connect(function()
@@ -601,6 +649,17 @@ FOVCircleBtn.MouseButton1Click:Connect(function()
     UpdateButtonText(FOVCircleBtn, "⭕ FOV圆圈: ", Circle.Visible)
 end)
 
+-- 新增近距离自瞄按钮事件
+NearestAimBtn.MouseButton1Click:Connect(function()
+    NearestAim = not NearestAim
+    UpdateButtonText(NearestAimBtn, "📏 近距离自瞄: ", NearestAim)
+    if NearestAim then
+        -- 如果开启近距离自瞄，关闭单锁模式
+        LockSingleTarget = false
+        UpdateButtonText(SingleTargetBtn, "🔒 单锁模式: ", false)
+    end
+end)
+
 FOVInput.FocusLost:Connect(function()
     local newFOV = tonumber(FOVInput.Text)
     if newFOV and newFOV > 0 then
@@ -626,6 +685,9 @@ TargetNameInput.FocusLost:Connect(function()
             TargetNameInput.BackgroundColor3 = Theme.Success
             SingleTargetBtn.Text = "🔒 单锁模式: 开启"
             SingleTargetBtn.BackgroundColor3 = Theme.Success
+            -- 如果名字锁定成功，关闭近距离自瞄模式
+            NearestAim = false
+            UpdateButtonText(NearestAimBtn, "📏 近距离自瞄: ", false)
         else
             TargetNameInput.BackgroundColor3 = Theme.Warning
         end
@@ -647,7 +709,7 @@ ToggleButton.MouseButton1Click:Connect(function()
         end
     end
     ToggleButton.Text = isExpanded and "▲" or "▼"
-    Frame.Size = isExpanded and UDim2.new(0, 280, 0, 420) or UDim2.new(0, 280, 0, 32)
+    Frame.Size = isExpanded and UDim2.new(0, 280, 0, 460) or UDim2.new(0, 280, 0, 32)
     ScrollFrame.Visible = isExpanded
 end)
 
@@ -670,13 +732,26 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
             end
         end
         ToggleButton.Text = isExpanded and "▲" or "▼"
-        Frame.Size = isExpanded and UDim2.new(0, 280, 0, 420) or UDim2.new(0, 280, 0, 32)
+        Frame.Size = isExpanded and UDim2.new(0, 280, 0, 460) or UDim2.new(0, 280, 0, 32)
         ScrollFrame.Visible = isExpanded
     elseif input.KeyCode == Enum.KeyCode.T then
         LockSingleTarget = not LockSingleTarget
         UpdateButtonText(SingleTargetBtn, "🔒 单锁模式: ", LockSingleTarget)
         if not LockSingleTarget then
             LockedTarget = nil
+        end
+        -- 如果开启单锁模式，关闭近距离自瞄
+        if LockSingleTarget then
+            NearestAim = false
+            UpdateButtonText(NearestAimBtn, "📏 近距离自瞄: ", false)
+        end
+    elseif input.KeyCode == Enum.KeyCode.N then -- 新增快捷键N切换近距离自瞄
+        NearestAim = not NearestAim
+        UpdateButtonText(NearestAimBtn, "📏 近距离自瞄: ", NearestAim)
+        if NearestAim then
+            -- 如果开启近距离自瞄，关闭单锁模式
+            LockSingleTarget = false
+            UpdateButtonText(SingleTargetBtn, "🔒 单锁模式: ", false)
         end
     elseif input.KeyCode == Enum.KeyCode.X then
         CancelNameLock()
@@ -708,7 +783,13 @@ RunService.RenderStepped:Connect(function()
     end
     
     if not LockedTarget or not LockSingleTarget then
-        LockedTarget = FindTargetInView() -- 改为使用视角对准的目标选择
+        if NearestAim then
+            -- 近距离自瞄模式：优先锁定最近的玩家
+            LockedTarget = FindNearestTarget()
+        else
+            -- 默认模式：使用视角对准的目标选择
+            LockedTarget = FindTargetInView()
+        end
     end
     
     if LockedTarget then
@@ -751,5 +832,5 @@ end)
 UpdateESP()
 
 print("🔥 终极自瞄系统加载完成！")
-print("快捷键: F-开关自瞄, T-锁定目标, V-开关ESP, U-隐藏/显示UI, X-取消名字锁定")
+print("快捷键: F-开关自瞄, T-锁定目标, N-近距离自瞄, V-开关ESP, U-隐藏/显示UI, X-取消名字锁定")
 print("ESP和穿墙检测已默认开启")

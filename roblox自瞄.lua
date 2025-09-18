@@ -10,17 +10,17 @@ while not LocalPlayer do
     LocalPlayer = Players.LocalPlayer
 end
 
--- ==================== 极致预判参数 ====================
-local FOV = 120
-local Prediction = 0.42
-local Smoothness = 0.85
+-- ==================== 参数设置 ====================
+local FOV = 90
+local Prediction = 0.15
+local Smoothness = 0.7
 local Enabled = true
 local LockedTarget = nil
-local LockSingleTarget = true
-local ESPEnabled = true
-local WallCheck = true
+local LockSingleTarget = false
+local ESPEnabled = true  -- ESP默认开启
+local WallCheck = true   -- 穿墙检测默认开启
 local PredictionEnabled = true
-local AimMode = "Camera"  -- Camera 或 Viewport
+local AimMode = "Camera"
 
 local ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 
@@ -34,10 +34,41 @@ Circle.Transparency = 1
 Circle.NumSides = 64
 Circle.Filled = false
 
-local ESPObjects = {}
-local Highlights = {}
 local TargetHistory = {}
-local MAX_HISTORY = 16
+local ESPBoxes = {}
+
+-- ==================== ESP功能 ====================
+local function UpdateESP()
+    for _, box in pairs(ESPBoxes) do
+        if box then
+            box:Remove()
+        end
+    end
+    ESPBoxes = {}
+
+    if not ESPEnabled then return end
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
+            
+            if humanoid and humanoid.Health > 0 and rootPart then
+                local box = Instance.new("BoxHandleAdornment")
+                box.Name = "ESP_" .. player.Name
+                box.Adornee = rootPart
+                box.AlwaysOnTop = true
+                box.ZIndex = 5
+                box.Size = Vector3.new(4, 6, 4)
+                box.Color3 = Color3.fromRGB(255, 0, 0)
+                box.Transparency = 0.3
+                box.Parent = rootPart
+                
+                table.insert(ESPBoxes, box)
+            end
+        end
+    end
+end
 
 -- ==================== 修复预判算法 ====================
 local function CalculatePredictedPosition(target)
@@ -45,109 +76,42 @@ local function CalculatePredictedPosition(target)
         return target and target.Position or nil
     end
     
-    local player = Players:GetPlayerFromCharacter(target.Parent)
-    if not player then return target.Position end
-    
-    if not TargetHistory[player] then
-        TargetHistory[player] = {}
-    end
-    
-    local history = TargetHistory[player]
-    local currentTime = tick()
-    
-    for i = #history, 1, -1 do
-        if currentTime - history[i].time > 0.5 then
-            table.remove(history, i)
-        end
-    end
-    
-    local currentData = {
-        position = target.Position,
-        time = currentTime,
-        velocity = target.Velocity
-    }
-    table.insert(history, currentData)
-    
-    if #history < 2 then
-        local distance = (target.Position - Camera.CFrame.Position).Magnitude
-        local dynamicPrediction = Prediction * (1.3 + distance / 80)
-        return target.Position + (target.Velocity * dynamicPrediction)
-    end
-    
-    local totalWeight = 0
-    local weightedVelocity = Vector3.zero
-    local weightedAcceleration = Vector3.zero
-    
-    for i = 2, #history do
-        local current = history[i]
-        local previous = history[i-1]
-        local timeDiff = current.time - previous.time
-        
-        if timeDiff > 0.001 then
-            local weight = 3.0 / (currentTime - current.time + 0.05)
-            totalWeight = totalWeight + weight
-            
-            local velocity = (current.position - previous.position) / timeDiff
-            weightedVelocity = weightedVelocity + (velocity * weight)
-            
-            if i > 2 then
-                local prevPrevious = history[i-2]
-                local prevTimeDiff = previous.time - prevPrevious.time
-                if prevTimeDiff > 0.001 then
-                    local prevVelocity = (previous.position - prevPrevious.position) / prevTimeDiff
-                    local acceleration = (velocity - prevVelocity) / timeDiff
-                    weightedAcceleration = weightedAcceleration + (acceleration * weight * 2.0)
-                end
-            end
-        end
-    end
-    
-    if totalWeight > 0 then
-        weightedVelocity = weightedVelocity / totalWeight
-        weightedAcceleration = weightedAcceleration / totalWeight
-        
-        local distance = (target.Position - Camera.CFrame.Position).Magnitude
-        local dynamicPrediction = Prediction * (1.4 + distance / 70)
-        
-        local predictedPos = target.Position + 
-                            (weightedVelocity * dynamicPrediction * 1.4) +
-                            (weightedAcceleration * dynamicPrediction * dynamicPrediction * 2.0)
-        
-        return predictedPos
-    end
-    
     local distance = (target.Position - Camera.CFrame.Position).Magnitude
-    return target.Position + (target.Velocity * Prediction * (1.5 + distance / 60))
+    local travelTime = distance / 1000
+    
+    return target.Position + (target.Velocity * travelTime * Prediction * 2)
 end
 
 -- ==================== 双模式瞄准系统 ====================
 local function AimAtPosition(position)
     if not position then return end
     
-    local cameraPos = Camera.CFrame.Position
-    
     if AimMode == "Camera" then
-        -- 相机视角锁定
+        local cameraPos = Camera.CFrame.Position
         local direction = (position - cameraPos).Unit
         local currentDirection = Camera.CFrame.LookVector
         local newDirection = (currentDirection * (1 - Smoothness) + direction * Smoothness).Unit
+        
         Camera.CFrame = CFrame.new(cameraPos, cameraPos + newDirection)
     else
-        -- 视角锁定（修复版）
+        -- 视角锁定模式
         local screenPos, visible = Camera:WorldToViewportPoint(position)
         if visible then
             local mousePos = UIS:GetMouseLocation()
             local targetPos = Vector2.new(screenPos.X, screenPos.Y)
-            local delta = (targetPos - mousePos) * Smoothness
-            mousemoverel(delta.X, delta.Y)
+            local delta = (targetPos - mousePos) * Smoothness * 0.5
+            
+            pcall(function()
+                mousemoverel(delta.X, delta.Y)
+            end)
         end
     end
 end
 
--- ==================== 目标选择逻辑 ====================
+-- ==================== 修复穿墙检测 ====================
 local function FindBestTarget()
     local bestTarget = nil
-    local closestAngle = math.rad(FOV)
+    local closestDistance = math.huge
     
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
@@ -155,30 +119,31 @@ local function FindBestTarget()
             local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
             
             if humanoid and humanoid.Health > 0 and rootPart then
+                local rayOrigin = Camera.CFrame.Position
+                local rayDirection = (rootPart.Position - rayOrigin).Unit * 200
+                
+                -- 修复穿墙检测
                 if WallCheck then
                     local raycastParams = RaycastParams.new()
                     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-                    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, player.Character}
+                    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
                     raycastParams.IgnoreWater = true
                     
-                    local raycastResult = workspace:Raycast(Camera.CFrame.Position, (rootPart.Position - Camera.CFrame.Position).Unit * 1000, raycastParams)
-                    
-                    if raycastResult and raycastResult.Instance:IsDescendantOf(player.Character) == false then
-                        continue
+                    local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+                    if raycastResult then
+                        local hitPart = raycastResult.Instance
+                        if not hitPart:IsDescendantOf(player.Character) then
+                            continue  -- 被墙壁阻挡，跳过
+                        end
                     end
                 end
                 
-                local predictedPosition = CalculatePredictedPosition(rootPart)
-                local screenPosition, visible = Camera:WorldToViewportPoint(predictedPosition)
+                local screenPosition, visible = Camera:WorldToViewportPoint(rootPart.Position)
                 
                 if visible then
-                    local angle = math.atan2(
-                        screenPosition.X - ScreenCenter.X,
-                        screenPosition.Y - ScreenCenter.Y
-                    )
-                    
-                    if math.abs(angle) < closestAngle then
-                        closestAngle = math.abs(angle)
+                    local distance = (rootPart.Position - Camera.CFrame.Position).Magnitude
+                    if distance < closestDistance then
+                        closestDistance = distance
                         bestTarget = rootPart
                     end
                 end
@@ -202,10 +167,11 @@ local function LockTargetByName(playerName)
             end
         end
     end
+    LockedTarget = nil
     return false
 end
 
--- ==================== UI美化 ====================
+-- ==================== 完整UI界面 ====================
 local Theme = {
     Background = Color3.fromRGB(28, 28, 38),
     Header = Color3.fromRGB(45, 45, 60),
@@ -224,7 +190,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 250, 0, 400)
+Frame.Size = UDim2.new(0, 280, 0, 420)
 Frame.Position = UDim2.new(0, 10, 0, 10)
 Frame.BackgroundColor3 = Theme.Background
 Frame.BackgroundTransparency = 0.1
@@ -254,16 +220,12 @@ ToggleButton.Font = Enum.Font.GothamBold
 ToggleButton.TextSize = 14
 ToggleButton.Parent = Frame
 
-local ToggleCorner = Instance.new("UICorner")
-ToggleCorner.CornerRadius = UDim.new(0, 6)
-ToggleCorner.Parent = ToggleButton
-
 local UIElements = {}
 local isExpanded = true
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 32)
-Title.Text = "🔮 死锁预判自瞄 🔮"
+Title.Text = "🔮 终极自瞄系统 🔮"
 Title.BackgroundColor3 = Theme.Header
 Title.BackgroundTransparency = 0.05
 Title.TextColor3 = Theme.Accent
@@ -273,10 +235,7 @@ Title.TextSize = 16
 Title.Parent = Frame
 table.insert(UIElements, Title)
 
-local TitleCorner = Instance.new("UICorner")
-TitleCorner.CornerRadius = UDim.new(0, 12)
-TitleCorner.Parent = Title
-
+-- 按钮创建函数
 local function CreateStyledButton(name, positionY, text)
     local button = Instance.new("TextButton")
     button.Name = name
@@ -291,10 +250,6 @@ local function CreateStyledButton(name, positionY, text)
     button.TextSize = 14
     button.Parent = Frame
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = button
-    
     button.MouseEnter:Connect(function()
         button.BackgroundColor3 = Theme.ButtonHover
     end)
@@ -306,6 +261,7 @@ local function CreateStyledButton(name, positionY, text)
     return button
 end
 
+-- 输入框创建函数
 local function CreateStyledTextBox(positionY, text, placeholder)
     local textBox = Instance.new("TextBox")
     textBox.Size = UDim2.new(0.9, 0, 0, 36)
@@ -320,57 +276,51 @@ local function CreateStyledTextBox(positionY, text, placeholder)
     textBox.TextSize = 14
     textBox.Parent = Frame
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = textBox
-    
     table.insert(UIElements, textBox)
     return textBox
 end
 
--- 新增瞄准模式按钮
-local AimModeBtn = CreateStyledButton("AimModeBtn", 0.12, "🎯 瞄准模式: 相机")
-local ToggleBtn = CreateStyledButton("ToggleBtn", 0.24, "🔥 自瞄: 开启")
-local ESPToggleBtn = CreateStyledButton("ESPToggleBtn", 0.36, "👁️ ESP: 开启")
-local WallCheckBtn = CreateStyledButton("WallCheckBtn", 0.48, "🧱 穿墙检测: 开启")
-local PredictionBtn = CreateStyledButton("PredictionBtn", 0.60, "⚡ 预判模式: 开启")
-local SingleTargetBtn = CreateStyledButton("SingleTargetBtn", 0.84, "🔒 单锁模式: 开启")
+-- 创建所有功能按钮
+local ToggleBtn = CreateStyledButton("ToggleBtn", 0.10, "🎯 自瞄: 开启")
+local AimModeBtn = CreateStyledButton("AimModeBtn", 0.20, "🔧 瞄准模式: 相机")
+local ESPToggleBtn = CreateStyledButton("ESPToggleBtn", 0.30, "👁️ ESP: 开启")
+local WallCheckBtn = CreateStyledButton("WallCheckBtn", 0.40, "🧱 穿墙检测: 开启")
+local PredictionBtn = CreateStyledButton("PredictionBtn", 0.50, "⚡ 预判模式: 开启")
+local SingleTargetBtn = CreateStyledButton("SingleTargetBtn", 0.60, "🔒 单锁模式: 关闭")
+local FOVCircleBtn = CreateStyledButton("FOVCircleBtn", 0.70, "⭕ FOV圆圈: 开启")
 
-local FOVInput = CreateStyledTextBox(0.72, tostring(FOV), "FOV范围")
-local PredictionInput = CreateStyledTextBox(0.78, tostring(Prediction), "预判系数")
-local TargetNameInput = CreateStyledTextBox(0.90, "", "输入玩家名字锁定")
+local FOVInput = CreateStyledTextBox(0.80, tostring(FOV), "FOV范围")
+local PredictionInput = CreateStyledTextBox(0.90, tostring(Prediction), "预判系数")
+local TargetNameInput = CreateStyledTextBox(1.00, "", "输入玩家名字锁定")
 
--- ==================== UI功能实现 ====================
+-- 更新按钮状态
 local function UpdateButtonText(button, text, state)
     button.Text = text .. (state and "开启" or "关闭")
     button.BackgroundColor3 = state and Theme.Success or Theme.Warning
 end
 
-UpdateButtonText(ToggleBtn, "🔥 自瞄: ", Enabled)
+UpdateButtonText(ToggleBtn, "🎯 自瞄: ", Enabled)
 UpdateButtonText(ESPToggleBtn, "👁️ ESP: ", ESPEnabled)
 UpdateButtonText(WallCheckBtn, "🧱 穿墙检测: ", WallCheck)
 UpdateButtonText(PredictionBtn, "⚡ 预判模式: ", PredictionEnabled)
 UpdateButtonText(SingleTargetBtn, "🔒 单锁模式: ", LockSingleTarget)
+UpdateButtonText(FOVCircleBtn, "⭕ FOV圆圈: ", Circle.Visible)
 
--- 新增瞄准模式切换
-AimModeBtn.MouseButton1Click:Connect(function()
-    if AimMode == "Camera" then
-        AimMode = "Viewport"
-        AimModeBtn.Text = "🎯 瞄准模式: 视角"
-    else
-        AimMode = "Camera"
-        AimModeBtn.Text = "🎯 瞄准模式: 相机"
-    end
-end)
-
+-- 按钮事件
 ToggleBtn.MouseButton1Click:Connect(function()
     Enabled = not Enabled
-    UpdateButtonText(ToggleBtn, "🔥 自瞄: ", Enabled)
+    UpdateButtonText(ToggleBtn, "🎯 自瞄: ", Enabled)
+end)
+
+AimModeBtn.MouseButton1Click:Connect(function()
+    AimMode = AimMode == "Camera" and "Viewport" or "Camera"
+    AimModeBtn.Text = "🔧 瞄准模式: " .. (AimMode == "Camera" and "相机" or "视角")
 end)
 
 ESPToggleBtn.MouseButton1Click:Connect(function()
     ESPEnabled = not ESPEnabled
     UpdateButtonText(ESPToggleBtn, "👁️ ESP: ", ESPEnabled)
+    UpdateESP()
 end)
 
 WallCheckBtn.MouseButton1Click:Connect(function()
@@ -389,6 +339,11 @@ SingleTargetBtn.MouseButton1Click:Connect(function()
     if not LockSingleTarget then
         LockedTarget = nil
     end
+end)
+
+FOVCircleBtn.MouseButton1Click:Connect(function()
+    Circle.Visible = not Circle.Visible
+    UpdateButtonText(FOVCircleBtn, "⭕ FOV圆圈: ", Circle.Visible)
 end)
 
 FOVInput.FocusLost:Connect(function()
@@ -410,7 +365,6 @@ PredictionInput.FocusLost:Connect(function()
     end
 end)
 
--- 名字锁定功能
 TargetNameInput.FocusLost:Connect(function()
     if TargetNameInput.Text ~= "" then
         if LockTargetByName(TargetNameInput.Text) then
@@ -420,28 +374,6 @@ TargetNameInput.FocusLost:Connect(function()
         end
     end
 end)
-
-local function toggleUI()
-    isExpanded = not isExpanded
-    
-    if isExpanded then
-        Frame.Size = UDim2.new(0, 250, 0, 400)
-        ToggleButton.Text = "▲"
-        for _, element in pairs(UIElements) do
-            element.Visible = true
-        end
-    else
-        Frame.Size = UDim2.new(0, 250, 0, 32)
-        ToggleButton.Text = "▼"
-        for _, element in pairs(UIElements) do
-            if element ~= Title then
-                element.Visible = false
-            end
-        end
-    end
-end
-
-ToggleButton.MouseButton1Click:Connect(toggleUI)
 
 -- ==================== 主循环 ====================
 RunService.RenderStepped:Connect(function()
@@ -469,19 +401,27 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- 按键绑定
 UIS.InputBegan:Connect(function(input)
     if input.KeyCode == Enum.KeyCode.U then
-        toggleUI()
+        isExpanded = not isExpanded
+        Frame.Visible = isExpanded
+        ToggleButton.Text = isExpanded and "▲" or "▼"
     elseif input.KeyCode == Enum.KeyCode.F then
         Enabled = not Enabled
-        UpdateButtonText(ToggleBtn, "🔥 自瞄: ", Enabled)
-    elseif input.KeyCode == Enum.KeyCode.T then
-        if TargetNameInput.Text ~= "" then
-            LockTargetByName(TargetNameInput.Text)
-        end
+        UpdateButtonText(ToggleBtn, "🎯 自瞄: ", Enabled)
+    elseif input.KeyCode == Enum.KeyCode.T and TargetNameInput.Text ~= "" then
+        LockTargetByName(TargetNameInput.Text)
+    elseif input.KeyCode == Enum.KeyCode.V then
+        ESPEnabled = not ESPEnabled
+        UpdateButtonText(ESPToggleBtn, "👁️ ESP: ", ESPEnabled)
+        UpdateESP()
     end
 end)
 
-print("💀 死锁预判自瞄加载完成 - 按F键切换自瞄，U键控制UI，T键锁定输入名字的玩家")
-print("当前预判系数:", Prediction)
-print("死锁模式已启用")
+-- 初始化ESP
+UpdateESP()
+
+print("🔥 终极自瞄系统加载完成！")
+print("快捷键: F-开关自瞄, T-锁定目标, V-开关ESP, U-隐藏/显示UI")
+print("ESP和穿墙检测已默认开启")

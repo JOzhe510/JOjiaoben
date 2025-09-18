@@ -151,12 +151,12 @@ local function CreateESPForCharacter(player, character)
             )
             highlight.Enabled = true
             
-            -- 更新标签
+            -- 更新标签 - 调整位置使其不遮挡视线
             nameLabel.Text = player.Name
-            nameLabel.Position = Vector2.new(headPos.X, headPos.Y - 30) -- 名字在上
+            nameLabel.Position = Vector2.new(headPos.X, headPos.Y - 40) -- 名字在上，距离更远
             
             healthLabel.Text = math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth)
-            healthLabel.Position = Vector2.new(headPos.X, headPos.Y - 15) -- 血量在下
+            healthLabel.Position = Vector2.new(headPos.X, headPos.Y - 25) -- 血量在下，距离更远
             
             nameLabel.Visible = true
             healthLabel.Visible = true
@@ -365,6 +365,7 @@ local function LockTargetByName(playerName)
                 local head = player.Character:FindFirstChild("Head")
                 if head then
                     LockedTarget = head
+                    LockSingleTarget = true  -- 强制开启单锁模式
                     return true
                 end
             end
@@ -372,6 +373,14 @@ local function LockTargetByName(playerName)
     end
     LockedTarget = nil
     return false
+end
+
+-- ==================== 取消名字锁定 ====================
+local function CancelNameLock()
+    LockedTarget = nil
+    LockSingleTarget = false
+    TargetNameInput.Text = ""
+    TargetNameInput.BackgroundColor3 = Theme.Button
 end
 
 -- ==================== 检查目标是否有效 ====================
@@ -429,7 +438,7 @@ UIStroke.Color = Color3.fromRGB(60, 60, 80)
 UIStroke.Thickness = 2
 UIStroke.Parent = Frame
 
--- 添加滚动功能
+-- 添加滚动功能 - 修复滚动区域
 local ScrollFrame = Instance.new("ScrollingFrame")
 ScrollFrame.Size = UDim2.new(1, -10, 1, -42)
 ScrollFrame.Position = UDim2.new(0, 5, 0, 37)
@@ -437,8 +446,15 @@ ScrollFrame.BackgroundTransparency = 1
 ScrollFrame.BorderSizePixel = 0
 ScrollFrame.ScrollBarThickness = 6
 ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 120)
-ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 550)
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 650) -- 增加画布大小
+ScrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+ScrollFrame.VerticalScrollBarInset = Enum.ScrollBarInset.Always
 ScrollFrame.Parent = Frame
+
+-- 创建一个内部容器来存放所有UI元素
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Padding = UDim.new(0, 5)
+UIListLayout.Parent = ScrollFrame
 
 local ToggleButton = Instance.new("TextButton")
 ToggleButton.Size = UDim2.new(0, 32, 0, 22)
@@ -468,11 +484,10 @@ Title.Parent = Frame
 table.insert(UIElements, Title)
 
 -- 按钮创建函数
-local function CreateStyledButton(name, positionY, text)
+local function CreateStyledButton(name, text)
     local button = Instance.new("TextButton")
     button.Name = name
     button.Size = UDim2.new(0.9, 0, 0, 36)
-    button.Position = UDim2.new(0.05, 0, positionY, 0)
     button.Text = text
     button.BackgroundColor3 = Theme.Button
     button.BackgroundTransparency = 0.1
@@ -494,10 +509,9 @@ local function CreateStyledButton(name, positionY, text)
 end
 
 -- 输入框创建函数
-local function CreateStyledTextBox(positionY, text, placeholder)
+local function CreateStyledTextBox(text, placeholder)
     local textBox = Instance.new("TextBox")
     textBox.Size = UDim2.new(0.9, 0, 0, 36)
-    textBox.Position = UDim2.new(0.05, 0, positionY, 0)
     textBox.Text = text
     textBox.PlaceholderText = placeholder
     textBox.BackgroundColor3 = Theme.Button
@@ -513,18 +527,19 @@ local function CreateStyledTextBox(positionY, text, placeholder)
 end
 
 -- 创建所有功能按钮
-local ToggleBtn = CreateStyledButton("ToggleBtn", 0.10, "🎯 自瞄: 开启")
-local AimModeBtn = CreateStyledButton("AimModeBtn", 0.20, "🔧 瞄准模式: 相机")
-local ESPToggleBtn = CreateStyledButton("ESPToggleBtn", 0.30, "👁️ ESP: 开启")
-local WallCheckBtn = CreateStyledButton("WallCheckBtn", 0.40, "🧱 穿墙检测: 开启")
-local TeamCheckBtn = CreateStyledButton("TeamCheckBtn", 0.50, "🎯 队友检测: 开启")
-local PredictionBtn = CreateStyledButton("PredictionBtn", 0.60, "⚡ 预判模式: 开启")
-local SingleTargetBtn = CreateStyledButton("SingleTargetBtn", 0.70, "🔒 单锁模式: 关闭")
-local FOVCircleBtn = CreateStyledButton("FOVCircleBtn", 0.80, "⭕ FOV圆圈: 开启")
+local ToggleBtn = CreateStyledButton("ToggleBtn", "🎯 自瞄: 开启")
+local AimModeBtn = CreateStyledButton("AimModeBtn", "🔧 瞄准模式: 相机")
+local ESPToggleBtn = CreateStyledButton("ESPToggleBtn", "👁️ ESP: 开启")
+local WallCheckBtn = CreateStyledButton("WallCheckBtn", "🧱 穿墙检测: 开启")
+local TeamCheckBtn = CreateStyledButton("TeamCheckBtn", "🎯 队友检测: 开启")
+local PredictionBtn = CreateStyledButton("PredictionBtn", "⚡ 预判模式: 开启")
+local SingleTargetBtn = CreateStyledButton("SingleTargetBtn", "🔒 单锁模式: 关闭")
+local FOVCircleBtn = CreateStyledButton("FOVCircleBtn", "⭕ FOV圆圈: 开启")
 
-local FOVInput = CreateStyledTextBox(0.90, tostring(FOV), "FOV范围")
-local PredictionInput = CreateStyledTextBox(1.00, tostring(Prediction), "预判系数")
-local TargetNameInput = CreateStyledTextBox(1.10, "", "输入玩家名字锁定")
+local FOVInput = CreateStyledTextBox(tostring(FOV), "FOV范围")
+local PredictionInput = CreateStyledTextBox(tostring(Prediction), "预判系数")
+local TargetNameInput = CreateStyledTextBox("", "输入玩家名字锁定")
+local CancelLockBtn = CreateStyledButton("CancelLockBtn", "❌ 取消名字锁定")
 
 -- 更新按钮状态
 local function UpdateButtonText(button, text, state)
@@ -609,10 +624,18 @@ TargetNameInput.FocusLost:Connect(function()
     if TargetNameInput.Text ~= "" then
         if LockTargetByName(TargetNameInput.Text) then
             TargetNameInput.BackgroundColor3 = Theme.Success
+            SingleTargetBtn.Text = "🔒 单锁模式: 开启"
+            SingleTargetBtn.BackgroundColor3 = Theme.Success
         else
             TargetNameInput.BackgroundColor3 = Theme.Warning
         end
     end
+end)
+
+CancelLockBtn.MouseButton1Click:Connect(function()
+    CancelNameLock()
+    SingleTargetBtn.Text = "🔒 单锁模式: 关闭"
+    SingleTargetBtn.BackgroundColor3 = Theme.Warning
 end)
 
 -- 修复展开/收起功能
@@ -626,6 +649,40 @@ ToggleButton.MouseButton1Click:Connect(function()
     ToggleButton.Text = isExpanded and "▲" or "▼"
     Frame.Size = isExpanded and UDim2.new(0, 280, 0, 420) or UDim2.new(0, 280, 0, 32)
     ScrollFrame.Visible = isExpanded
+end)
+
+-- ==================== 键盘快捷键 ====================
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.F then
+        Enabled = not Enabled
+        UpdateButtonText(ToggleBtn, "🎯 自瞄: ", Enabled)
+    elseif input.KeyCode == Enum.KeyCode.V then
+        ESPEnabled = not ESPEnabled
+        UpdateButtonText(ESPToggleBtn, "👁️ ESP: ", ESPEnabled)
+        UpdateESP()
+    elseif input.KeyCode == Enum.KeyCode.U then
+        isExpanded = not isExpanded
+        for _, element in pairs(UIElements) do
+            if element ~= Title then
+                element.Visible = isExpanded
+            end
+        end
+        ToggleButton.Text = isExpanded and "▲" or "▼"
+        Frame.Size = isExpanded and UDim2.new(0, 280, 0, 420) or UDim2.new(0, 280, 0, 32)
+        ScrollFrame.Visible = isExpanded
+    elseif input.KeyCode == Enum.KeyCode.T then
+        LockSingleTarget = not LockSingleTarget
+        UpdateButtonText(SingleTargetBtn, "🔒 单锁模式: ", LockSingleTarget)
+        if not LockSingleTarget then
+            LockedTarget = nil
+        end
+    elseif input.KeyCode == Enum.KeyCode.X then
+        CancelNameLock()
+        SingleTargetBtn.Text = "🔒 单锁模式: 关闭"
+        SingleTargetBtn.BackgroundColor3 = Theme.Warning
+    end
 end)
 
 -- ==================== 主循环 ====================
@@ -694,5 +751,5 @@ end)
 UpdateESP()
 
 print("🔥 终极自瞄系统加载完成！")
-print("快捷键: F-开关自瞄, T-锁定目标, V-开关ESP, U-隐藏/显示UI")
+print("快捷键: F-开关自瞄, T-锁定目标, V-开关ESP, U-隐藏/显示UI, X-取消名字锁定")
 print("ESP和穿墙检测已默认开启")

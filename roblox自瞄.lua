@@ -273,10 +273,14 @@ local function CalculatePredictedPosition(target)
     local distance = (head.Position - Camera.CFrame.Position).Magnitude
     local travelTime = distance / 1000
     
-    -- 计算预判位置 - 将头部位置按速度方向偏移
-    local predictedHeadPosition = head.Position + (target.Velocity * travelTime * Prediction)
+    -- 核心修改：预判系数直接控制偏移量
+    -- Prediction=0: 无预判（瞄准当前位置）
+    -- Prediction>0: 正向预判（瞄准移动方向前方）
+    -- Prediction<0: 反向预判（瞄准移动方向后方）
+    local velocityOffset = target.Velocity * travelTime * Prediction
     
-    return predictedHeadPosition
+    -- 返回预判位置（头部位置 + 速度方向偏移）
+    return head.Position + velocityOffset
 end
 
 -- ==================== 双模式瞄准系统 ====================

@@ -374,6 +374,24 @@ local function LockTargetByName(playerName)
     return false
 end
 
+-- ==================== 检查目标是否有效 ====================
+local function IsTargetValid(target)
+    if not target then return false end
+    
+    -- 检查目标是否仍然存在
+    if not target:IsDescendantOf(workspace) then
+        return false
+    end
+    
+    -- 检查目标的生命值
+    local humanoid = target.Parent:FindFirstChild("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then
+        return false
+    end
+    
+    return true
+end
+
 -- ==================== 完整UI界面 ====================
 local Theme = {
     Background = Color3.fromRGB(28, 28, 38),
@@ -624,6 +642,13 @@ RunService.RenderStepped:Connect(function()
     
     -- 自瞄逻辑
     if not Enabled then return end
+    
+    -- 检查当前锁定目标是否有效（生命值>0）
+    if LockedTarget and LockSingleTarget then
+        if not IsTargetValid(LockedTarget) then
+            LockedTarget = nil  -- 目标无效，解除锁定
+        end
+    end
     
     if not LockedTarget or not LockSingleTarget then
         LockedTarget = FindTargetInView() -- 改为使用视角对准的目标选择

@@ -29,7 +29,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 280, 0, 580) -- 增加高度以容纳新功能
+Frame.Size = UDim2.new(0, 280, 0, 650) -- 增加高度以容纳传送功能
 Frame.Position = UDim2.new(0, 10, 0, 10)
 Frame.BackgroundColor3 = Theme.Background
 Frame.BackgroundTransparency = 0.1
@@ -55,7 +55,7 @@ ScrollFrame.BackgroundTransparency = 1
 ScrollFrame.BorderSizePixel = 0
 ScrollFrame.ScrollBarThickness = 6
 ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 120)
-ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 850) -- 增加画布大小
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 1000) -- 增加画布大小
 ScrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
 ScrollFrame.VerticalScrollBarInset = Enum.ScrollBarInset.Always
 ScrollFrame.Parent = Frame
@@ -165,7 +165,8 @@ end
 -- 创建功能按钮
 local SuicideBtn = CreateStyledButton("SuicideBtn", "💀 自杀")
 local RespawnBtn = CreateStyledButton("RespawnBtn", "🔁 原地复活")
-local FollowBtn = CreateStyledButton("FollowBtn", "👥 追踪玩家")
+local FollowBtn = CreateStyledButton("FollowBtn", "👥 平滑追踪")
+local TeleportBtn = CreateStyledButton("TeleportBtn", "🔮 直接传送") -- 新增传送按钮
 local BulletTrackBtn = CreateStyledButton("BulletTrackBtn", "🎯 子弹追踪")
 
 -- 创建追踪功能相关的UI元素
@@ -175,6 +176,12 @@ CreateLabel("追踪速度 (1-9999):")
 local FollowSpeedTextBox = CreateTextBox("FollowSpeedTextBox", "输入速度", "100")
 CreateLabel("追踪距离 (1-50):")
 local FollowDistanceTextBox = CreateTextBox("FollowDistanceTextBox", "输入距离", "3")
+
+-- 创建传送功能相关的UI元素
+CreateLabel("传送高度偏移 (0-10):")
+local TeleportHeightTextBox = CreateTextBox("TeleportHeightTextBox", "输入高度偏移", "1.5")
+CreateLabel("传送角度偏移 (0-360):")
+local TeleportAngleTextBox = CreateTextBox("TeleportAngleTextBox", "输入角度偏移", "180")
 
 -- 创建子弹追踪相关的UI元素
 CreateLabel("子弹追踪目标:")
@@ -264,7 +271,10 @@ local FollowService = {
     Connection = nil,
     LastPosition = Vector3.new(0, 0, 0),
     PredictionTime = 0.1,
-    SmoothingFactor = 0.8
+    SmoothingFactor = 0.8,
+    Mode = "Follow", -- 新增模式: "Follow" 或 "Teleport"
+    TeleportHeight = 1.5,
+    TeleportAngle = 180
 }
 
 function FollowService:FindTargetPlayer(targetName)
@@ -315,7 +325,8 @@ function FollowService:StartFollowing()
         
         if not self.TargetPlayer or not self.TargetPlayer.Character then
             self:StopFollowing()
-            FollowBtn.Text = "👥 追踪玩家"
+            FollowBtn.Text = "👥 平滑追踪"
+            TeleportBtn.Text = "🔮 直接传送"
             self.Enabled = false
             print("目标玩家不存在或已离开游戏")
             return
@@ -329,32 +340,63 @@ function FollowService:StartFollowing()
             return
         end
         
-        local predictedPosition = self:PredictPosition(targetRoot, deltaTime)
-        local targetCFrame = targetRoot.CFrame
-        local behindOffset = targetCFrame.LookVector * -self.FollowDistance
-        local targetPosition = predictedPosition + behindOffset + Vector3.new(0, 1.5, 0)
-        
-        local direction = (targetPosition - localRoot.Position).Unit
-        local distance = (targetPosition - localRoot.Position).Magnitude
-        
-        local actualSpeed = self.FollowSpeed
-        if distance > 10 then
-            actualSpeed = actualSpeed * 2
-        elseif distance > 5 then
-            actualSpeed = actualSpeed * 1.5
-        end
-        
-        actualSpeed = math.min(actualSpeed, 9999)
-        local smoothVelocity = self.SmoothingFactor * localRoot.Velocity + (1 - self.SmoothingFactor) * direction * actualSpeed
-        
-        localRoot.Velocity = smoothVelocity
-        
-        if distance < 1 then
+        if self.Mode == "Teleport" then
+            -- 直接传送模式 - 无抖动
+            local targetCFrame = targetRoot.CFrame
+            local angleRad = math.rad(self.TeleportAngle)
+            
+            -- 计算偏移方向
+            local offsetDirection = Vector3.new(
+                math.sin(angleRad) * self.FollowDistance,
+                self.TeleportHeight,
+                math.cos(angleRad) * self.FollowDistance
+            )
+            
+            -- 应用旋转到偏移方向
+            local rotatedOffset = targetCFrame:VectorToWorldSpace(offsetDirection)
+            local targetPosition = targetRoot.Position + rotatedOffset
+            
+            -- 直接传送到目标位置
+            localRoot.CFrame = CFrame.new(targetPosition, Vector3.new(targetRoot.Position.X, targetPosition.Y, targetRoot.Position.Z))
+            
+            -- 保持零速度避免物理引擎干扰
             localRoot.Velocity = Vector3.new(0, 0, 0)
-        end
-        
-        if distance > 2 then
-            localRoot.CFrame = CFrame.new(localRoot.Position, Vector3.new(targetPosition.X, localRoot.Position.Y, targetPosition.Z))
+            localRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            localRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+        else
+            -- 平滑追踪模式 (优化版)
+            local predictedPosition = self:PredictPosition(targetRoot, deltaTime)
+            local targetCFrame = targetRoot.CFrame
+            local behindOffset = targetCFrame.LookVector * -self.FollowDistance
+            local targetPosition = predictedPosition + behindOffset + Vector3.new(0, 1.5, 0)
+            
+            local direction = (targetPosition - localRoot.Position).Unit
+            local distance = (targetPosition - localRoot.Position).Magnitude
+            
+            local actualSpeed = self.FollowSpeed
+            if distance > 10 then
+                actualSpeed = actualSpeed * 2
+            elseif distance > 5 then
+                actualSpeed = actualSpeed * 1.5
+            end
+            
+            actualSpeed = math.min(actualSpeed, 9999)
+            
+            -- 使用更平滑的速度计算
+            local smoothVelocity = self.SmoothingFactor * localRoot.Velocity + (1 - self.SmoothingFactor) * direction * actualSpeed
+            
+            -- 应用速度
+            localRoot.Velocity = smoothVelocity
+            
+            -- 当距离较近时停止移动
+            if distance < 1 then
+                localRoot.Velocity = Vector3.new(0, 0, 0)
+            end
+            
+            -- 保持面向目标
+            if distance > 2 then
+                localRoot.CFrame = CFrame.new(localRoot.Position, Vector3.new(targetPosition.X, localRoot.Position.Y, targetPosition.Z))
+            end
         end
     end)
 end
@@ -369,18 +411,25 @@ function FollowService:StopFollowing()
     local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
     if localRoot then
         localRoot.Velocity = Vector3.new(0, 0, 0)
+        localRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        localRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
     end
     
     self.LastPosition = Vector3.new(0, 0, 0)
 end
 
-function FollowService:ToggleFollowing()
+function FollowService:ToggleFollowing(mode)
+    if mode then
+        self.Mode = mode
+    end
+    
     self.Enabled = not self.Enabled
     
     if self.Enabled then
         local targetName = TargetPlayerTextBox.Text
         if targetName == "" then
-            FollowBtn.Text = "👥 追踪玩家"
+            FollowBtn.Text = "👥 平滑追踪"
+            TeleportBtn.Text = "🔮 直接传送"
             self.Enabled = false
             return
         end
@@ -388,7 +437,8 @@ function FollowService:ToggleFollowing()
         self.TargetPlayer = self:FindTargetPlayer(targetName)
         
         if not self.TargetPlayer then
-            FollowBtn.Text = "👥 追踪玩家"
+            FollowBtn.Text = "👥 平滑追踪"
+            TeleportBtn.Text = "🔮 直接传送"
             self.Enabled = false
             print("未找到玩家: " .. targetName)
             return
@@ -404,19 +454,51 @@ function FollowService:ToggleFollowing()
             self.FollowDistance = math.clamp(distance, 1, 50)
         end
         
-        FollowBtn.Text = "🛑 停止追踪"
+        -- 获取传送参数
+        local height = tonumber(TeleportHeightTextBox.Text)
+        if height then
+            self.TeleportHeight = math.clamp(height, 0, 10)
+        end
+        
+        local angle = tonumber(TeleportAngleTextBox.Text)
+        if angle then
+            self.TeleportAngle = math.clamp(angle, 0, 360)
+        end
+        
+        if self.Mode == "Teleport" then
+            TeleportBtn.Text = "🛑 停止传送"
+            FollowBtn.Text = "👥 平滑追踪"
+        else
+            FollowBtn.Text = "🛑 停止追踪"
+            TeleportBtn.Text = "🔮 直接传送"
+        end
+        
         self:StartFollowing()
-        print("开始追踪: " .. self.TargetPlayer.Name)
+        print("开始" .. (self.Mode == "Teleport" and "传送" or "追踪") .. ": " .. self.TargetPlayer.Name)
     else
-        FollowBtn.Text = "👥 追踪玩家"
+        FollowBtn.Text = "👥 平滑追踪"
+        TeleportBtn.Text = "🔮 直接传送"
         self:StopFollowing()
-        print("停止追踪")
+        print("停止" .. (self.Mode == "Teleport" and "传送" or "追踪"))
     end
 end
 
 -- 追踪按钮功能
 FollowBtn.MouseButton1Click:Connect(function()
-    FollowService:ToggleFollowing()
+    if FollowService.Enabled and FollowService.Mode == "Follow" then
+        FollowService:ToggleFollowing()
+    else
+        FollowService:ToggleFollowing("Follow")
+    end
+end)
+
+-- 传送按钮功能
+TeleportBtn.MouseButton1Click:Connect(function()
+    if FollowService.Enabled and FollowService.Mode == "Teleport" then
+        FollowService:ToggleFollowing()
+    else
+        FollowService:ToggleFollowing("Teleport")
+    end
 end)
 
 -- ==================== 极致子弹追踪功能 ====================
@@ -730,7 +812,8 @@ Players.PlayerRemoving:Connect(function(player)
     if FollowService.Enabled and FollowService.TargetPlayer == player then
         FollowService.Enabled = false
         FollowService:StopFollowing()
-        FollowBtn.Text = "👥 追踪玩家"
+        FollowBtn.Text = "👥 平滑追踪"
+        TeleportBtn.Text = "🔮 直接传送"
         print("目标玩家已离开游戏，停止追踪")
     end
     
@@ -751,7 +834,7 @@ ToggleButton.MouseButton1Click:Connect(function()
         end
     end
     ToggleButton.Text = isExpanded and "▲" or "▼"
-    Frame.Size = isExpanded and UDim2.new(0, 280, 0, 580) or UDim2.new(0, 280, 0, 32)
+    Frame.Size = isExpanded and UDim2.new(0, 280, 0, 650) or UDim2.new(0, 280, 0, 32)
     ScrollFrame.Visible = isExpanded
 end)
 
@@ -767,13 +850,18 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
             end
         end
         ToggleButton.Text = isExpanded and "▲" or "▼"
-        Frame.Size = isExpanded and UDim2.new(0, 280, 0, 580) or UDim2.new(0, 280, 0, 32)
+        Frame.Size = isExpanded and UDim2.new(0, 280, 0, 650) or UDim2.new(0, 280, 0, 32)
         ScrollFrame.Visible = isExpanded
-    elseif input.KeyCode == Enum.KeyCode.F and FollowService.Enabled then
+    elseif input.KeyCode == Enum.KeyCode.F and FollowService.Enabled and FollowService.Mode == "Follow" then
         FollowService.Enabled = false
         FollowService:StopFollowing()
-        FollowBtn.Text = "👥 追踪玩家"
+        FollowBtn.Text = "👥 平滑追踪"
         print("快捷键停止追踪")
+    elseif input.KeyCode == Enum.KeyCode.T and FollowService.Enabled and FollowService.Mode == "Teleport" then
+        FollowService.Enabled = false
+        FollowService:StopFollowing()
+        TeleportBtn.Text = "🔮 直接传送"
+        print("快捷键停止传送")
     elseif input.KeyCode == Enum.KeyCode.B and BulletTrackService.Enabled then
         BulletTrackService.Enabled = false
         BulletTrackService:StopTracking()
@@ -789,7 +877,8 @@ LocalPlayer.CharacterAdded:Connect(function(character)
         if FollowService.Enabled then
             FollowService.Enabled = false
             FollowService:StopFollowing()
-            FollowBtn.Text = "👥 追踪玩家"
+            FollowBtn.Text = "👥 平滑追踪"
+            TeleportBtn.Text = "🔮 直接传送"
             print("角色死亡，停止追踪")
         end
         
@@ -803,5 +892,5 @@ LocalPlayer.CharacterAdded:Connect(function(character)
 end)
 
 print("🔮 功能菜单加载完成！")
-print("快捷键: U-隐藏/显示UI, F-停止追踪, B-停止子弹追踪")
-print("子弹追踪功能已加载：支持物理子弹、光线武器、远程事件拦截")
+print("快捷键: U-隐藏/显示UI, F-停止追踪, T-停止传送, B-停止子弹追踪")
+print("追踪功能已改进：新增直接传送模式，无抖动")

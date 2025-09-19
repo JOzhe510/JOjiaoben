@@ -1,8 +1,43 @@
-local library = loadstring(game:HttpGet(('https://github.com/DevSloPo/Auto/raw/main/Ware-obfuscated.lua'))()
+local library = loadstring(game:HttpGet('https://github.com/DevSloPo/Auto/raw/main/Ware-obfuscated.lua'))()
+
+-- 获取必要的服务
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- 创建复活服务表
+local respawnService = {
+    autoRespawn = false,
+    followPlayer = nil,
+    following = false,
+    followSpeed = 100,
+    followDistance = 3,
+    savedPositions = {},
+    followConnection = nil
+}
 
 local window = library:new("复活功能脚本")
 local XKHub = window:Tab("复活功能", "7733774602")
 local XK = XKHub:section("复活系统", true)
+
+-- 获取玩家列表
+local playerOptions = {"选择玩家"}
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        table.insert(playerOptions, player.Name)
+    end
+end
+
+-- 玩家列表更新函数
+local function updatePlayerList()
+    playerOptions = {"选择玩家"}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            table.insert(playerOptions, player.Name)
+        end
+    end
+end
 
 -- 创建UI界面
 XK:Label("复活功能控制")
@@ -184,3 +219,7 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
         end
     end
 end)
+
+-- 玩家加入/离开时更新列表
+Players.PlayerAdded:Connect(updatePlayerList)
+Players.PlayerRemoving:Connect(updatePlayerList)

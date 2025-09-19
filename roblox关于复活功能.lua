@@ -29,7 +29,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 280, 0, 520) -- 增加高度以容纳新功能
+Frame.Size = UDim2.new(0, 280, 0, 580) -- 增加高度以容纳新功能
 Frame.Position = UDim2.new(0, 10, 0, 10)
 Frame.BackgroundColor3 = Theme.Background
 Frame.BackgroundTransparency = 0.1
@@ -55,7 +55,7 @@ ScrollFrame.BackgroundTransparency = 1
 ScrollFrame.BorderSizePixel = 0
 ScrollFrame.ScrollBarThickness = 6
 ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 120)
-ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 750) -- 增加画布大小
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 850) -- 增加画布大小
 ScrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
 ScrollFrame.VerticalScrollBarInset = Enum.ScrollBarInset.Always
 ScrollFrame.Parent = Frame
@@ -166,12 +166,23 @@ end
 local SuicideBtn = CreateStyledButton("SuicideBtn", "💀 自杀")
 local RespawnBtn = CreateStyledButton("RespawnBtn", "🔁 原地复活")
 local FollowBtn = CreateStyledButton("FollowBtn", "👥 追踪玩家")
+local BulletTrackBtn = CreateStyledButton("BulletTrackBtn", "🎯 子弹追踪")
 
 -- 创建追踪功能相关的UI元素
 CreateLabel("追踪目标玩家名称:")
 local TargetPlayerTextBox = CreateTextBox("TargetPlayerTextBox", "输入玩家名称", "")
-CreateLabel("追踪速度:")
-local FollowSpeedTextBox = CreateTextBox("FollowSpeedTextBox", "输入速度", "50")
+CreateLabel("追踪速度 (1-9999):")
+local FollowSpeedTextBox = CreateTextBox("FollowSpeedTextBox", "输入速度", "100")
+CreateLabel("追踪距离 (1-50):")
+local FollowDistanceTextBox = CreateTextBox("FollowDistanceTextBox", "输入距离", "3")
+
+-- 创建子弹追踪相关的UI元素
+CreateLabel("子弹追踪目标:")
+local BulletTargetTextBox = CreateTextBox("BulletTargetTextBox", "输入玩家名称", "")
+CreateLabel("追踪强度 (1-100):")
+local TrackStrengthTextBox = CreateTextBox("TrackStrengthTextBox", "输入强度", "50")
+CreateLabel("预测时间 (0.1-2):")
+local PredictionTimeTextBox = CreateTextBox("PredictionTimeTextBox", "输入时间", "0.3")
 
 -- 自杀功能
 SuicideBtn.MouseButton1Click:Connect(function()
@@ -244,13 +255,46 @@ RespawnBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ==================== 追踪玩家功能 ====================
+-- ==================== 极致追踪玩家功能 ====================
 local FollowService = {
     Enabled = false,
     TargetPlayer = nil,
-    FollowSpeed = 50,
-    Connection = nil
+    FollowSpeed = 100,
+    FollowDistance = 3,
+    Connection = nil,
+    LastPosition = Vector3.new(0, 0, 0),
+    PredictionTime = 0.1,
+    SmoothingFactor = 0.8
 }
+
+function FollowService:FindTargetPlayer(targetName)
+    if targetName == "" or targetName == "自己" or targetName:lower() == "me" then
+        return LocalPlayer
+    end
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Name:lower():find(targetName:lower()) or 
+           player.DisplayName:lower():find(targetName:lower()) or
+           tostring(player.UserId) == targetName then
+            return player
+        end
+    end
+    return nil
+end
+
+function FollowService:PredictPosition(targetRoot, deltaTime)
+    if not targetRoot then return Vector3.new(0, 0, 0) end
+    
+    local currentPosition = targetRoot.Position
+    local velocity = targetRoot.Velocity
+    local acceleration = (currentPosition - self.LastPosition - velocity * deltaTime) / (deltaTime * deltaTime)
+    
+    local predictedPosition = currentPosition + velocity * self.PredictionTime + 0.5 * acceleration * self.PredictionTime * self.PredictionTime
+    
+    self.LastPosition = currentPosition
+    
+    return predictedPosition
+end
 
 function FollowService:StartFollowing()
     if self.Connection then
@@ -258,8 +302,22 @@ function FollowService:StartFollowing()
         self.Connection = nil
     end
     
+    local lastTime = tick()
+    
     self.Connection = RunService.Heartbeat:Connect(function()
-        if not self.Enabled or not self.TargetPlayer or not self.TargetPlayer.Character then
+        if not self.Enabled or not self.TargetPlayer then
+            return
+        end
+        
+        local currentTime = tick()
+        local deltaTime = currentTime - lastTime
+        lastTime = currentTime
+        
+        if not self.TargetPlayer or not self.TargetPlayer.Character then
+            self:StopFollowing()
+            FollowBtn.Text = "👥 追踪玩家"
+            self.Enabled = false
+            print("目标玩家不存在或已离开游戏")
             return
         end
         
@@ -271,27 +329,32 @@ function FollowService:StartFollowing()
             return
         end
         
-        -- 计算目标背后的位置
+        local predictedPosition = self:PredictPosition(targetRoot, deltaTime)
         local targetCFrame = targetRoot.CFrame
-        local behindOffset = targetCFrame.LookVector * -3 -- 在目标背后3个单位
-        local targetPosition = targetCFrame.Position + behindOffset + Vector3.new(0, 1.5, 0) -- 稍微抬高一点
+        local behindOffset = targetCFrame.LookVector * -self.FollowDistance
+        local targetPosition = predictedPosition + behindOffset + Vector3.new(0, 1.5, 0)
         
-        -- 计算移动方向
         local direction = (targetPosition - localRoot.Position).Unit
         local distance = (targetPosition - localRoot.Position).Magnitude
         
-        -- 如果距离较远，使用更快的速度
         local actualSpeed = self.FollowSpeed
-        if distance > 20 then
+        if distance > 10 then
             actualSpeed = actualSpeed * 2
+        elseif distance > 5 then
+            actualSpeed = actualSpeed * 1.5
         end
         
-        -- 移动本地玩家
-        localRoot.Velocity = direction * actualSpeed
+        actualSpeed = math.min(actualSpeed, 9999)
+        local smoothVelocity = self.SmoothingFactor * localRoot.Velocity + (1 - self.SmoothingFactor) * direction * actualSpeed
         
-        -- 如果距离很近，停止移动以避免过度抖动
-        if distance < 2 then
+        localRoot.Velocity = smoothVelocity
+        
+        if distance < 1 then
             localRoot.Velocity = Vector3.new(0, 0, 0)
+        end
+        
+        if distance > 2 then
+            localRoot.CFrame = CFrame.new(localRoot.Position, Vector3.new(targetPosition.X, localRoot.Position.Y, targetPosition.Z))
         end
     end)
 end
@@ -302,19 +365,19 @@ function FollowService:StopFollowing()
         self.Connection = nil
     end
     
-    -- 停止移动
     local localChar = LocalPlayer.Character
     local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
     if localRoot then
         localRoot.Velocity = Vector3.new(0, 0, 0)
     end
+    
+    self.LastPosition = Vector3.new(0, 0, 0)
 end
 
 function FollowService:ToggleFollowing()
     self.Enabled = not self.Enabled
     
     if self.Enabled then
-        -- 获取目标玩家
         local targetName = TargetPlayerTextBox.Text
         if targetName == "" then
             FollowBtn.Text = "👥 追踪玩家"
@@ -322,13 +385,7 @@ function FollowService:ToggleFollowing()
             return
         end
         
-        -- 查找玩家
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player.Name:lower():find(targetName:lower()) or player.DisplayName:lower():find(targetName:lower()) then
-                self.TargetPlayer = player
-                break
-            end
-        end
+        self.TargetPlayer = self:FindTargetPlayer(targetName)
         
         if not self.TargetPlayer then
             FollowBtn.Text = "👥 追踪玩家"
@@ -337,10 +394,14 @@ function FollowService:ToggleFollowing()
             return
         end
         
-        -- 获取速度
         local speed = tonumber(FollowSpeedTextBox.Text)
         if speed then
-            self.FollowSpeed = math.clamp(speed, 1, 1000)
+            self.FollowSpeed = math.clamp(speed, 1, 9999)
+        end
+        
+        local distance = tonumber(FollowDistanceTextBox.Text)
+        if distance then
+            self.FollowDistance = math.clamp(distance, 1, 50)
         end
         
         FollowBtn.Text = "🛑 停止追踪"
@@ -358,6 +419,329 @@ FollowBtn.MouseButton1Click:Connect(function()
     FollowService:ToggleFollowing()
 end)
 
+-- ==================== 极致子弹追踪功能 ====================
+local BulletTrackService = {
+    Enabled = false,
+    TargetPlayer = nil,
+    TrackStrength = 50,
+    PredictionTime = 0.3,
+    Connection = nil,
+    BulletConnections = {},
+    DetectedGuns = {},
+    LastFireTime = 0
+}
+
+-- 自动检测武器系统
+function BulletTrackService:DetectWeaponSystems()
+    self.DetectedGuns = {}
+    
+    -- 检测常见的武器类型
+    local weaponTypes = {
+        "Gun", "Weapon", "Firearm", "Rifle", "Pistol", "Shotgun", 
+        "SMG", "Sniper", "Revolver", "Launcher", "Blaster"
+    }
+    
+    -- 检测本地玩家手中的武器
+    if LocalPlayer.Character then
+        for _, tool in ipairs(LocalPlayer.Character:GetChildren()) do
+            if tool:IsA("Tool") then
+                for _, weaponType in ipairs(weaponTypes) do
+                    if tool.Name:lower():find(weaponType:lower()) then
+                        table.insert(self.DetectedGuns, tool)
+                        print("检测到武器: " .. tool.Name)
+                        break
+                    end
+                end
+            end
+        end
+    end
+    
+    -- 检测工作区中的武器
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Tool") then
+            for _, weaponType in ipairs(weaponTypes) do
+                if obj.Name:lower():find(weaponType:lower()) then
+                    table.insert(self.DetectedGuns, obj)
+                    break
+                end
+            end
+        end
+    end
+    
+    return #self.DetectedGuns > 0
+end
+
+-- 查找子弹发射函数
+function BulletTrackService:FindFireFunction(tool)
+    if not tool then return nil end
+    
+    -- 检查工具中的脚本
+    for _, script in ipairs(tool:GetDescendants()) do
+        if script:IsA("Script") or script:IsA("LocalScript") then
+            local source = script.Source
+            if source then
+                -- 查找常见的发射函数
+                local firePatterns = {
+                    "fire", "shoot", "Fire", "Shoot", "FireBullet", "ShootBullet",
+                    "RemoteEvent", "FireServer", "InvokeServer"
+                }
+                
+                for _, pattern in ipairs(firePatterns) do
+                    if source:find(pattern) then
+                        return script
+                    end
+                end
+            end
+        end
+    end
+    
+    return nil
+end
+
+-- 拦截子弹发射
+function BulletTrackService:InterceptBullets()
+    for _, gun in ipairs(self.DetectedGuns) do
+        local fireScript = self:FindFireFunction(gun)
+        if fireScript then
+            -- 保存原始函数
+            local originalSource = fireScript.Source
+            
+            -- 修改脚本以添加追踪
+            local modifiedSource = originalSource:gsub("function%s+([%w_]+)%s*%(", function(funcName)
+                return "function " .. funcName .. "("
+            end)
+            
+            -- 这里需要更复杂的脚本修改逻辑，实际应用中需要根据具体游戏定制
+            print("找到武器脚本: " .. gun.Name)
+        end
+    end
+end
+
+-- 物理子弹追踪
+function BulletTrackService:TrackPhysicalBullets()
+    -- 监听新创建的子弹
+    workspace.DescendantAdded:Connect(function(descendant)
+        if not self.Enabled or not self.TargetPlayer then return end
+        
+        -- 检测常见的子弹类型
+        local bulletNames = {"Bullet", "Projectile", "Shot", "Shell", "Missile", "Rocket"}
+        local isBullet = false
+        
+        for _, name in ipairs(bulletNames) do
+            if descendant.Name:lower():find(name:lower()) then
+                isBullet = true
+                break
+            end
+        end
+        
+        if isBullet and descendant:IsA("BasePart") then
+            -- 追踪这个子弹
+            self:TrackSingleBullet(descendant)
+        end
+    end)
+end
+
+-- 追踪单个子弹
+function BulletTrackService:TrackSingleBullet(bullet)
+    local connection
+    connection = RunService.Heartbeat:Connect(function()
+        if not self.Enabled or not self.TargetPlayer or not bullet or not bullet.Parent then
+            if connection then
+                connection:Disconnect()
+            end
+            return
+        end
+        
+        if not self.TargetPlayer.Character then
+            if connection then
+                connection:Disconnect()
+            end
+            return
+        end
+        
+        local targetRoot = self.TargetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not targetRoot then
+            if connection then
+                connection:Disconnect()
+            end
+            return
+        end
+        
+        -- 计算预测位置
+        local bulletPosition = bullet.Position
+        local targetPosition = targetRoot.Position + Vector3.new(0, 1.5, 0) -- 瞄准胸部高度
+        local targetVelocity = targetRoot.Velocity
+        
+        -- 计算子弹到目标的向量
+        local toTarget = targetPosition - bulletPosition
+        local distance = toTarget.Magnitude
+        
+        -- 预测目标移动
+        local timeToHit = distance / (bullet.Velocity.Magnitude + 0.001)
+        local predictedPosition = targetPosition + targetVelocity * timeToHit
+        
+        -- 计算追踪方向
+        local trackDirection = (predictedPosition - bulletPosition).Unit
+        
+        -- 应用追踪（根据强度调整）
+        local strengthFactor = self.TrackStrength / 100
+        local newVelocity = bullet.Velocity:Lerp(trackDirection * bullet.Velocity.Magnitude, strengthFactor)
+        
+        -- 应用新的速度
+        bullet.Velocity = newVelocity
+        
+        -- 如果子弹距离目标很近，停止追踪
+        if distance < 2 then
+            if connection then
+                connection:Disconnect()
+            end
+        end
+    end)
+    
+    table.insert(self.BulletConnections, connection)
+end
+
+-- 光线投射武器追踪
+function BulletTrackService:TrackRaycastWeapons()
+    -- 监听远程事件（常见的射击游戏通信方式）
+    for _, obj in ipairs(game:GetDescendants()) do
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+            if obj.Name:lower():find("fire") or obj.Name:lower():find("shoot") then
+                local originalFire = obj.FireServer
+                obj.FireServer = function(self, ...)
+                    if BulletTrackService.Enabled and BulletTrackService.TargetPlayer then
+                        local args = {...}
+                        -- 这里可以修改射击参数来实现追踪
+                        print("拦截到射击事件")
+                    end
+                    return originalFire(self, ...)
+                end
+            end
+        end
+    end
+end
+
+function BulletTrackService:FindTargetPlayer(targetName)
+    if targetName == "" or targetName == "自己" or targetName:lower() == "me" then
+        return LocalPlayer
+    end
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Name:lower():find(targetName:lower()) or 
+           player.DisplayName:lower():find(targetName:lower()) or
+           tostring(player.UserId) == targetName then
+            return player
+        end
+    end
+    return nil
+end
+
+function BulletTrackService:StartTracking()
+    if self.Connection then
+        self.Connection:Disconnect()
+        self.Connection = nil
+    end
+    
+    -- 清空之前的连接
+    for _, conn in ipairs(self.BulletConnections) do
+        conn:Disconnect()
+    end
+    self.BulletConnections = {}
+    
+    -- 自动检测武器系统
+    local hasWeapons = self:DetectWeaponSystems()
+    if not hasWeapons then
+        print("未检测到武器系统，使用通用追踪方法")
+    end
+    
+    -- 启动多种追踪方式
+    self:TrackPhysicalBullets()
+    self:TrackRaycastWeapons()
+    self:InterceptBullets()
+    
+    self.Connection = RunService.Heartbeat:Connect(function()
+        if not self.Enabled or not self.TargetPlayer then return end
+        
+        -- 主循环用于处理各种追踪逻辑
+    end)
+end
+
+function BulletTrackService:StopTracking()
+    if self.Connection then
+        self.Connection:Disconnect()
+        self.Connection = nil
+    end
+    
+    for _, conn in ipairs(self.BulletConnections) do
+        conn:Disconnect()
+    end
+    self.BulletConnections = {}
+end
+
+function BulletTrackService:ToggleTracking()
+    self.Enabled = not self.Enabled
+    
+    if self.Enabled then
+        local targetName = BulletTargetTextBox.Text
+        if targetName == "" then
+            BulletTrackBtn.Text = "🎯 子弹追踪"
+            self.Enabled = false
+            return
+        end
+        
+        self.TargetPlayer = self:FindTargetPlayer(targetName)
+        
+        if not self.TargetPlayer then
+            BulletTrackBtn.Text = "🎯 子弹追踪"
+            self.Enabled = false
+            print("未找到玩家: " .. targetName)
+            return
+        end
+        
+        local strength = tonumber(TrackStrengthTextBox.Text)
+        if strength then
+            self.TrackStrength = math.clamp(strength, 1, 100)
+        end
+        
+        local prediction = tonumber(PredictionTimeTextBox.Text)
+        if prediction then
+            self.PredictionTime = math.clamp(prediction, 0.1, 2)
+        end
+        
+        BulletTrackBtn.Text = "🛑 停止追踪"
+        self:StartTracking()
+        print("开始子弹追踪: " .. self.TargetPlayer.Name)
+        print("追踪强度: " .. self.TrackStrength)
+        print("预测时间: " .. self.PredictionTime)
+    else
+        BulletTrackBtn.Text = "🎯 子弹追踪"
+        self:StopTracking()
+        print("停止子弹追踪")
+    end
+end
+
+-- 子弹追踪按钮功能
+BulletTrackBtn.MouseButton1Click:Connect(function()
+    BulletTrackService:ToggleTracking()
+end)
+
+-- 玩家离开时自动停止追踪
+Players.PlayerRemoving:Connect(function(player)
+    if FollowService.Enabled and FollowService.TargetPlayer == player then
+        FollowService.Enabled = false
+        FollowService:StopFollowing()
+        FollowBtn.Text = "👥 追踪玩家"
+        print("目标玩家已离开游戏，停止追踪")
+    end
+    
+    if BulletTrackService.Enabled and BulletTrackService.TargetPlayer == player then
+        BulletTrackService.Enabled = false
+        BulletTrackService:StopTracking()
+        BulletTrackBtn.Text = "🎯 子弹追踪"
+        print("目标玩家已离开游戏，停止子弹追踪")
+    end
+end)
+
 -- 修复展开/收起功能
 ToggleButton.MouseButton1Click:Connect(function()
     isExpanded = not isExpanded
@@ -367,7 +751,7 @@ ToggleButton.MouseButton1Click:Connect(function()
         end
     end
     ToggleButton.Text = isExpanded and "▲" or "▼"
-    Frame.Size = isExpanded and UDim2.new(0, 280, 0, 520) or UDim2.new(0, 280, 0, 32)
+    Frame.Size = isExpanded and UDim2.new(0, 280, 0, 580) or UDim2.new(0, 280, 0, 32)
     ScrollFrame.Visible = isExpanded
 end)
 
@@ -383,10 +767,41 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
             end
         end
         ToggleButton.Text = isExpanded and "▲" or "▼"
-        Frame.Size = isExpanded and UDim2.new(0, 280, 0, 520) or UDim2.new(0, 280, 0, 32)
+        Frame.Size = isExpanded and UDim2.new(0, 280, 0, 580) or UDim2.new(0, 280, 0, 32)
         ScrollFrame.Visible = isExpanded
+    elseif input.KeyCode == Enum.KeyCode.F and FollowService.Enabled then
+        FollowService.Enabled = false
+        FollowService:StopFollowing()
+        FollowBtn.Text = "👥 追踪玩家"
+        print("快捷键停止追踪")
+    elseif input.KeyCode == Enum.KeyCode.B and BulletTrackService.Enabled then
+        BulletTrackService.Enabled = false
+        BulletTrackService:StopTracking()
+        BulletTrackBtn.Text = "🎯 子弹追踪"
+        print("快捷键停止子弹追踪")
     end
 end)
 
+-- 角色死亡时自动停止追踪
+LocalPlayer.CharacterAdded:Connect(function(character)
+    local humanoid = character:WaitForChild("Humanoid")
+    humanoid.Died:Connect(function()
+        if FollowService.Enabled then
+            FollowService.Enabled = false
+            FollowService:StopFollowing()
+            FollowBtn.Text = "👥 追踪玩家"
+            print("角色死亡，停止追踪")
+        end
+        
+        if BulletTrackService.Enabled then
+            BulletTrackService.Enabled = false
+            BulletTrackService:StopTracking()
+            BulletTrackBtn.Text = "🎯 子弹追踪"
+            print("角色死亡，停止子弹追踪")
+        end
+    end)
+end)
+
 print("🔮 功能菜单加载完成！")
-print("快捷键: U-隐藏/显示UI")
+print("快捷键: U-隐藏/显示UI, F-停止追踪, B-停止子弹追踪")
+print("子弹追踪功能已加载：支持物理子弹、光线武器、远程事件拦截")

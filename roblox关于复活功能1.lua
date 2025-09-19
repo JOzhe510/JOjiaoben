@@ -1,4 +1,4 @@
-local library = loadstring(game:HttpGet(('https://github.com/DevSloPo/Auto/raw/main/Ware-obfuscated.lua')))()
+local library = loadstring(game:HttpGet(('https://github.com/DevSloPo/Auto/raw/main/Ware-obfuscated.lua'))()
 
 local window = library:new("复活功能脚本")
 local XKHub = window:Tab("复活功能", "7733774602")
@@ -184,12 +184,3 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
         end
     end
 end)
-
--- 快捷键说明
-local XKInfo = XKHub:section("快捷键说明", true)
-XKInfo:Label("R键: 快速复活")
-XKInfo:Label("T键: 快速传送")
-XKInfo:Label("F键: 切换追踪")
-
-print("🎮 复活功能脚本加载完成！")
-print("快捷键: R-快速复活, T-快速传送, F-切换追踪")

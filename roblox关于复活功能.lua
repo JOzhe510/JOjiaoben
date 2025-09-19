@@ -29,7 +29,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 280, 0, 460)
+Frame.Size = UDim2.new(0, 280, 0, 520) -- 增加高度以容纳新功能
 Frame.Position = UDim2.new(0, 10, 0, 10)
 Frame.BackgroundColor3 = Theme.Background
 Frame.BackgroundTransparency = 0.1
@@ -55,7 +55,7 @@ ScrollFrame.BackgroundTransparency = 1
 ScrollFrame.BorderSizePixel = 0
 ScrollFrame.ScrollBarThickness = 6
 ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 120)
-ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 690)
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 750) -- 增加画布大小
 ScrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
 ScrollFrame.VerticalScrollBarInset = Enum.ScrollBarInset.Always
 ScrollFrame.Parent = Frame
@@ -117,9 +117,61 @@ local function CreateStyledButton(name, text)
     return button
 end
 
+-- 创建文本框函数
+local function CreateTextBox(name, placeholder, default)
+    local textBoxFrame = Instance.new("Frame")
+    textBoxFrame.Size = UDim2.new(0.9, 0, 0, 36)
+    textBoxFrame.BackgroundTransparency = 1
+    textBoxFrame.Parent = ScrollFrame
+    
+    local textBox = Instance.new("TextBox")
+    textBox.Name = name
+    textBox.Size = UDim2.new(1, 0, 1, 0)
+    textBox.PlaceholderText = placeholder
+    textBox.Text = default
+    textBox.BackgroundColor3 = Theme.Button
+    textBox.BackgroundTransparency = 0.1
+    textBox.TextColor3 = Theme.Text
+    textBox.BorderSizePixel = 0
+    textBox.Font = Enum.Font.Gotham
+    textBox.TextSize = 14
+    textBox.Parent = textBoxFrame
+    
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(0, 6)
+    UICorner.Parent = textBox
+    
+    table.insert(UIElements, textBoxFrame)
+    return textBox
+end
+
+-- 创建标签函数
+local function CreateLabel(text)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.9, 0, 0, 20)
+    label.Text = text
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Theme.Text
+    label.BorderSizePixel = 0
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = ScrollFrame
+    
+    table.insert(UIElements, label)
+    return label
+end
+
 -- 创建功能按钮
 local SuicideBtn = CreateStyledButton("SuicideBtn", "💀 自杀")
 local RespawnBtn = CreateStyledButton("RespawnBtn", "🔁 原地复活")
+local FollowBtn = CreateStyledButton("FollowBtn", "👥 追踪玩家")
+
+-- 创建追踪功能相关的UI元素
+CreateLabel("追踪目标玩家名称:")
+local TargetPlayerTextBox = CreateTextBox("TargetPlayerTextBox", "输入玩家名称", "")
+CreateLabel("追踪速度:")
+local FollowSpeedTextBox = CreateTextBox("FollowSpeedTextBox", "输入速度", "50")
 
 -- 自杀功能
 SuicideBtn.MouseButton1Click:Connect(function()
@@ -192,6 +244,120 @@ RespawnBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+-- ==================== 追踪玩家功能 ====================
+local FollowService = {
+    Enabled = false,
+    TargetPlayer = nil,
+    FollowSpeed = 50,
+    Connection = nil
+}
+
+function FollowService:StartFollowing()
+    if self.Connection then
+        self.Connection:Disconnect()
+        self.Connection = nil
+    end
+    
+    self.Connection = RunService.Heartbeat:Connect(function()
+        if not self.Enabled or not self.TargetPlayer or not self.TargetPlayer.Character then
+            return
+        end
+        
+        local targetRoot = self.TargetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local localChar = LocalPlayer.Character
+        local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
+        
+        if not targetRoot or not localRoot then
+            return
+        end
+        
+        -- 计算目标背后的位置
+        local targetCFrame = targetRoot.CFrame
+        local behindOffset = targetCFrame.LookVector * -3 -- 在目标背后3个单位
+        local targetPosition = targetCFrame.Position + behindOffset + Vector3.new(0, 1.5, 0) -- 稍微抬高一点
+        
+        -- 计算移动方向
+        local direction = (targetPosition - localRoot.Position).Unit
+        local distance = (targetPosition - localRoot.Position).Magnitude
+        
+        -- 如果距离较远，使用更快的速度
+        local actualSpeed = self.FollowSpeed
+        if distance > 20 then
+            actualSpeed = actualSpeed * 2
+        end
+        
+        -- 移动本地玩家
+        localRoot.Velocity = direction * actualSpeed
+        
+        -- 如果距离很近，停止移动以避免过度抖动
+        if distance < 2 then
+            localRoot.Velocity = Vector3.new(0, 0, 0)
+        end
+    end)
+end
+
+function FollowService:StopFollowing()
+    if self.Connection then
+        self.Connection:Disconnect()
+        self.Connection = nil
+    end
+    
+    -- 停止移动
+    local localChar = LocalPlayer.Character
+    local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
+    if localRoot then
+        localRoot.Velocity = Vector3.new(0, 0, 0)
+    end
+end
+
+function FollowService:ToggleFollowing()
+    self.Enabled = not self.Enabled
+    
+    if self.Enabled then
+        -- 获取目标玩家
+        local targetName = TargetPlayerTextBox.Text
+        if targetName == "" then
+            FollowBtn.Text = "👥 追踪玩家"
+            self.Enabled = false
+            return
+        end
+        
+        -- 查找玩家
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player.Name:lower():find(targetName:lower()) or player.DisplayName:lower():find(targetName:lower()) then
+                self.TargetPlayer = player
+                break
+            end
+        end
+        
+        if not self.TargetPlayer then
+            FollowBtn.Text = "👥 追踪玩家"
+            self.Enabled = false
+            print("未找到玩家: " .. targetName)
+            return
+        end
+        
+        -- 获取速度
+        local speed = tonumber(FollowSpeedTextBox.Text)
+        if speed then
+            self.FollowSpeed = math.clamp(speed, 1, 1000)
+        end
+        
+        FollowBtn.Text = "🛑 停止追踪"
+        self:StartFollowing()
+        print("开始追踪: " .. self.TargetPlayer.Name)
+    else
+        FollowBtn.Text = "👥 追踪玩家"
+        self:StopFollowing()
+        print("停止追踪")
+    end
+end
+
+-- 追踪按钮功能
+FollowBtn.MouseButton1Click:Connect(function()
+    FollowService:ToggleFollowing()
+end)
+
 -- 修复展开/收起功能
 ToggleButton.MouseButton1Click:Connect(function()
     isExpanded = not isExpanded
@@ -201,7 +367,7 @@ ToggleButton.MouseButton1Click:Connect(function()
         end
     end
     ToggleButton.Text = isExpanded and "▲" or "▼"
-    Frame.Size = isExpanded and UDim2.new(0, 280, 0, 460) or UDim2.new(0, 280, 0, 32)
+    Frame.Size = isExpanded and UDim2.new(0, 280, 0, 520) or UDim2.new(0, 280, 0, 32)
     ScrollFrame.Visible = isExpanded
 end)
 
@@ -217,7 +383,7 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
             end
         end
         ToggleButton.Text = isExpanded and "▲" or "▼"
-        Frame.Size = isExpanded and UDim2.new(0, 280, 0, 460) or UDim2.new(0, 280, 0, 32)
+        Frame.Size = isExpanded and UDim2.new(0, 280, 0, 520) or UDim2.new(0, 280, 0, 32)
         ScrollFrame.Visible = isExpanded
     end
 end)

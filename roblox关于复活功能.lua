@@ -179,9 +179,9 @@ local FollowDistanceTextBox = CreateTextBox("FollowDistanceTextBox", "输入距�
 
 -- 创建传送功能相关的UI元素
 CreateLabel("传送高度偏移 (0-10):")
-local TeleportHeightTextBox = CreateTextBox("TeleportHeightTextBox", "输入高度偏移", "1.5")
+local TeleportHeightTextBox = CreateTextBox("TeleportHeightTextBox", "输入高度偏移", "0")
 CreateLabel("传送角度偏移 (0-360):")
-local TeleportAngleTextBox = CreateTextBox("TeleportAngleTextBox", "输入角度偏移", "180")
+local TeleportAngleTextBox = CreateTextBox("TeleportAngleTextBox", "输入角度偏移", "360")
 
 -- 创建子弹追踪相关的UI元素
 CreateLabel("子弹追踪目标:")

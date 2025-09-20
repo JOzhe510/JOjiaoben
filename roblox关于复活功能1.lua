@@ -26,8 +26,8 @@ local respawnService = {
     followPlayer = nil,
     following = false,
     teleporting = false,
-    followSpeed = 100,
-    followDistance = 3,
+    followSpeed = 500, -- 增加默认速度
+    followDistance = 0.5, -- 减少默认距离，更贴近
     followHeight = 1.5,
     followPosition = 180,
     savedPositions = {},
@@ -332,9 +332,10 @@ local FollowToggle = MainTab:CreateToggle({
                     local direction = (targetPosition - currentPosition).Unit
                     local distance = (targetPosition - currentPosition).Magnitude
                     
-                    local actualSpeed = math.min(respawnService.followSpeed, distance * 5)
+                    -- 使用极高的速度确保即使目标快速移动也能跟上
+                    local actualSpeed = math.min(respawnService.followSpeed * 5, distance * 50) -- 大幅增加速度系数
                     
-                    if distance > 2 then
+                    if distance > 0.1 then -- 减少停止距离，更贴近
                         localRoot.Velocity = direction * actualSpeed
                     else
                         localRoot.Velocity = Vector3.new(0, 0, 0)
@@ -458,10 +459,10 @@ local SettingsSection = MainTab:CreateSection("追踪设置")
 
 local Slider = MainTab:CreateSlider({
    Name = "追踪速度",
-   Range = {10, 500},
-   Increment = 10,
+   Range = {100, 2000}, -- 增加最大速度范围
+   Increment = 50,
    Suffix = "速度",
-   CurrentValue = 100,
+   CurrentValue = 500, -- 设置默认值为500
    Flag = "FollowSpeedSlider",
    Callback = function(Value)
         respawnService.followSpeed = Value
@@ -475,10 +476,10 @@ local Slider = MainTab:CreateSlider({
 
 local Slider = MainTab:CreateSlider({
    Name = "追踪距离",
-   Range = {1, 20},
-   Increment = 1,
+   Range = {0.1, 10}, -- 允许更小的距离
+   Increment = 0.1,
    Suffix = "距离",
-   CurrentValue = 3,
+   CurrentValue = 3, -- 设置默认值为0.5
    Flag = "FollowDistanceSlider",
    Callback = function(Value)
         respawnService.followDistance = Value
@@ -495,7 +496,7 @@ local Slider = MainTab:CreateSlider({
    Range = {0, 360},
    Increment = 5,
    Suffix = "度 (0=前,90=右,180=后,270=左)",
-   CurrentValue = 180,
+   CurrentValue = 360,
    Flag = "FollowPositionSlider",
    Callback = function(Value)
         respawnService.followPosition = Value
@@ -519,7 +520,7 @@ local Slider = MainTab:CreateSlider({
    Range = {-5, 10},
    Increment = 0.5,
    Suffix = "高度",
-   CurrentValue = 1.5,
+   CurrentValue = 3,
    Flag = "FollowHeightSlider",
    Callback = function(Value)
         respawnService.followHeight = Value
@@ -592,6 +593,6 @@ local Keybind = MainTab:CreateKeybind({
 -- 初始通知
 Rayfield:Notify({
    Title = "脚本加载成功",
-   Content = "复活功能脚本已就绪\n请先点击玩家名字选择目标，再使用追踪或传送功能",
+   Content = "复活功能脚本已就绪\n请先点击玩家名字选择目标，再使用追踪或传送功能\n追踪速度已大幅提升，可以跟上快速移动的目标",
    Duration = 5,
 })

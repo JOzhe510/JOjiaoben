@@ -87,16 +87,6 @@ end
 
 SetupRespawnSystem()
 
-local function updatePlayerList()
-    local playerList = {"选择玩家"}
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            table.insert(playerList, player.Name)
-        end
-    end
-    return playerList
-end
-
 local MainTab = Window:CreateTab("🏠 复活功能", nil)
 local MainSection = MainTab:CreateSection("复活系统")
 
@@ -134,14 +124,20 @@ local Toggle = MainTab:CreateToggle({
    end,
 })
 
-local Dropdown = MainTab:CreateDropdown({
-   Name = "选择玩家",
-   Options = updatePlayerList(),
-   CurrentOption = {"选择玩家"},
-   MultipleOptions = false,
-   Flag = "PlayerDropdown",
-   Callback = function(Option)
-        respawnService.followPlayer = Option
+-- 改为输入玩家名字
+local PlayerInput = MainTab:CreateInput({
+   Name = "输入玩家名字",
+   PlaceholderText = "输入要追踪的玩家名字",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        if Text and Text ~= "" then
+            respawnService.followPlayer = Text
+            Rayfield:Notify({
+                Title = "玩家设置",
+                Content = "已设置目标玩家: " .. Text,
+                Duration = 3,
+            })
+        end
    end,
 })
 
@@ -169,10 +165,10 @@ local FollowToggle = MainTab:CreateToggle({
         end
         
         if respawnService.following then
-            if not respawnService.followPlayer or respawnService.followPlayer == "选择玩家" then
+            if not respawnService.followPlayer or respawnService.followPlayer == "" then
                 Rayfield:Notify({
                     Title = "错误",
-                    Content = "请先选择一个玩家",
+                    Content = "请先输入玩家名字",
                     Duration = 3,
                 })
                 FollowToggle:Set(false)
@@ -183,7 +179,7 @@ local FollowToggle = MainTab:CreateToggle({
             if not targetPlayer then
                 Rayfield:Notify({
                     Title = "错误",
-                    Content = "目标玩家不存在",
+                    Content = "玩家不存在: " .. respawnService.followPlayer,
                     Duration = 3,
                 })
                 FollowToggle:Set(false)
@@ -228,7 +224,7 @@ local FollowToggle = MainTab:CreateToggle({
    end,
 })
 
--- 直接传送改为Toggle
+-- 直接传送Toggle
 local TeleportToggle = MainTab:CreateToggle({
    Name = "直接传送",
    CurrentValue = false,
@@ -252,10 +248,10 @@ local TeleportToggle = MainTab:CreateToggle({
         end
         
         if respawnService.teleporting then
-            if not respawnService.followPlayer or respawnService.followPlayer == "选择玩家" then
+            if not respawnService.followPlayer or respawnService.followPlayer == "" then
                 Rayfield:Notify({
                     Title = "错误",
-                    Content = "请先选择一个玩家",
+                    Content = "请先输入玩家名字",
                     Duration = 3,
                 })
                 TeleportToggle:Set(false)
@@ -266,7 +262,7 @@ local TeleportToggle = MainTab:CreateToggle({
             if not targetPlayer or not targetPlayer.Character then
                 Rayfield:Notify({
                     Title = "错误",
-                    Content = "目标玩家不存在",
+                    Content = "玩家不存在: " .. respawnService.followPlayer,
                     Duration = 3,
                 })
                 TeleportToggle:Set(false)
@@ -358,9 +354,15 @@ local Keybind = MainTab:CreateKeybind({
     HoldToInteract = false,
     Flag = "ToggleFollowKeybind",
     Callback = function(Keybind)
-        if respawnService.followPlayer and respawnService.followPlayer ~= "选择玩家" then
+        if respawnService.followPlayer and respawnService.followPlayer ~= "" then
             respawnService.following = not respawnService.following
             FollowToggle:Set(respawnService.following)
+        else
+            Rayfield:Notify({
+                Title = "错误",
+                Content = "请先输入玩家名字",
+                Duration = 3,
+            })
         end
     end,
 })
@@ -371,20 +373,18 @@ local Keybind = MainTab:CreateKeybind({
     HoldToInteract = false,
     Flag = "ToggleTeleportKeybind",
     Callback = function(Keybind)
-        if respawnService.followPlayer and respawnService.followPlayer ~= "选择玩家" then
+        if respawnService.followPlayer and respawnService.followPlayer ~= "" then
             respawnService.teleporting = not respawnService.teleporting
             TeleportToggle:Set(respawnService.teleporting)
+        else
+            Rayfield:Notify({
+                Title = "错误",
+                Content = "请先输入玩家名字",
+                Duration = 3,
+            })
         end
     end,
 })
-
-Players.PlayerAdded:Connect(function()
-    Dropdown:SetOptions(updatePlayerList())
-end)
-
-Players.PlayerRemoving:Connect(function()
-    Dropdown:SetOptions(updatePlayerList())
-end)
 
 -- 玩家离开时自动停止功能
 Players.PlayerRemoving:Connect(function(player)
@@ -396,6 +396,11 @@ Players.PlayerRemoving:Connect(function(player)
                 respawnService.followConnection = nil
             end
             FollowToggle:Set(false)
+            Rayfield:Notify({
+                Title = "追踪停止",
+                Content = "目标玩家已离开游戏",
+                Duration = 3,
+            })
         end
         if respawnService.teleporting then
             respawnService.teleporting = false
@@ -404,6 +409,11 @@ Players.PlayerRemoving:Connect(function(player)
                 respawnService.teleportConnection = nil
             end
             TeleportToggle:Set(false)
+            Rayfield:Notify({
+                Title = "传送停止",
+                Content = "目标玩家已离开游戏",
+                Duration = 3,
+            })
         end
     end
 end)

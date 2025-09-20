@@ -2,7 +2,6 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
--- 必须先创建主窗口
 local Window = Rayfield:CreateWindow({
    Name = "🎖️ 动作脚本",
    LoadingTitle = "动作系统加载中",
@@ -20,57 +19,74 @@ local Window = Rayfield:CreateWindow({
    KeySystem = false,
 })
 
--- 创建敬礼功能部分
 local Tab = Window:CreateTab("🎖️ 敬礼动作", 4483362458)
+local MainSection = Tab:CreateSection("敬礼动作设置")
 
-local MainSection = Tab:CreateSection("敬礼动作设置")  -- 修正变量名
-
--- 敬礼动作服务
 local saluteService = {
     isSaluting = false,
-    saluteAnimation = nil,
     saluteTrack = nil
 }
 
--- 测试多个可能的敬礼动画ID
-local saluteAnimations = {
-    "rbxassetid://188881735",  -- 标准敬礼
-    "rbxassetid://313762630",  -- 敬礼动画2
-    "rbxassetid://5915788520", -- 现代敬礼
-    "rbxassetid://5915719362", -- 军事敬礼
-    "rbxassetid://5915688522"  -- 正式敬礼
-}
-
--- 创建敬礼动画函数
-local function CreateSaluteAnimation()
-    -- 尝试加载不同的动画，直到找到有效的
-    for _, animId in ipairs(saluteAnimations) do
-        local success, animation = pcall(function()
-            local anim = Instance.new("Animation")
-            anim.AnimationId = animId
-            return anim
-        end)
-        
-        if success and animation then
-            Rayfield:Notify({
-                Title = "动画加载成功",
-                Content = "使用动画ID: " .. animId,
-                Duration = 3,
-            })
-            return animation
-        end
+-- 更可靠的敬礼动画函数
+local function CreateSalutePose()
+    local character = LocalPlayer.Character
+    if not character then return nil end
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not humanoid then return nil end
+    
+    -- 检查是R6还是R15
+    local isR15 = humanoid.RigType == Enum.HumanoidRigType.R15
+    
+    if isR15 then
+        -- R15角色：使用Tween方法创建敬礼姿势
+        return "R15"
+    else
+        -- R6角色：使用CFrame调整
+        return "R6"
     end
+end
+
+-- R15敬礼姿势
+local function ApplyR15Salute()
+    local character = LocalPlayer.Character
+    if not character then return false end
     
-    -- 如果所有预设动画都失败，创建一个简单的自定义动画
-    Rayfield:Notify({
-        Title = "警告",
-        Content = "使用备用敬礼动画",
-        Duration = 3,
-    })
+    local rightArm = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
+    local head = character:FindFirstChild("Head")
     
-    local animation = Instance.new("Animation")
-    animation.AnimationId = "rbxassetid://188881735" -- 默认
-    return animation
+    if not rightArm or not head then return false end
+    
+    -- 保存原始CFrame
+    saluteService.originalCFrames = saluteService.originalCFrames or {}
+    saluteService.originalCFrames[rightArm] = rightArm.CFrame
+    
+    -- 创建敬礼姿势：手举到额头旁边
+    local saluteCFrame = head.CFrame * CFrame.new(0.5, 0, 0) * CFrame.Angles(0, 0, math.rad(90))
+    rightArm.CFrame = saluteCFrame
+    
+    return true
+end
+
+-- R6敬礼姿势
+local function ApplyR6Salute()
+    local character = LocalPlayer.Character
+    if not character then return false end
+    
+    local rightArm = character:FindFirstChild("Right Arm")
+    local torso = character:FindFirstChild("Torso")
+    
+    if not rightArm or not torso then return false end
+    
+    -- 保存原始CFrame
+    saluteService.originalCFrames = saluteService.originalCFrames or {}
+    saluteService.originalCFrames[rightArm] = rightArm.CFrame
+    
+    -- 创建敬礼姿势
+    local saluteCFrame = torso.CFrame * CFrame.new(1.5, 0.5, 0) * CFrame.Angles(0, 0, math.rad(90))
+    rightArm.CFrame = saluteCFrame
+    
+    return true
 end
 
 -- 开始敬礼
@@ -104,7 +120,6 @@ local function StartSalute()
         return 
     end
     
-    -- 确保角色已经加载完成
     if not character:FindFirstChild("HumanoidRootPart") then
         Rayfield:Notify({
             Title = "错误",
@@ -114,40 +129,40 @@ local function StartSalute()
         return
     end
     
-    -- 停止所有现有动画
-    for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
-        track:Stop()
+    -- 检测角色类型并应用相应的敬礼姿势
+    local isR15 = humanoid.RigType == Enum.HumanoidRigType.R15
+    local success = false
+    
+    if isR15 then
+        success = ApplyR15Salute()
+        Rayfield:Notify({
+            Title = "R15角色",
+            Content = "使用R15敬礼姿势",
+            Duration = 2,
+        })
+    else
+        success = ApplyR6Salute()
+        Rayfield:Notify({
+            Title = "R6角色",
+            Content = "使用R6敬礼姿势",
+            Duration = 2,
+        })
     end
     
-    -- 创建并播放敬礼动画
-    if not saluteService.saluteAnimation then
-        saluteService.saluteAnimation = CreateSaluteAnimation()
-    end
-    
-    local success, track = pcall(function()
-        return humanoid:LoadAnimation(saluteService.saluteAnimation)
-    end)
-    
-    if not success or not track then
+    if success then
+        saluteService.isSaluting = true
+        Rayfield:Notify({
+            Title = "敬礼开始",
+            Content = "角色正在敬礼",
+            Duration = 2,
+        })
+    else
         Rayfield:Notify({
             Title = "错误",
-            Content = "动画加载失败",
-            Duration = 3,
+            Content = "无法应用敬礼姿势",
+            Duration = 2,
         })
-        return
     end
-    
-    saluteService.saluteTrack = track
-    saluteService.saluteTrack:Play()
-    saluteService.saluteTrack:AdjustSpeed(1.0)
-    
-    saluteService.isSaluting = true
-    
-    Rayfield:Notify({
-        Title = "敬礼开始",
-        Content = "角色正在敬礼",
-        Duration = 2,
-    })
 end
 
 -- 停止敬礼
@@ -161,11 +176,14 @@ local function StopSalute()
         return 
     end
     
-    if saluteService.saluteTrack then
-        pcall(function()
-            saluteService.saluteTrack:Stop()
-        end)
-        saluteService.saluteTrack = nil
+    -- 恢复原始姿势
+    if saluteService.originalCFrames then
+        for part, cframe in pairs(saluteService.originalCFrames) do
+            if part and part.Parent then
+                part.CFrame = cframe
+            end
+        end
+        saluteService.originalCFrames = nil
     end
     
     saluteService.isSaluting = false
@@ -177,20 +195,8 @@ local function StopSalute()
     })
 end
 
--- 敬礼按钮
-local Button = Tab:CreateButton({  -- 修正为 Tab
-    Name = "执行敬礼动作",
-    Callback = function()
-        if saluteService.isSaluting then
-            StopSalute()
-        else
-            StartSalute()
-        end
-    end,
-})
-
 -- 调试按钮：检查角色状态
-local Button = Tab:CreateButton({  -- 修正为 Tab
+local Button = Tab:CreateButton({
     Name = "调试：检查角色状态",
     Callback = function()
         local character = LocalPlayer.Character
@@ -205,24 +211,41 @@ local Button = Tab:CreateButton({  -- 修正为 Tab
         
         local humanoid = character:FindFirstChild("Humanoid")
         local rootPart = character:FindFirstChild("HumanoidRootPart")
+        local rightArm = character:FindFirstChild("Right Arm") or character:FindFirstChild("RightHand")
+        
+        local rigType = humanoid and humanoid.RigType.Name or "未知"
         
         local message = string.format(
-            "角色状态:\nHumanoid: %s\nHumanoidRootPart: %s\nHealth: %s",
+            "角色状态:\n类型: %s\nHumanoid: %s\nRootPart: %s\n右手: %s\nHealth: %s",
+            rigType,
             tostring(humanoid ~= nil),
             tostring(rootPart ~= nil),
-            humanoid and tostring(humanoid.Health) or "N/A"
+            tostring(rightArm ~= nil),
+            humanoid and tostring(math.floor(humanoid.Health)) or "N/A"
         )
         
         Rayfield:Notify({
             Title = "调试信息",
             Content = message,
-            Duration = 5,
+            Duration = 6,
         })
     end,
 })
 
+-- 敬礼按钮
+local Button = Tab:CreateButton({
+    Name = "执行敬礼动作",
+    Callback = function()
+        if saluteService.isSaluting then
+            StopSalute()
+        else
+            StartSalute()
+        end
+    end,
+})
+
 -- 敬礼快捷键
-local Keybind = Tab:CreateKeybind({  -- 修正为 Tab
+local Keybind = Tab:CreateKeybind({
     Name = "敬礼快捷键",
     CurrentKeybind = "T",
     HoldToInteract = false,
@@ -235,30 +258,34 @@ local Keybind = Tab:CreateKeybind({  -- 修正为 Tab
     end,
 })
 
--- 测试不同的动画
-local Button = Tab:CreateButton({  -- 修正为 Tab
-    Name = "测试不同动画",
+-- 测试不同的姿势
+local Button = Tab:CreateButton({
+    Name = "测试简单挥手",
     Callback = function()
-        saluteService.saluteAnimation = nil -- 重置动画
-        saluteService.isSaluting = false
+        local character = LocalPlayer.Character
+        if not character then return end
         
-        Rayfield:Notify({
-            Title = "动画重置",
-            Content = "将尝试使用不同的动画ID",
-            Duration = 3,
-        })
+        local rightArm = character:FindFirstChild("Right Arm") or character:FindFirstChild("RightHand")
+        if not rightArm then return end
+        
+        -- 简单的挥手测试
+        for i = 1, 3 do
+            rightArm.CFrame = rightArm.CFrame * CFrame.Angles(0, math.rad(30), 0)
+            wait(0.1)
+            rightArm.CFrame = rightArm.CFrame * CFrame.Angles(0, math.rad(-30), 0)
+            wait(0.1)
+        end
     end,
 })
 
--- 使用说明
-local Section = Tab:CreateSection("故障排除")  -- 修正为 Tab
-local Label = Tab:CreateLabel("如果敬礼不工作，请尝试：")  -- 修正为 Tab
-local Label = Tab:CreateLabel("1. 点击「调试：检查角色状态」")  -- 修正为 Tab
-local Label = Tab:CreateLabel("2. 点击「测试不同动画」")  -- 修正为 Tab
-local Label = Tab:CreateLabel("3. 确保角色已完全加载")  -- 修正为 Tab
+local Section = Tab:CreateSection("使用说明")
+local Label = Tab:CreateLabel("1. 先点击「调试」按钮检查角色状态")
+local Label = Tab:CreateLabel("2. 确保角色完全加载后再使用敬礼")
+local Label = Tab:CreateLabel("3. 按T键或点击按钮执行敬礼")
+local Label = Tab:CreateLabel("4. 其他玩家可以看到你的姿势")
 
 Rayfield:Notify({
-    Title = "敬礼功能已加载",
-    Content = "点击「调试：检查角色状态」来诊断问题",
+    Title = "动作功能已加载",
+    Content = "请先使用「调试」按钮检查角色状态",
     Duration = 6,
 })

@@ -784,6 +784,81 @@ local Keybind = MainTab:CreateKeybind({
     end,
 })
 
+local MainTab = Window:CreateTab("速度调节", nil)
+
+-- 在追踪设置部分添加速度模式切换功能
+local MainSection = MainTab:CreateSection("速度设置")
+
+-- 速度模式切换按钮
+local Button = MainTab:CreateButton({
+   Name = "切换速度模式: 普通",
+   Callback = function()
+        if respawnService.speedMode == "normal" then
+            respawnService.speedMode = "tpwalk"
+            Rayfield:Notify({
+                Title = "速度模式已切换",
+                Content = "当前模式: TP行走模式",
+                Duration = 2,
+            })
+        else
+            respawnService.speedMode = "normal"
+            Rayfield:Notify({
+                Title = "速度模式已切换",
+                Content = "当前模式: 普通模式",
+                Duration = 2,
+            })
+        end
+   end,
+})
+
+-- 普通速度调节
+local Input = MainTab:CreateInput({
+   Name = "普通模式速度",
+   PlaceholderText = "输入普通模式速度 (默认: 500)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value > 0 then
+            respawnService.followSpeed = value
+            Rayfield:Notify({
+                Title = "设置更新",
+                Content = "普通模式速度设置为: " .. value,
+                Duration = 2,
+            })
+        else
+            Rayfield:Notify({
+                Title = "输入错误",
+                Content = "请输入有效的数字",
+                Duration = 2,
+            })
+        end
+   end,
+})
+
+-- TP行走速度调节
+local Input = MainTab:CreateInput({
+   Name = "TP行走模式速度",
+   PlaceholderText = "输入TP行走模式速度 (默认: 100)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value > 0 then
+            respawnService.tpWalkSpeed = value
+            Rayfield:Notify({
+                Title = "设置更新",
+                Content = "TP行走模式速度设置为: " .. value,
+                Duration = 2,
+            })
+        else
+            Rayfield:Notify({
+                Title = "输入错误",
+                Content = "请输入有效的数字",
+                Duration = 2,
+            })
+        end
+   end,
+})
+
 -- 初始通知
 Rayfield:Notify({
    Title = "脚本加载成功",

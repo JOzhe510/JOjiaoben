@@ -3,9 +3,9 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 -- 之前的代码保持不变...
 
 -- 创建敬礼功能部分
-local SaluteTab = Window:CreateTab("🎖️ 敬礼动作", 4483362458)
+local Tab = Window:CreateTab("🎖️ 敬礼动作", 4483362458)
 
-local SaluteSection = SaluteTab:CreateSection("敬礼动作设置")
+local MianSection = SaluteTab:CreateSection("敬礼动作设置")
 
 -- 敬礼动作服务
 local saluteService = {

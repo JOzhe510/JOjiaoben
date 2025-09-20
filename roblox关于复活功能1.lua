@@ -38,14 +38,20 @@ local respawnService = {
 -- 存储玩家按钮的表格
 local playerButtons = {}
 
--- 计算追踪位置
+-- 计算追踪位置 (优化版本)
 local function CalculateFollowPosition(targetRoot, distance, angle, height)
     local angleRad = math.rad(angle)
-    local offset = Vector3.new(
-        math.sin(angleRad) * distance,
-        height,
-        math.cos(angleRad) * distance
-    )
+    
+    -- 获取目标的朝向向量
+    local lookVector = targetRoot.CFrame.LookVector
+    local rightVector = targetRoot.CFrame.RightVector
+    
+    -- 计算相对于目标朝向的偏移
+    local forwardOffset = -math.cos(angleRad) * distance  -- 负号是因为LookVector是向前
+    local rightOffset = math.sin(angleRad) * distance
+    
+    local offset = (lookVector * forwardOffset) + (rightVector * rightOffset) + Vector3.new(0, height, 0)
+    
     return targetRoot.Position + offset
 end
 

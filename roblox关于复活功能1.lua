@@ -105,14 +105,6 @@ local currentPlayerLabel = MainTab:CreateLabel("当前选择: 无")
 -- 创建玩家列表容器
 local playerListContainer = MainTab:CreateSection("玩家列表")
 
--- 创建刷新玩家按钮
-local refreshButton = MainTab:CreateButton({
-   Name = "刷新玩家列表",
-   Callback = function()
-        UpdatePlayerButtons()
-   end,
-})
-
 -- 更新玩家按钮函数
 function UpdatePlayerButtons()
     -- 清除旧的玩家按钮
@@ -126,6 +118,29 @@ function UpdatePlayerButtons()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             table.insert(players, player.Name)
+        end
+    end
+    
+    -- 检查当前选择的玩家是否仍然有效
+    if respawnService.followPlayer and not IsPlayerValid(respawnService.followPlayer) then
+        respawnService.followPlayer = nil
+        currentPlayerLabel:Set("当前选择: 无")
+        
+        -- 如果正在追踪或传送，则停止
+        if respawnService.following then
+            respawnService.following = false
+            if respawnService.followConnection then
+                respawnService.followConnection:Disconnect()
+                respawnService.followConnection = nil
+            end
+        end
+        
+        if respawnService.teleporting then
+            respawnService.teleporting = false
+            if respawnService.teleportConnection then
+                respawnService.teleportConnection:Disconnect()
+                respawnService.teleportConnection = nil
+            end
         end
     end
     
@@ -162,6 +177,19 @@ function UpdatePlayerButtons()
         table.insert(playerButtons, label)
     end
 end
+
+-- 创建刷新玩家按钮
+local refreshButton = MainTab:CreateButton({
+   Name = "刷新玩家列表",
+   Callback = function()
+        UpdatePlayerButtons()
+        Rayfield:Notify({
+            Title = "刷新完成",
+            Content = "玩家列表已刷新",
+            Duration = 2,
+        })
+   end,
+})
 
 -- 初始更新玩家按钮
 UpdatePlayerButtons()

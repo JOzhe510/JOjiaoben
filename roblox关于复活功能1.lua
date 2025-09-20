@@ -55,6 +55,16 @@ local function CalculateFollowPosition(targetRoot, distance, angle, height)
     return targetRoot.Position + offset
 end
 
+-- 强制角色朝向目标
+local function ForceLookAtTarget(localRoot, targetRoot)
+    if localRoot and targetRoot then
+        -- 计算朝向目标的向量
+        local direction = (targetRoot.Position - localRoot.Position).Unit
+        -- 设置角色的朝向
+        localRoot.CFrame = CFrame.new(localRoot.Position, localRoot.Position + direction)
+    end
+end
+
 -- 检查玩家是否存在
 local function IsPlayerValid(playerName)
     if not playerName or playerName == "" then
@@ -302,7 +312,11 @@ local followToggle = MainTab:CreateToggle({
                         respawnService.followHeight
                     )
                     
+                    -- 移动到目标位置
                     localRoot.CFrame = CFrame.new(targetPosition)
+                    
+                    -- 强制角色朝向目标玩家
+                    ForceLookAtTarget(localRoot, targetRoot)
                 end
             end)
             
@@ -374,7 +388,11 @@ local teleportToggle = MainTab:CreateToggle({
                         respawnService.followHeight
                     )
                     
+                    -- 移动到目标位置
                     localRoot.CFrame = CFrame.new(targetPosition)
+                    
+                    -- 强制角色朝向目标玩家
+                    ForceLookAtTarget(localRoot, targetRoot)
                 end
             end)
             
@@ -552,6 +570,6 @@ local Keybind = MainTab:CreateKeybind({
 -- 初始通知
 Rayfield:Notify({
    Title = "脚本加载成功",
-   Content = "复活功能脚本已就绪！\n自动检测玩家功能已启用",
+   Content = "复活功能脚本已就绪！\n自动检测玩家功能已启用\n追踪时角色会自动朝向目标",
    Duration = 6,
 })

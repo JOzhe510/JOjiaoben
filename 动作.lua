@@ -1,9 +1,29 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- 必须先创建主窗口
+local Window = Rayfield:CreateWindow({
+   Name = "🎖️ 动作脚本",
+   LoadingTitle = "动作系统加载中",
+   LoadingSubtitle = "by 开发者",
+   ConfigurationSaving = {
+      Enabled = false,
+      FolderName = nil,
+      FileName = "动作功能"
+   },
+   Discord = {
+      Enabled = false,
+      Invite = "noinvitelink",
+      RememberJoins = true
+   },
+   KeySystem = false,
+})
 
 -- 创建敬礼功能部分
 local Tab = Window:CreateTab("🎖️ 敬礼动作", 4483362458)
 
-local MianSection = SaluteTab:CreateSection("敬礼动作设置")
+local MainSection = Tab:CreateSection("敬礼动作设置")  -- 修正变量名
 
 -- 敬礼动作服务
 local saluteService = {
@@ -158,7 +178,7 @@ local function StopSalute()
 end
 
 -- 敬礼按钮
-local Button = SaluteTab:CreateButton({
+local Button = Tab:CreateButton({  -- 修正为 Tab
     Name = "执行敬礼动作",
     Callback = function()
         if saluteService.isSaluting then
@@ -170,7 +190,7 @@ local Button = SaluteTab:CreateButton({
 })
 
 -- 调试按钮：检查角色状态
-local Button = SaluteTab:CreateButton({
+local Button = Tab:CreateButton({  -- 修正为 Tab
     Name = "调试：检查角色状态",
     Callback = function()
         local character = LocalPlayer.Character
@@ -202,7 +222,7 @@ local Button = SaluteTab:CreateButton({
 })
 
 -- 敬礼快捷键
-local Keybind = SaluteTab:CreateKeybind({
+local Keybind = Tab:CreateKeybind({  -- 修正为 Tab
     Name = "敬礼快捷键",
     CurrentKeybind = "T",
     HoldToInteract = false,
@@ -216,7 +236,7 @@ local Keybind = SaluteTab:CreateKeybind({
 })
 
 -- 测试不同的动画
-local Button = SaluteTab:CreateButton({
+local Button = Tab:CreateButton({  -- 修正为 Tab
     Name = "测试不同动画",
     Callback = function()
         saluteService.saluteAnimation = nil -- 重置动画
@@ -231,11 +251,11 @@ local Button = SaluteTab:CreateButton({
 })
 
 -- 使用说明
-local Section = SaluteTab:CreateSection("故障排除")
-local Label = SaluteTab:CreateLabel("如果敬礼不工作，请尝试：")
-local Label = SaluteTab:CreateLabel("1. 点击「调试：检查角色状态」")
-local Label = SaluteTab:CreateLabel("2. 点击「测试不同动画」")
-local Label = SaluteTab:CreateLabel("3. 确保角色已完全加载")
+local Section = Tab:CreateSection("故障排除")  -- 修正为 Tab
+local Label = Tab:CreateLabel("如果敬礼不工作，请尝试：")  -- 修正为 Tab
+local Label = Tab:CreateLabel("1. 点击「调试：检查角色状态」")  -- 修正为 Tab
+local Label = Tab:CreateLabel("2. 点击「测试不同动画」")  -- 修正为 Tab
+local Label = Tab:CreateLabel("3. 确保角色已完全加载")  -- 修正为 Tab
 
 Rayfield:Notify({
     Title = "敬礼功能已加载",

@@ -789,7 +789,7 @@ local MainTab = Window:CreateTab("速度调节", nil)
 -- 在追踪设置部分添加速度模式切换功能
 local MainSection = MainTab:CreateSection("速度设置")
 
--- 速度模式切换按钮
+-- 添加速度模式切换
 local Button = MainTab:CreateButton({
    Name = "切换速度模式: 普通",
    Callback = function()
@@ -813,16 +813,25 @@ local Button = MainTab:CreateButton({
 
 -- 普通速度调节
 local Input = MainTab:CreateInput({
-   Name = "普通模式速度",
-   PlaceholderText = "输入普通模式速度 (默认: 500)",
+   Name = "普通移动速度",
+   PlaceholderText = "输入移动速度 (默认: 16)",
    RemoveTextAfterFocusLost = false,
    Callback = function(Text)
         local value = tonumber(Text)
-        if value and value > 0 then
-            respawnService.followSpeed = value
+        if value and value >= 0 then
+            respawnService.walkSpeed = value
+            
+            -- 如果当前是普通模式，立即应用速度
+            if respawnService.speedMode == "normal" and LocalPlayer.Character then
+                local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+                if humanoid then
+                    humanoid.WalkSpeed = value
+                end
+            end
+            
             Rayfield:Notify({
                 Title = "设置更新",
-                Content = "普通模式速度设置为: " .. value,
+                Content = "普通移动速度设置为: " .. value,
                 Duration = 2,
             })
         else
@@ -837,16 +846,16 @@ local Input = MainTab:CreateInput({
 
 -- TP行走速度调节
 local Input = MainTab:CreateInput({
-   Name = "TP行走模式速度",
-   PlaceholderText = "输入TP行走模式速度 (默认: 100)",
+   Name = "TP行走速度",
+   PlaceholderText = "输入TP行走速度 (默认: 100)",
    RemoveTextAfterFocusLost = false,
    Callback = function(Text)
         local value = tonumber(Text)
-        if value and value > 0 then
+        if value and value >= 0 then
             respawnService.tpWalkSpeed = value
             Rayfield:Notify({
                 Title = "设置更新",
-                Content = "TP行走模式速度设置为: " .. value,
+                Content = "TP行走速度设置为: " .. value,
                 Duration = 2,
             })
         else
@@ -858,6 +867,80 @@ local Input = MainTab:CreateInput({
         end
    end,
 })
+
+-- 应用速度设置的函数
+local function ApplySpeedSettings()
+    if not LocalPlayer.Character then return end
+    
+    local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    if respawnService.speedMode == "normal" then
+        humanoid.WalkSpeed = respawnService.walkSpeed or 16
+    else
+        humanoid.WalkSpeed = 16 -- 重置为默认速度，TP行走模式不使用WalkSpeed
+    end
+end
+
+-- 监听角色变化
+LocalPlayer.CharacterAdded:Connect(function(character)
+    wait(0.5) -- 等待角色完全加载
+    ApplySpeedSettings()
+end)
+
+-- 如果已经有角色，立即应用设置
+if LocalPlayer.Character then
+    ApplySpeedSettings()
+end
+
+-- TP行走模式的实现
+local tpWalkConnection = nil
+
+local function StartTPWalk()
+    if tpWalkConnection then
+        tpWalkConnection:Disconnect()
+        tpWalkConnection = nil
+    end
+    
+    tpWalkConnection = RunService.Heartbeat:Connect(function()
+        if respawnService.speedMode ~= "tpwalk" or not LocalPlayer.Character then
+            if tpWalkConnection then
+                tpWalkConnection:Disconnect()
+                tpWalkConnection = nil
+            end
+            return
+        end
+        
+        local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+        local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        
+        if humanoid and rootPart and humanoid.MoveDirection.Magnitude > 0 then
+            -- 获取移动方向
+            local moveDirection = humanoid.MoveDirection
+            -- 计算移动距离
+            local moveDistance = (respawnService.tpWalkSpeed or 100) * 0.016 -- 每帧移动距离
+            -- 移动角色
+            rootPart.CFrame = rootPart.CFrame + moveDirection * moveDistance
+        end
+    end)
+end
+
+-- 监听速度模式变化
+local lastSpeedMode = respawnService.speedMode
+while true do
+    wait(0.1)
+    if respawnService.speedMode ~= lastSpeedMode then
+        lastSpeedMode = respawnService.speedMode
+        ApplySpeedSettings()
+        
+        if respawnService.speedMode == "tpwalk" then
+            StartTPWalk()
+        elseif tpWalkConnection then
+            tpWalkConnection:Disconnect()
+            tpWalkConnection = nil
+        end
+    end
+end
 
 -- 初始通知
 Rayfield:Notify({

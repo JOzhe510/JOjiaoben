@@ -3,7 +3,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
    Name = "🔥 复活功能脚本",
    LoadingTitle = "复活功能系统",
-   LoadingSubtitle = "by Dio",
+   LoadingSubtitle = "by 1_F0",
    ConfigurationSaving = {
       Enabled = false,
       FolderName = nil,
@@ -187,11 +187,11 @@ function FollowService:StartFollowing()
         if self.Mode == "Teleport" then
             -- 直接传送模式
             local targetCFrame = targetRoot.CFrame
-            local angleRad = math.rad(180) -- 默认180度
+            local angleRad = math.rad(180)
             
             local offsetDirection = Vector3.new(
                 math.sin(angleRad) * self.FollowDistance,
-                0, -- 默认高度
+                0,
                 math.cos(angleRad) * self.FollowDistance
             )
             
@@ -297,6 +297,24 @@ local Slider = MainTab:CreateSlider({
    end,
 })
 
+local Input = MainTab:CreateInput({
+   Name = "传送高度偏移",
+   PlaceholderText = "0-10",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        -- 高度偏移设置
+   end,
+})
+
+local Input = MainTab:CreateInput({
+   Name = "传送角度偏移",
+   PlaceholderText = "0-360",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        -- 角度偏移设置
+   end,
+})
+
 local KeybindSection = MainTab:CreateSection("快捷键")
 
 local Keybind = MainTab:CreateKeybind({
@@ -386,3 +404,10 @@ Players.PlayerRemoving:Connect(function(player)
         FollowToggle:Set(false)
     end
 end)
+
+-- 初始通知
+Rayfield:Notify({
+   Title = "脚本加载成功",
+   Content = "复活功能脚本已就绪",
+   Duration = 5,
+})

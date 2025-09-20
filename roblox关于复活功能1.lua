@@ -143,103 +143,44 @@ local Dropdown = MainTab:CreateDropdown({
    end,
 })
 
--- ==================== 极致追踪玩家功能 ====================
-local FollowService = {
-    Enabled = false,
-    TargetPlayer = nil,
-    FollowSpeed = 100,
-    FollowDistance = 3,
-    Connection = nil,
-    Mode = "Follow"
-}
-
-function FollowService:FindTargetPlayer(targetName)
-    if targetName == "选择玩家" then return nil end
-    
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player.Name == targetName then
-            return player
-        end
-    end
-    return nil
-end
-
-function FollowService:StartFollowing()
-    if self.Connection then
-        self.Connection:Disconnect()
-        self.Connection = nil
-    end
-    
-    self.Connection = RunService.Heartbeat:Connect(function()
-        if not self.Enabled or not self.TargetPlayer then return end
-        
-        if not self.TargetPlayer.Character then
-            self:StopFollowing()
-            return
-        end
-        
-        local targetRoot = self.TargetPlayer.Character:FindFirstChild("HumanoidRootPart")
-        local localChar = LocalPlayer.Character
-        local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
-        
-        if not targetRoot or not localRoot then return end
-        
-        if self.Mode == "Teleport" then
-            -- 直接传送模式
-            local targetCFrame = targetRoot.CFrame
-            local angleRad = math.rad(180)
-            
-            local offsetDirection = Vector3.new(
-                math.sin(angleRad) * self.FollowDistance,
-                0,
-                math.cos(angleRad) * self.FollowDistance
-            )
-            
-            local rotatedOffset = targetCFrame:VectorToWorldSpace(offsetDirection)
-            local targetPosition = targetRoot.Position + rotatedOffset
-            
-            localRoot.CFrame = CFrame.new(targetPosition, Vector3.new(targetRoot.Position.X, targetPosition.Y, targetRoot.Position.Z))
-        else
-            -- 平滑追踪模式
-            local targetCFrame = targetRoot.CFrame
-            local behindOffset = targetCFrame.LookVector * -self.FollowDistance
-            local targetPosition = targetRoot.Position + behindOffset + Vector3.new(0, 1.5, 0)
-            
-            local direction = (targetPosition - localRoot.Position).Unit
-            localRoot.Velocity = direction * self.FollowSpeed
-        end
-    end)
-end
-
-function FollowService:StopFollowing()
-    if self.Connection then
-        self.Connection:Disconnect()
-        self.Connection = nil
-    end
-end
-
--- 追踪Toggle功能
-local FollowToggle = MainTab:CreateToggle({
+-- 修复追踪功能
+local Toggle = MainTab:CreateToggle({
    Name = "追踪玩家",
    CurrentValue = false,
    Flag = "FollowToggle",
    Callback = function(Value)
-        FollowService.Enabled = Value
+        respawnService.following = Value
         
-        if FollowService.Enabled then
-            FollowService.TargetPlayer = FollowService:FindTargetPlayer(respawnService.followPlayer)
-            FollowService.FollowSpeed = respawnService.followSpeed
-            FollowService.FollowDistance = respawnService.followDistance
-            FollowService.Mode = "Follow"
-            
-            if FollowService.TargetPlayer then
-                FollowService:StartFollowing()
-            else
-                FollowService.Enabled = false
-                FollowToggle:Set(false)
-            end
-        else
-            FollowService:StopFollowing()
+        if respawnService.followConnection then
+            respawnService.followConnection:Disconnect()
+            respawnService.followConnection = nil
+        end
+        
+        if respawnService.following then
+            respawnService.followConnection = RunService.Heartbeat:Connect(function()
+                if not respawnService.following or not respawnService.followPlayer or respawnService.followPlayer == "选择玩家" then return end
+                
+                local followedPlayer = Players:FindFirstChild(respawnService.followPlayer)
+                if not followedPlayer or not followedPlayer.Character then return end
+                
+                local followedRoot = followedPlayer.Character:FindFirstChild("HumanoidRootPart")
+                local localChar = LocalPlayer.Character
+                local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
+                local localHumanoid = localChar and localChar:FindFirstChild("Humanoid")
+                
+                if followedRoot and localRoot and localHumanoid then
+                    local distance = (followedRoot.Position - localRoot.Position).Magnitude
+                    
+                    if distance > respawnService.followDistance then
+                        local direction = (followedRoot.Position - localRoot.Position).Unit
+                        local targetPosition = followedRoot.Position - (direction * respawnService.followDistance)
+                        
+                        localHumanoid:MoveTo(targetPosition)
+                    else
+                        localHumanoid:MoveTo(localRoot.Position)
+                    end
+                end
+            end)
         end
    end,
 })
@@ -248,11 +189,21 @@ local Button = MainTab:CreateButton({
    Name = "直接传送",
    Callback = function()
         if not respawnService.followPlayer or respawnService.followPlayer == "选择玩家" then
+            Rayfield:Notify({
+                Title = "错误",
+                Content = "请先选择一个玩家",
+                Duration = 3,
+            })
             return
         end
         
         local followedPlayer = Players:FindFirstChild(respawnService.followPlayer)
         if not followedPlayer or not followedPlayer.Character then
+            Rayfield:Notify({
+                Title = "错误",
+                Content = "目标玩家不存在",
+                Duration = 3,
+            })
             return
         end
         
@@ -265,6 +216,18 @@ local Button = MainTab:CreateButton({
             local targetPosition = followedRoot.Position - (direction * respawnService.followDistance)
             
             localRoot.CFrame = CFrame.new(targetPosition, followedRoot.Position)
+            
+            Rayfield:Notify({
+                Title = "传送成功",
+                Content = "已传送到: " .. respawnService.followPlayer,
+                Duration = 3,
+            })
+        else
+            Rayfield:Notify({
+                Title = "错误",
+                Content = "传送失败，请检查角色状态",
+                Duration = 3,
+            })
         end
    end,
 })
@@ -280,7 +243,6 @@ local Slider = MainTab:CreateSlider({
    Flag = "FollowSpeedSlider",
    Callback = function(Value)
         respawnService.followSpeed = Value
-        FollowService.FollowSpeed = Value
    end,
 })
 
@@ -293,25 +255,6 @@ local Slider = MainTab:CreateSlider({
    Flag = "FollowDistanceSlider",
    Callback = function(Value)
         respawnService.followDistance = Value
-        FollowService.FollowDistance = Value
-   end,
-})
-
-local Input = MainTab:CreateInput({
-   Name = "传送高度偏移",
-   PlaceholderText = "0-10",
-   RemoveTextAfterFocusLost = false,
-   Callback = function(Text)
-        -- 高度偏移设置
-   end,
-})
-
-local Input = MainTab:CreateInput({
-   Name = "传送角度偏移",
-   PlaceholderText = "0-360",
-   RemoveTextAfterFocusLost = false,
-   Callback = function(Text)
-        -- 角度偏移设置
    end,
 })
 
@@ -353,6 +296,12 @@ local Keybind = MainTab:CreateKeybind({
                     local targetPosition = followedRoot.Position - (direction * respawnService.followDistance)
                     
                     localRoot.CFrame = CFrame.new(targetPosition, followedRoot.Position)
+                    
+                    Rayfield:Notify({
+                        Title = "传送成功",
+                        Content = "已传送到: " .. respawnService.followPlayer,
+                        Duration = 3,
+                    })
                 end
             end
         end
@@ -366,23 +315,50 @@ local Keybind = MainTab:CreateKeybind({
     Flag = "ToggleFollowKeybind",
     Callback = function(Keybind)
         if respawnService.followPlayer and respawnService.followPlayer ~= "选择玩家" then
-            FollowService.Enabled = not FollowService.Enabled
+            respawnService.following = not respawnService.following
             
-            if FollowService.Enabled then
-                FollowService.TargetPlayer = FollowService:FindTargetPlayer(respawnService.followPlayer)
-                FollowService.FollowSpeed = respawnService.followSpeed
-                FollowService.FollowDistance = respawnService.followDistance
-                FollowService.Mode = "Follow"
+            if respawnService.followConnection then
+                respawnService.followConnection:Disconnect()
+                respawnService.followConnection = nil
+            end
+            
+            if respawnService.following then
+                respawnService.followConnection = RunService.Heartbeat:Connect(function()
+                    if not respawnService.following or not respawnService.followPlayer then return end
+                    
+                    local followedPlayer = Players:FindFirstChild(respawnService.followPlayer)
+                    if not followedPlayer or not followedPlayer.Character then return end
+                    
+                    local followedRoot = followedPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    local localChar = LocalPlayer.Character
+                    local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
+                    local localHumanoid = localChar and localChar:FindFirstChild("Humanoid")
+                    
+                    if followedRoot and localRoot and localHumanoid then
+                        local distance = (followedRoot.Position - localRoot.Position).Magnitude
+                        
+                        if distance > respawnService.followDistance then
+                            local direction = (followedRoot.Position - localRoot.Position).Unit
+                            local targetPosition = followedRoot.Position - (direction * respawnService.followDistance)
+                            
+                            localHumanoid:MoveTo(targetPosition)
+                        else
+                            localHumanoid:MoveTo(localRoot.Position)
+                        end
+                    end
+                end)
                 
-                if FollowService.TargetPlayer then
-                    FollowService:StartFollowing()
-                    FollowToggle:Set(true)
-                else
-                    FollowService.Enabled = false
-                end
+                Rayfield:Notify({
+                    Title = "追踪状态",
+                    Content = "已开始追踪: " .. respawnService.followPlayer,
+                    Duration = 3,
+                })
             else
-                FollowService:StopFollowing()
-                FollowToggle:Set(false)
+                Rayfield:Notify({
+                    Title = "追踪状态",
+                    Content = "已停止追踪",
+                    Duration = 3,
+                })
             end
         end
     end,
@@ -398,10 +374,12 @@ end)
 
 -- 玩家离开时自动停止追踪
 Players.PlayerRemoving:Connect(function(player)
-    if FollowService.Enabled and FollowService.TargetPlayer == player then
-        FollowService.Enabled = false
-        FollowService:StopFollowing()
-        FollowToggle:Set(false)
+    if respawnService.following and respawnService.followPlayer == player.Name then
+        respawnService.following = false
+        if respawnService.followConnection then
+            respawnService.followConnection:Disconnect()
+            respawnService.followConnection = nil
+        end
     end
 end)
 

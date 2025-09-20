@@ -1,13 +1,13 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "🔥 复活功能脚本 | Roblox 🔫",
-   LoadingTitle = "🔫 复活功能系统 💥",
+   Name = "🔥 复活功能脚本",
+   LoadingTitle = "复活功能系统",
    LoadingSubtitle = "by 1_F0",
    ConfigurationSaving = {
       Enabled = false,
       FolderName = nil,
-      FileName = "Respawn Hub"
+      FileName = "复活功能"
    },
    Discord = {
       Enabled = false,
@@ -17,13 +17,10 @@ local Window = Rayfield:CreateWindow({
    KeySystem = false,
 })
 
--- 获取必要的服务
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
--- 创建复活服务表
 local respawnService = {
     autoRespawn = false,
     followPlayer = nil,
@@ -34,7 +31,6 @@ local respawnService = {
     followConnection = nil
 }
 
--- 获取玩家列表
 local function updatePlayerList()
     local playerList = {"选择玩家"}
     for _, player in ipairs(Players:GetPlayers()) do
@@ -48,8 +44,7 @@ end
 local MainTab = Window:CreateTab("🏠 复活功能", nil)
 local MainSection = MainTab:CreateSection("复活系统")
 
--- 立即自杀按钮
-local SuicideBtn = MainTab:CreateButton({
+local Button = MainTab:CreateButton({
    Name = "立即自杀",
    Callback = function()
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
@@ -58,8 +53,7 @@ local SuicideBtn = MainTab:CreateButton({
    end,
 })
 
--- 原地复活按钮
-local RespawnBtn = MainTab:CreateButton({
+local Button = MainTab:CreateButton({
    Name = "原地复活",
    Callback = function()
         if LocalPlayer.Character then
@@ -75,8 +69,7 @@ local RespawnBtn = MainTab:CreateButton({
    end,
 })
 
--- 自动复活开关
-local AutoRespawnToggle = MainTab:CreateToggle({
+local Toggle = MainTab:CreateToggle({
    Name = "自动复活",
    CurrentValue = false,
    Flag = "AutoRespawnToggle",
@@ -85,8 +78,7 @@ local AutoRespawnToggle = MainTab:CreateToggle({
    end,
 })
 
--- 玩家选择下拉菜单
-local playerDropdown = MainTab:CreateDropdown({
+local Dropdown = MainTab:CreateDropdown({
    Name = "选择玩家",
    Options = updatePlayerList(),
    CurrentOption = {"选择玩家"},
@@ -97,16 +89,10 @@ local playerDropdown = MainTab:CreateDropdown({
    end,
 })
 
--- 平滑追踪按钮
-local FollowBtn = MainTab:CreateButton({
+local Button = MainTab:CreateButton({
    Name = "平滑追踪",
    Callback = function()
         if not respawnService.followPlayer or respawnService.followPlayer == "选择玩家" then
-            Rayfield:Notify({
-                Title = "错误",
-                Content = "请先选择一个玩家",
-                Duration = 3,
-            })
             return
         end
         
@@ -142,42 +128,19 @@ local FollowBtn = MainTab:CreateButton({
                     end
                 end
             end)
-            
-            Rayfield:Notify({
-                Title = "追踪状态",
-                Content = "已开始追踪: " .. respawnService.followPlayer,
-                Duration = 3,
-            })
-        else
-            Rayfield:Notify({
-                Title = "追踪状态",
-                Content = "已停止追踪",
-                Duration = 3,
-            })
         end
    end,
 })
 
--- 直接传送按钮
-local TeleportBtn = MainTab:CreateButton({
+local Button = MainTab:CreateButton({
    Name = "直接传送",
    Callback = function()
         if not respawnService.followPlayer or respawnService.followPlayer == "选择玩家" then
-            Rayfield:Notify({
-                Title = "错误",
-                Content = "请先选择一个玩家",
-                Duration = 3,
-            })
             return
         end
         
         local followedPlayer = Players:FindFirstChild(respawnService.followPlayer)
         if not followedPlayer or not followedPlayer.Character then
-            Rayfield:Notify({
-                Title = "错误",
-                Content = "目标玩家不存在",
-                Duration = 3,
-            })
             return
         end
         
@@ -190,27 +153,13 @@ local TeleportBtn = MainTab:CreateButton({
             local targetPosition = followedRoot.Position - (direction * respawnService.followDistance)
             
             localRoot.CFrame = CFrame.new(targetPosition, followedRoot.Position)
-            
-            Rayfield:Notify({
-                Title = "传送成功",
-                Content = "已传送到: " .. respawnService.followPlayer,
-                Duration = 3,
-            })
-        else
-            Rayfield:Notify({
-                Title = "错误",
-                Content = "传送失败，请检查角色状态",
-                Duration = 3,
-            })
         end
    end,
 })
 
--- 设置区域
 local SettingsSection = MainTab:CreateSection("设置")
 
--- 追踪速度滑块
-local SpeedSlider = MainTab:CreateSlider({
+local Slider = MainTab:CreateSlider({
    Name = "追踪速度",
    Range = {10, 200},
    Increment = 1,
@@ -222,8 +171,7 @@ local SpeedSlider = MainTab:CreateSlider({
    end,
 })
 
--- 追踪距离滑块
-local DistanceSlider = MainTab:CreateSlider({
+local Slider = MainTab:CreateSlider({
    Name = "追踪距离",
    Range = {1, 10},
    Increment = 1,
@@ -235,17 +183,14 @@ local DistanceSlider = MainTab:CreateSlider({
    end,
 })
 
--- 快捷键区域
 local KeybindSection = MainTab:CreateSection("快捷键")
 
--- 快速复活快捷键
-local RespawnKeybind = MainTab:CreateKeybind({
+local Keybind = MainTab:CreateKeybind({
     Name = "快速复活快捷键",
     CurrentKeybind = "R",
     HoldToInteract = false,
     Flag = "RespawnKeybind",
     Callback = function(Keybind)
-        -- 快速复活功能
         if LocalPlayer.Character then
             local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             if rootPart then
@@ -258,14 +203,12 @@ local RespawnKeybind = MainTab:CreateKeybind({
     end,
 })
 
--- 快速传送快捷键
-local TeleportKeybind = MainTab:CreateKeybind({
+local Keybind = MainTab:CreateKeybind({
     Name = "快速传送快捷键",
     CurrentKeybind = "T",
     HoldToInteract = false,
     Flag = "TeleportKeybind",
     Callback = function(Keybind)
-        -- 快速传送功能
         if respawnService.followPlayer and respawnService.followPlayer ~= "选择玩家" then
             local followedPlayer = Players:FindFirstChild(respawnService.followPlayer)
             if followedPlayer and followedPlayer.Character then
@@ -278,26 +221,18 @@ local TeleportKeybind = MainTab:CreateKeybind({
                     local targetPosition = followedRoot.Position - (direction * respawnService.followDistance)
                     
                     localRoot.CFrame = CFrame.new(targetPosition, followedRoot.Position)
-                    
-                    Rayfield:Notify({
-                        Title = "传送成功",
-                        Content = "已传送到: " .. respawnService.followPlayer,
-                        Duration = 3,
-                    })
                 end
             end
         end
     end,
 })
 
--- 切换追踪快捷键
-local ToggleFollowKeybind = MainTab:CreateKeybind({
+local Keybind = MainTab:CreateKeybind({
     Name = "切换追踪快捷键",
     CurrentKeybind = "F",
     HoldToInteract = false,
     Flag = "ToggleFollowKeybind",
     Callback = function(Keybind)
-        -- 切换追踪功能
         if respawnService.followPlayer and respawnService.followPlayer ~= "选择玩家" then
             respawnService.following = not respawnService.following
             
@@ -331,35 +266,15 @@ local ToggleFollowKeybind = MainTab:CreateKeybind({
                         end
                     end
                 end)
-                
-                Rayfield:Notify({
-                    Title = "追踪状态",
-                    Content = "已开始追踪: " .. respawnService.followPlayer,
-                    Duration = 3,
-                })
-            else
-                Rayfield:Notify({
-                    Title = "追踪状态",
-                    Content = "已停止追踪",
-                    Duration = 3,
-                })
             end
         end
     end,
 })
 
--- 玩家列表更新
 Players.PlayerAdded:Connect(function()
-    playerDropdown:SetOptions(updatePlayerList())
+    Dropdown:SetOptions(updatePlayerList())
 end)
 
 Players.PlayerRemoving:Connect(function()
-    playerDropdown:SetOptions(updatePlayerList())
+    Dropdown:SetOptions(updatePlayerList())
 end)
-
--- 初始通知
-Rayfield:Notify({
-   Title = "脚本加载成功",
-   Content = "复活功能脚本已就绪",
-   Duration = 5,
-})

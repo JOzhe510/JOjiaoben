@@ -32,15 +32,15 @@ local respawnService = {
     followPosition = 350,
     savedPositions = {},
     followConnection = nil,
-    teleportConnection = nil,
-    lastPosition = Vector3.new(0, 0, 0)
+    teleportConnection = nil
 }
 
 -- 玩家列表管理
 local playerList = {}
 local selectedPlayer = nil
-local playerButtonsContainer = nil
 local playerButtons = {}
+local currentPlayerLabel
+local playerListLabel
 
 -- 更新玩家列表
 local function UpdatePlayerList()
@@ -52,9 +52,6 @@ local function UpdatePlayerList()
     end
 end
 
--- 初始化玩家列表
-UpdatePlayerList()
-
 -- 计算追踪位置
 local function CalculateFollowPosition(targetRoot, distance, angle, height)
     local angleRad = math.rad(angle)
@@ -63,67 +60,63 @@ local function CalculateFollowPosition(targetRoot, distance, angle, height)
         height,
         math.cos(angleRad) * distance
     )
-    return targetRoot.Position + (targetRoot.CFrame:VectorToWorldSpace(offset))
+    return targetRoot.Position + offset
 end
 
--- 原地复活系统初始化
-local function SetupRespawnSystem()
-    respawnService.savedPositions = {}
+-- 自动刷新玩家列表函数
+local function AutoRefreshPlayerButtons()
+    UpdatePlayerList()
     
-    local function SetupPlayer(player)
-        player.CharacterAdded:Connect(function(character)
-            local humanoid = character:WaitForChild("Humanoid")
-            
-            if respawnService.savedPositions[player] then
-                wait(0.1) 
-                local rootPart = character:FindFirstChild("HumanoidRootPart")
-                if rootPart then
-                    rootPart.CFrame = CFrame.new(respawnService.savedPositions[player])
-                end
-            end
-            
-            humanoid.Died:Connect(function()
-                local rootPart = character:FindFirstChild("HumanoidRootPart")
-                if rootPart then
-                    respawnService.savedPositions[player] = rootPart.Position
-                end
-                
-                if respawnService.autoRespawn then
-                    wait(2)
-                    player:LoadCharacter()
-                end
-            end)
-        end)
-        
-        if player.Character then
-            local humanoid = player.Character:WaitForChild("Humanoid")
-            humanoid.Died:Connect(function()
-                local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
-                if rootPart then
-                    respawnService.savedPositions[player] = rootPart.Position
-                end
-                
-                if respawnService.autoRespawn then
-                    wait(2)
-                    player:LoadCharacter()
-                end
-            end)
-        end
+    -- 清除旧的按钮
+    for _, button in pairs(playerButtons) do
+        button:Destroy()
     end
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        SetupPlayer(player)
+    playerButtons = {}
+    
+    -- 更新玩家数量显示
+    playerListLabel:Set("在线玩家: " .. #playerList .. "人")
+    
+    -- 创建新的玩家选择按钮
+    for _, playerName in ipairs(playerList) do
+        local Button = MainTab:CreateButton({
+            Name = "选择: " .. playerName,
+            Callback = function()
+                local targetPlayer = Players:FindFirstChild(playerName)
+                if targetPlayer then
+                    selectedPlayer = playerName
+                    respawnService.followPlayer = playerName
+                    currentPlayerLabel:Set("当前选择: " .. playerName)
+                    Rayfield:Notify({
+                        Title = "玩家选择成功",
+                        Content = "已选择玩家: " .. targetPlayer.Name,
+                        Duration = 3,
+                    })
+                else
+                    Rayfield:Notify({
+                        Title = "错误",
+                        Content = "玩家不存在: " .. playerName,
+                        Duration = 3,
+                    })
+                end
+            end,
+        })
+        table.insert(playerButtons, Button)
     end
-
-    Players.PlayerAdded:Connect(SetupPlayer)
+    
+    -- 如果没有玩家，显示提示
+    if #playerList == 0 then
+        local Label = MainTab:CreateLabel("当前没有其他玩家在线")
+        table.insert(playerButtons, Label)
+    end
 end
 
-SetupRespawnSystem()
-
+-- 创建主标签页
 local MainTab = Window:CreateTab("🏠 复活功能", nil)
+
+-- 复活系统部分
 local MainSection = MainTab:CreateSection("复活系统")
 
-local SuicideButton = MainTab:CreateButton({
+local Button = MainTab:CreateButton({
    Name = "立即自杀",
    Callback = function()
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
@@ -132,7 +125,7 @@ local SuicideButton = MainTab:CreateButton({
    end,
 })
 
-local RespawnButton = MainTab:CreateButton({
+local Button = MainTab:CreateButton({
    Name = "原地复活",
    Callback = function()
         if LocalPlayer.Character then
@@ -148,161 +141,90 @@ local RespawnButton = MainTab:CreateButton({
    end,
 })
 
-local AutoRespawnToggle = MainTab:CreateToggle({
+local Toggle = MainTab:CreateToggle({
    Name = "自动复活",
    CurrentValue = false,
-   Flag = "AutoRespawnToggle",
    Callback = function(Value)
         respawnService.autoRespawn = Value
    end,
 })
 
--- 创建玩家选择区域
-local PlayerSelectionSection = MainTab:CreateSection("选择玩家")
+-- 玩家选择部分
+local Section = MainTab:CreateSection("选择玩家")
 
--- 创建玩家按钮容器
-local function CreatePlayerButtonsContainer()
-    if playerButtonsContainer then
-        playerButtonsContainer:Destroy()
-    end
-    
-    playerButtonsContainer = MainTab:CreateSection("玩家列表")
-    return playerButtonsContainer
-end
+-- 显示玩家数量
+playerListLabel = MainTab:CreateLabel("在线玩家: 加载中...")
 
--- 刷新玩家列表函数
-local function RefreshPlayerButtons()
-    UpdatePlayerList()
-    
-    -- 清除旧的按钮
-    for _, button in pairs(playerButtons) do
-        button:Destroy()
-    end
-    playerButtons = {}
-    
-    -- 创建新的容器
-    local container = CreatePlayerButtonsContainer()
-    
-    -- 创建新的玩家选择按钮
-    for _, playerName in ipairs(playerList) do
-        local playerButton = container:CreateButton({
-            Name = "选择: " .. playerName,
-            Callback = function()
-                local targetPlayer = Players:FindFirstChild(playerName)
-                if targetPlayer then
-                    selectedPlayer = playerName
-                    respawnService.followPlayer = playerName
-                    CurrentPlayerLabel:Set("当前选择: " .. playerName)
+-- 显示当前选择的玩家
+currentPlayerLabel = MainTab:CreateLabel("当前选择: 无")
+
+-- 玩家加入/离开时自动更新
+local function SetupPlayerEvents()
+    Players.PlayerAdded:Connect(function(player)
+        if player ~= LocalPlayer then
+            wait(0.1)
+            AutoRefreshPlayerButtons()
+            Rayfield:Notify({
+                Title = "玩家加入",
+                Content = player.Name .. " 加入了游戏",
+                Duration = 2,
+            })
+        end
+    end)
+
+    Players.PlayerRemoving:Connect(function(player)
+        if player ~= LocalPlayer then
+            -- 如果追踪的目标玩家离开
+            if respawnService.followPlayer == player.Name then
+                if respawnService.following then
+                    respawnService.following = false
+                    if respawnService.followConnection then
+                        respawnService.followConnection:Disconnect()
+                        respawnService.followConnection = nil
+                    end
                     Rayfield:Notify({
-                        Title = "玩家选择成功",
-                        Content = "已选择玩家: " .. targetPlayer.Name,
-                        Duration = 3,
-                    })
-                else
-                    Rayfield:Notify({
-                        Title = "错误",
-                        Content = "玩家不存在: " .. playerName,
+                        Title = "追踪停止",
+                        Content = "目标玩家 " .. player.Name .. " 已离开游戏",
                         Duration = 3,
                     })
                 end
-            end,
-        })
-        table.insert(playerButtons, playerButton)
-    end
-    
-    -- 如果没有玩家，显示提示
-    if #playerList == 0 then
-        container:CreateLabel("当前没有其他玩家在线")
-    end
+                if respawnService.teleporting then
+                    respawnService.teleporting = false
+                    if respawnService.teleportConnection then
+                        respawnService.teleportConnection:Disconnect()
+                        respawnService.teleportConnection = nil
+                    end
+                    Rayfield:Notify({
+                        Title = "传送停止",
+                        Content = "目标玩家 " .. player.Name .. " 已离开游戏",
+                        Duration = 3,
+                    })
+                end
+                respawnService.followPlayer = nil
+                selectedPlayer = nil
+                currentPlayerLabel:Set("当前选择: 无")
+            end
+            
+            AutoRefreshPlayerButtons()
+            Rayfield:Notify({
+                Title = "玩家离开",
+                Content = player.Name .. " 离开了游戏",
+                Duration = 2,
+            })
+        end
+    end)
 end
 
 -- 初始创建玩家按钮
-RefreshPlayerButtons()
+AutoRefreshPlayerButtons()
+SetupPlayerEvents()
 
--- 添加刷新玩家列表按钮
-local RefreshButton = MainTab:CreateButton({
-   Name = "刷新玩家列表",
-   Callback = function()
-        RefreshPlayerButtons()
-        Rayfield:Notify({
-            Title = "刷新完成",
-            Content = "玩家列表已更新",
-            Duration = 2,
-        })
-   end,
-})
-
--- 显示当前选择的玩家
-local CurrentPlayerLabel = MainTab:CreateLabel("当前选择: " .. (selectedPlayer or "无"))
-
--- 玩家加入/离开时自动更新
-Players.PlayerAdded:Connect(function(player)
-    if player ~= LocalPlayer then
-        wait(0.5)
-        UpdatePlayerList()
-        RefreshPlayerButtons()
-    end
-end)
-
-Players.PlayerRemoving:Connect(function(player)
-    if respawnService.followPlayer == player.Name then
-        if respawnService.following then
-            respawnService.following = false
-            if respawnService.followConnection then
-                respawnService.followConnection:Disconnect()
-                respawnService.followConnection = nil
-            end
-            if FollowToggle then
-                FollowToggle:Set(false)
-            end
-            Rayfield:Notify({
-                Title = "追踪停止",
-                Content = "目标玩家已离开游戏",
-                Duration = 3,
-            })
-        end
-        if respawnService.teleporting then
-            respawnService.teleporting = false
-            if respawnService.teleportConnection then
-                respawnService.teleportConnection:Disconnect()
-                respawnService.teleportConnection = nil
-            end
-            if TeleportToggle then
-                TeleportToggle:Set(false)
-            end
-            Rayfield:Notify({
-                Title = "传送停止",
-                Content = "目标玩家已离开游戏",
-                Duration = 3,
-            })
-        end
-        respawnService.followPlayer = nil
-        selectedPlayer = nil
-        CurrentPlayerLabel:Set("当前选择: 无")
-    end
-    UpdatePlayerList()
-    RefreshPlayerButtons()
-end)
-
--- 平滑追踪功能
-local FollowToggle = MainTab:CreateToggle({
+-- 追踪功能
+local Toggle = MainTab:CreateToggle({
    Name = "平滑追踪",
    CurrentValue = false,
-   Flag = "FollowToggle",
    Callback = function(Value)
         respawnService.following = Value
-        
-        -- 停止传送功能
-        if respawnService.teleporting then
-            respawnService.teleporting = false
-            if respawnService.teleportConnection then
-                respawnService.teleportConnection:Disconnect()
-                respawnService.teleportConnection = nil
-            end
-            if TeleportToggle then
-                TeleportToggle:Set(false)
-            end
-        end
         
         if respawnService.followConnection then
             respawnService.followConnection:Disconnect()
@@ -316,7 +238,6 @@ local FollowToggle = MainTab:CreateToggle({
                     Content = "请先选择玩家",
                     Duration = 3,
                 })
-                FollowToggle:Set(false)
                 return
             end
             
@@ -324,135 +245,18 @@ local FollowToggle = MainTab:CreateToggle({
             if not targetPlayer then
                 Rayfield:Notify({
                     Title = "错误",
-                    Content = "玩家不存在或已离开: " .. respawnService.followPlayer,
+                    Content = "玩家不存在或已离开",
                     Duration = 3,
                 })
-                respawnService.followPlayer = nil
-                selectedPlayer = nil
-                CurrentPlayerLabel:Set("当前选择: 无")
-                FollowToggle:Set(false)
                 return
             end
             
             respawnService.followConnection = RunService.Heartbeat:Connect(function()
                 if not respawnService.following then return end
-                if not respawnService.followPlayer then return end
                 
                 local targetPlayer = Players:FindFirstChild(respawnService.followPlayer)
                 if not targetPlayer then
                     respawnService.following = false
-                    FollowToggle:Set(false)
-                    return
-                end
-                
-                local targetChar = targetPlayer.Character
-                local localChar = LocalPlayer.Character
-                if not targetChar or not localChar then return end
-                
-                local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
-                local localRoot = localChar:FindFirstChild("HumanoidRootPart")
-                local localHumanoid = localChar:FindFirstChild("Humanoid")
-                
-                if targetRoot and localRoot and localHumanoid then
-                    local targetPosition = CalculateFollowPosition(
-                        targetRoot, 
-                        respawnService.followDistance, 
-                        respawnService.followPosition, 
-                        respawnService.followHeight
-                    )
-                    
-                    local currentPosition = localRoot.Position
-                    local direction = (targetPosition - currentPosition).Unit
-                    local distance = (targetPosition - currentPosition).Magnitude
-                    
-                    -- 使用极高的速度确保即使目标快速移动也能跟上
-                    local actualSpeed = math.min(respawnService.followSpeed * 5, distance * 50)
-                    
-                    if distance > 0.1 then
-                        localRoot.Velocity = direction * actualSpeed
-                    else
-                        localRoot.Velocity = Vector3.new(0, 0, 0)
-                    end
-                end
-            end)
-            
-            Rayfield:Notify({
-                Title = "追踪状态",
-                Content = "已开始平滑追踪: " .. targetPlayer.Name,
-                Duration = 3,
-            })
-        else
-            if respawnService.followConnection then
-                respawnService.followConnection:Disconnect()
-                respawnService.followConnection = nil
-            end
-            Rayfield:Notify({
-                Title = "追踪状态",
-                Content = "已停止追踪",
-                Duration = 3,
-            })
-        end
-   end,
-})
-
--- 直接传送Toggle
-local TeleportToggle = MainTab:CreateToggle({
-   Name = "直接传送",
-   CurrentValue = false,
-   Flag = "TeleportToggle",
-   Callback = function(Value)
-        respawnService.teleporting = Value
-        
-        -- 停止追踪功能
-        if respawnService.following then
-            respawnService.following = false
-            if respawnService.followConnection then
-                respawnService.followConnection:Disconnect()
-                respawnService.followConnection = nil
-            end
-            if FollowToggle then
-                FollowToggle:Set(false)
-            end
-        end
-        
-        if respawnService.teleportConnection then
-            respawnService.teleportConnection:Disconnect()
-            respawnService.teleportConnection = nil
-        end
-        
-        if respawnService.teleporting then
-            if not respawnService.followPlayer then
-                Rayfield:Notify({
-                    Title = "错误",
-                    Content = "请先选择玩家",
-                    Duration = 3,
-                })
-                TeleportToggle:Set(false)
-                return
-            end
-            
-            local targetPlayer = Players:FindFirstChild(respawnService.followPlayer)
-            if not targetPlayer or not targetPlayer.Character then
-                Rayfield:Notify({
-                    Title = "错误",
-                    Content = "玩家不存在或已离开: " .. respawnService.followPlayer,
-                    Duration = 3,
-                })
-                respawnService.followPlayer = nil
-                selectedPlayer = nil
-                CurrentPlayerLabel:Set("当前选择: 无")
-                TeleportToggle:Set(false)
-                return
-            end
-            
-            respawnService.teleportConnection = RunService.Heartbeat:Connect(function()
-                if not respawnService.teleporting then return end
-                if not respawnService.followPlayer then return end
-                
-                local targetPlayer = Players:FindFirstChild(respawnService.followPlayer)
-                if not targetPlayer then
-                    respawnService.teleporting = false
-                    TeleportToggle:Set(false)
                     return
                 end
                 
@@ -471,22 +275,93 @@ local TeleportToggle = MainTab:CreateToggle({
                         respawnService.followHeight
                     )
                     
-                    localRoot.CFrame = CFrame.new(targetPosition, targetRoot.Position)
+                    localRoot.CFrame = CFrame.new(targetPosition)
                 end
             end)
             
             Rayfield:Notify({
-                Title = "传送状态",
-                Content = "已开始传送: " .. targetPlayer.Name,
+                Title = "追踪开始",
+                Content = "正在追踪: " .. targetPlayer.Name,
                 Duration = 3,
             })
         else
-            if respawnService.teleportConnection then
-                respawnService.teleportConnection:Disconnect()
-                respawnService.teleportConnection = nil
-            end
             Rayfield:Notify({
-                Title = "传送状态",
+                Title = "追踪停止",
+                Content = "已停止追踪",
+                Duration = 3,
+            })
+        end
+   end,
+})
+
+-- 传送功能
+local Toggle = MainTab:CreateToggle({
+   Name = "直接传送",
+   CurrentValue = false,
+   Callback = function(Value)
+        respawnService.teleporting = Value
+        
+        if respawnService.teleportConnection then
+            respawnService.teleportConnection:Disconnect()
+            respawnService.teleportConnection = nil
+        end
+        
+        if respawnService.teleporting then
+            if not respawnService.followPlayer then
+                Rayfield:Notify({
+                    Title = "错误",
+                    Content = "请先选择玩家",
+                    Duration = 3,
+                })
+                return
+            end
+            
+            local targetPlayer = Players:FindFirstChild(respawnService.followPlayer)
+            if not targetPlayer then
+                Rayfield:Notify({
+                    Title = "错误",
+                    Content = "玩家不存在或已离开",
+                    Duration = 3,
+                })
+                return
+            end
+            
+            respawnService.teleportConnection = RunService.Heartbeat:Connect(function()
+                if not respawnService.teleporting then return end
+                
+                local targetPlayer = Players:FindFirstChild(respawnService.followPlayer)
+                if not targetPlayer then
+                    respawnService.teleporting = false
+                    return
+                end
+                
+                local targetChar = targetPlayer.Character
+                local localChar = LocalPlayer.Character
+                if not targetChar or not localChar then return end
+                
+                local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+                local localRoot = localChar:FindFirstChild("HumanoidRootPart")
+                
+                if targetRoot and localRoot then
+                    local targetPosition = CalculateFollowPosition(
+                        targetRoot, 
+                        respawnService.followDistance, 
+                        respawnService.followPosition, 
+                        respawnService.followHeight
+                    )
+                    
+                    localRoot.CFrame = CFrame.new(targetPosition)
+                end
+            end)
+            
+            Rayfield:Notify({
+                Title = "传送开始",
+                Content = "正在传送到: " .. targetPlayer.Name,
+                Duration = 3,
+            })
+        else
+            Rayfield:Notify({
+                Title = "传送停止",
                 Content = "已停止传送",
                 Duration = 3,
             })
@@ -494,91 +369,116 @@ local TeleportToggle = MainTab:CreateToggle({
    end,
 })
 
-local SettingsSection = MainTab:CreateSection("追踪设置")
+-- 追踪设置
+local Section = MainTab:CreateSection("追踪设置")
 
-local SpeedSlider = MainTab:CreateSlider({
+local Input = MainTab:CreateInput({
    Name = "追踪速度",
-   Range = {100, 2000},
-   Increment = 500,
-   Suffix = "速度",
-   CurrentValue = respawnService.followSpeed,
-   Flag = "FollowSpeedSlider",
-   Callback = function(Value)
-        respawnService.followSpeed = Value
-        Rayfield:Notify({
-            Title = "设置更新",
-            Content = "追踪速度设置为: " .. Value,
-            Duration = 2,
-        })
+   PlaceholderText = "输入追踪速度 (默认: 500)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value > 0 then
+            respawnService.followSpeed = value
+            Rayfield:Notify({
+                Title = "设置更新",
+                Content = "追踪速度设置为: " .. value,
+                Duration = 2,
+            })
+        else
+            Rayfield:Notify({
+                Title = "输入错误",
+                Content = "请输入有效的数字",
+                Duration = 2,
+            })
+        end
    end,
 })
 
-local DistanceSlider = MainTab:CreateSlider({
+local Input = MainTab:CreateInput({
    Name = "追踪距离",
-   Range = {0.1, 10},
-   Increment = 3.9,
-   Suffix = "距离",
-   CurrentValue = respawnService.followDistance,
-   Flag = "FollowDistanceSlider",
-   Callback = function(Value)
-        respawnService.followDistance = Value
-        Rayfield:Notify({
-            Title = "设置更新",
-            Content = "追踪距离设置为: " .. Value,
-            Duration = 2,
-        })
+   PlaceholderText = "输入追踪距离 (默认: 3.9)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value > 0 then
+            respawnService.followDistance = value
+            Rayfield:Notify({
+                Title = "设置更新",
+                Content = "追踪距离设置为: " .. value,
+                Duration = 2,
+            })
+        else
+            Rayfield:Notify({
+                Title = "输入错误",
+                Content = "请输入有效的数字",
+                Duration = 2,
+            })
+        end
    end,
 })
 
-local PositionSlider = MainTab:CreateSlider({
+local Input = MainTab:CreateInput({
    Name = "追踪位置",
-   Range = {0, 360},
-   Increment = 350,
-   Suffix = "度 (0=前,90=右,180=后,270=左)",
-   CurrentValue = respawnService.followPosition,
-   Flag = "FollowPositionSlider",
-   Callback = function(Value)
-        respawnService.followPosition = Value
-        local positionText = ""
-        if Value == 0 then positionText = "前方"
-        elseif Value == 90 then positionText = "右侧"
-        elseif Value == 180 then positionText = "后方"
-        elseif Value == 270 then positionText = "左侧"
-        else positionText = Value .. "度" end
-        
-        Rayfield:Notify({
-            Title = "位置设置",
-            Content = "追踪位置: " .. positionText,
-            Duration = 2,
-        })
+   PlaceholderText = "输入追踪角度 (0-360度, 默认: 350)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value >= 0 and value <= 360 then
+            respawnService.followPosition = value
+            local positionText = ""
+            if value == 0 then positionText = "前方"
+            elseif value == 90 then positionText = "右侧"
+            elseif value == 180 then positionText = "后方"
+            elseif value == 270 then positionText = "左侧"
+            else positionText = value .. "度" end
+            
+            Rayfield:Notify({
+                Title = "位置设置",
+                Content = "追踪位置: " .. positionText,
+                Duration = 2,
+            })
+        else
+            Rayfield:Notify({
+                Title = "输入错误",
+                Content = "请输入0-360之间的数字",
+                Duration = 2,
+            })
+        end
    end,
 })
 
-local HeightSlider = MainTab:CreateSlider({
+local Input = MainTab:CreateInput({
    Name = "追踪高度",
-   Range = {-5, 10},
-   Increment = 0,
-   Suffix = "高度",
-   CurrentValue = respawnService.followHeight,
-   Flag = "FollowHeightSlider",
-   Callback = function(Value)
-        respawnService.followHeight = Value
-        Rayfield:Notify({
-            Title = "高度设置",
-            Content = "追踪高度设置为: " .. Value,
-            Duration = 2,
-        })
+   PlaceholderText = "输入追踪高度 (默认: 0)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value then
+            respawnService.followHeight = value
+            Rayfield:Notify({
+                Title = "高度设置",
+                Content = "追踪高度设置为: " .. value,
+                Duration = 2,
+            })
+        else
+            Rayfield:Notify({
+                Title = "输入错误",
+                Content = "请输入有效的数字",
+                Duration = 2,
+            })
+        end
    end,
 })
 
-local KeybindSection = MainTab:CreateSection("快捷键")
+-- 快捷键
+local Section = MainTab:CreateSection("快捷键")
 
-local RespawnKeybind = MainTab:CreateKeybind({
+local Keybind = MainTab:CreateKeybind({
     Name = "快速复活快捷键",
     CurrentKeybind = "R",
     HoldToInteract = false,
-    Flag = "RespawnKeybind",
-    Callback = function(Keybind)
+    Callback = function()
         if LocalPlayer.Character then
             local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             if rootPart then
@@ -591,38 +491,34 @@ local RespawnKeybind = MainTab:CreateKeybind({
     end,
 })
 
-local FollowKeybind = MainTab:CreateKeybind({
+local Keybind = MainTab:CreateKeybind({
     Name = "切换追踪快捷键",
     CurrentKeybind = "F",
     HoldToInteract = false,
-    Flag = "ToggleFollowKeybind",
-    Callback = function(Keybind)
+    Callback = function()
         if respawnService.followPlayer then
             respawnService.following = not respawnService.following
-            FollowToggle:Set(respawnService.following)
         else
             Rayfield:Notify({
                 Title = "错误",
-                Content = "请先选择有效的玩家",
+                Content = "请先选择玩家",
                 Duration = 3,
             })
         end
     end,
 })
 
-local TeleportKeybind = MainTab:CreateKeybind({
+local Keybind = MainTab:CreateKeybind({
     Name = "切换传送快捷键",
     CurrentKeybind = "G",
     HoldToInteract = false,
-    Flag = "ToggleTeleportKeybind",
-    Callback = function(Keybind)
+    Callback = function()
         if respawnService.followPlayer then
             respawnService.teleporting = not respawnService.teleporting
-            TeleportToggle:Set(respawnService.teleporting)
         else
             Rayfield:Notify({
                 Title = "错误",
-                Content = "请先选择有效的玩家",
+                Content = "请先选择玩家",
                 Duration = 3,
             })
         end
@@ -632,6 +528,6 @@ local TeleportKeybind = MainTab:CreateKeybind({
 -- 初始通知
 Rayfield:Notify({
    Title = "脚本加载成功",
-   Content = "复活功能脚本已就绪\n请先点击玩家名字选择目标，再使用追踪或传送功能\n追踪速度已大幅提升，可以跟上快速移动的目标",
-   Duration = 5,
+   Content = "复活功能脚本已就绪！\n自动检测玩家功能已启用\n现在可以使用输入框直接设置数值",
+   Duration = 6,
 })

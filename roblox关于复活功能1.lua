@@ -127,19 +127,96 @@ local Button = MainTab:CreateButton({
    end,
 })
 
-local Button = MainTab:CreateButton({
+local Toggle = MainTab:CreateToggle({
    Name = "原地复活",
    Callback = function()
-        if LocalPlayer.Character then
-            local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if rootPart then
-                respawnService.savedPositions[LocalPlayer] = rootPart.Position
-            end
+        local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+while not LocalPlayer do
+    Players.PlayerAdded:Wait()
+    LocalPlayer = Players.LocalPlayer
+end
+
+-- 原地复活系统
+local respawnService = {}
+respawnService.savedPositions = {}
+
+function respawnService:SetupPlayer(player)
+    player.CharacterAdded:Connect(function(character)
+        self:OnCharacterAdded(player, character)
+    end)
+    
+    if player.Character then
+        self:OnCharacterAdded(player, player.Character)
+    end
+end
+
+function respawnService:OnCharacterAdded(player, character)
+    local humanoid = character:WaitForChild("Humanoid")
+    
+    if self.savedPositions[player] then
+        wait(0.1) 
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            rootPart.CFrame = CFrame.new(self.savedPositions[player])
+            print("传送 " .. player.Name .. " 到保存位置")
+        end
+    end
+    
+    humanoid.Died:Connect(function()
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            self.savedPositions[player] = rootPart.Position
+            print("保存 " .. player.Name .. " 的位置")
         end
         
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-            LocalPlayer.Character.Humanoid.Health = 0
+        wait(5)
+        player:LoadCharacter()
+    end)
+end
+
+-- 初始化原地复活系统
+for _, player in ipairs(Players:GetPlayers()) do
+    respawnService:SetupPlayer(player)
+end
+
+Players.PlayerAdded:Connect(function(player)
+    respawnService:SetupPlayer(player)
+end)
+
+print("原地复活系统初始化完成")
+
+-- 原地复活按钮功能（如果需要按钮触发）
+local function RespawnAtSavedPosition()
+    if LocalPlayer.Character then
+        local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            respawnService.savedPositions[LocalPlayer] = rootPart.Position
+            print("保存当前位置用于复活")
         end
+    end
+    
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.Health = 0
+    end
+end
+
+-- 如果需要键盘快捷键触发复活
+local UIS = game:GetService("UserInputService")
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.R then -- 按R键触发原地复活
+        RespawnAtSavedPosition()
+    end
+end)
+
+-- 导出函数供其他脚本使用
+return {
+    RespawnAtSavedPosition = RespawnAtSavedPosition,
+    respawnService = respawnService
+}
    end,
 })
 
@@ -156,6 +233,39 @@ local Section = MainTab:CreateSection("选择玩家")
 
 -- 显示当前选择的玩家
 local currentPlayerLabel = MainTab:CreateLabel("当前选择: 无")
+
+-- 创建刷新选择按钮
+local clearSelectionButton = MainTab:CreateButton({
+   Name = "刷新选择的玩家",
+   Callback = function()
+        -- 停止追踪和传送
+        if respawnService.following then
+            respawnService.following = false
+            if respawnService.followConnection then
+                respawnService.followConnection:Disconnect()
+                respawnService.followConnection = nil
+            end
+        end
+        
+        if respawnService.teleporting then
+            respawnService.teleporting = false
+            if respawnService.teleportConnection then
+                respawnService.teleportConnection:Disconnect()
+                respawnService.teleportConnection = nil
+            end
+        end
+        
+        -- 清空选择的玩家
+        respawnService.followPlayer = nil
+        currentPlayerLabel:Set("当前选择: 无")
+        
+        Rayfield:Notify({
+            Title = "选择已刷新",
+            Content = "已清空当前选择的玩家，可以重新选择",
+            Duration = 3,
+        })
+   end,
+})
 
 -- 创建玩家列表容器
 local playerListContainer = MainTab:CreateSection("玩家列表")

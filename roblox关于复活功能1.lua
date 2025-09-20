@@ -469,14 +469,14 @@ local SettingsSection = MainTab:CreateSection("追踪设置")
 
 -- 创建滑块时立即应用默认值
 respawnService.followSpeed = 500
-respawnService.followDistance = 0.5
-respawnService.followPosition = 180
-respawnService.followHeight = 1.5
+respawnService.followDistance = 3.9
+respawnService.followPosition = 350
+respawnService.followHeight = 0
 
 local Slider = MainTab:CreateSlider({
    Name = "追踪速度",
    Range = {100, 2000},
-   Increment = 50,
+   Increment = 500,
    Suffix = "速度",
    CurrentValue = respawnService.followSpeed,
    Flag = "FollowSpeedSlider",
@@ -493,7 +493,7 @@ local Slider = MainTab:CreateSlider({
 local Slider = MainTab:CreateSlider({
    Name = "追踪距离",
    Range = {0.1, 10},
-   Increment = 0.1,
+   Increment = 3.9,
    Suffix = "距离",
    CurrentValue = respawnService.followDistance,
    Flag = "FollowDistanceSlider",
@@ -510,7 +510,7 @@ local Slider = MainTab:CreateSlider({
 local Slider = MainTab:CreateSlider({
    Name = "追踪位置",
    Range = {0, 360},
-   Increment = 5,
+   Increment = 180,
    Suffix = "度 (0=前,90=右,180=后,270=左)",
    CurrentValue = respawnService.followPosition,
    Flag = "FollowPositionSlider",
@@ -534,7 +534,7 @@ local Slider = MainTab:CreateSlider({
 local Slider = MainTab:CreateSlider({
    Name = "追踪高度",
    Range = {-5, 10},
-   Increment = 0.5,
+   Increment = 0,
    Suffix = "高度",
    CurrentValue = respawnService.followHeight,
    Flag = "FollowHeightSlider",

@@ -27,9 +27,9 @@ local respawnService = {
     following = false,
     teleporting = false,
     followSpeed = 500,
-    followDistance = 0.5,
-    followHeight = 1.5,
-    followPosition = 180,
+    followDistance = 3.9,
+    followHeight = 0,
+    followPosition = 350,
     savedPositions = {},
     followConnection = nil,
     teleportConnection = nil,
@@ -39,7 +39,8 @@ local respawnService = {
 -- 玩家列表管理
 local playerList = {}
 local selectedPlayer = nil
-local playerButtonsContainer = nil -- 用于存储玩家按钮的容器
+local playerButtonsContainer = nil
+local playerButtons = {}
 
 -- 更新玩家列表
 local function UpdatePlayerList()
@@ -53,49 +54,6 @@ end
 
 -- 初始化玩家列表
 UpdatePlayerList()
-
--- 玩家加入/离开时自动更新
-Players.PlayerAdded:Connect(function(player)
-    if player ~= LocalPlayer then
-        wait(0.5)
-        UpdatePlayerList()
-        RefreshPlayerButtons()
-    end
-end)
-
-Players.PlayerRemoving:Connect(function(player)
-    if respawnService.followPlayer == player.Name then
-        if respawnService.following then
-            respawnService.following = false
-            if respawnService.followConnection then
-                respawnService.followConnection:Disconnect()
-                respawnService.followConnection = nil
-            end
-            Rayfield:Notify({
-                Title = "追踪停止",
-                Content = "目标玩家已离开游戏",
-                Duration = 3,
-            })
-        end
-        if respawnService.teleporting then
-            respawnService.teleporting = false
-            if respawnService.teleportConnection then
-                respawnService.teleportConnection:Disconnect()
-                respawnService.teleportConnection = nil
-            end
-            Rayfield:Notify({
-                Title = "传送停止",
-                Content = "目标玩家已离开游戏",
-                Duration = 3,
-            })
-        end
-        respawnService.followPlayer = nil
-        selectedPlayer = nil
-        CurrentPlayerLabel:Set("当前选择: 无")
-    end
-    UpdatePlayerList()
-    RefreshPlayerButtons()
-end)
 
 -- 计算追踪位置
 local function CalculateFollowPosition(targetRoot, distance, angle, height)
@@ -165,7 +123,7 @@ SetupRespawnSystem()
 local MainTab = Window:CreateTab("🏠 复活功能", nil)
 local MainSection = MainTab:CreateSection("复活系统")
 
-local Button = MainTab:CreateButton({
+local SuicideButton = MainTab:CreateButton({
    Name = "立即自杀",
    Callback = function()
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
@@ -174,7 +132,7 @@ local Button = MainTab:CreateButton({
    end,
 })
 
-local Button = MainTab:CreateButton({
+local RespawnButton = MainTab:CreateButton({
    Name = "原地复活",
    Callback = function()
         if LocalPlayer.Character then
@@ -190,7 +148,7 @@ local Button = MainTab:CreateButton({
    end,
 })
 
-local Toggle = MainTab:CreateToggle({
+local AutoRespawnToggle = MainTab:CreateToggle({
    Name = "自动复活",
    CurrentValue = false,
    Flag = "AutoRespawnToggle",
@@ -199,18 +157,15 @@ local Toggle = MainTab:CreateToggle({
    end,
 })
 
--- 创建玩家选择按钮列表
+-- 创建玩家选择区域
 local PlayerSelectionSection = MainTab:CreateSection("选择玩家")
 
 -- 创建玩家按钮容器
-local playerButtons = {}
 local function CreatePlayerButtonsContainer()
-    -- 如果容器已存在，先销毁它
     if playerButtonsContainer then
         playerButtonsContainer:Destroy()
     end
     
-    -- 创建新的容器
     playerButtonsContainer = MainTab:CreateSection("玩家列表")
     return playerButtonsContainer
 end
@@ -240,7 +195,7 @@ local function RefreshPlayerButtons()
                     CurrentPlayerLabel:Set("当前选择: " .. playerName)
                     Rayfield:Notify({
                         Title = "玩家选择成功",
-                        Content = "已选择玩家: " .. targetPlayer.Name .. " (" .. (targetPlayer.DisplayName or targetPlayer.Name) .. ")",
+                        Content = "已选择玩家: " .. targetPlayer.Name,
                         Duration = 3,
                     })
                 else
@@ -280,7 +235,56 @@ local RefreshButton = MainTab:CreateButton({
 -- 显示当前选择的玩家
 local CurrentPlayerLabel = MainTab:CreateLabel("当前选择: " .. (selectedPlayer or "无"))
 
--- 修复平滑追踪功能
+-- 玩家加入/离开时自动更新
+Players.PlayerAdded:Connect(function(player)
+    if player ~= LocalPlayer then
+        wait(0.5)
+        UpdatePlayerList()
+        RefreshPlayerButtons()
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    if respawnService.followPlayer == player.Name then
+        if respawnService.following then
+            respawnService.following = false
+            if respawnService.followConnection then
+                respawnService.followConnection:Disconnect()
+                respawnService.followConnection = nil
+            end
+            if FollowToggle then
+                FollowToggle:Set(false)
+            end
+            Rayfield:Notify({
+                Title = "追踪停止",
+                Content = "目标玩家已离开游戏",
+                Duration = 3,
+            })
+        end
+        if respawnService.teleporting then
+            respawnService.teleporting = false
+            if respawnService.teleportConnection then
+                respawnService.teleportConnection:Disconnect()
+                respawnService.teleportConnection = nil
+            end
+            if TeleportToggle then
+                TeleportToggle:Set(false)
+            end
+            Rayfield:Notify({
+                Title = "传送停止",
+                Content = "目标玩家已离开游戏",
+                Duration = 3,
+            })
+        end
+        respawnService.followPlayer = nil
+        selectedPlayer = nil
+        CurrentPlayerLabel:Set("当前选择: 无")
+    end
+    UpdatePlayerList()
+    RefreshPlayerButtons()
+end)
+
+-- 平滑追踪功能
 local FollowToggle = MainTab:CreateToggle({
    Name = "平滑追踪",
    CurrentValue = false,
@@ -295,7 +299,9 @@ local FollowToggle = MainTab:CreateToggle({
                 respawnService.teleportConnection:Disconnect()
                 respawnService.teleportConnection = nil
             end
-            TeleportToggle:Set(false)
+            if TeleportToggle then
+                TeleportToggle:Set(false)
+            end
         end
         
         if respawnService.followConnection then
@@ -404,7 +410,9 @@ local TeleportToggle = MainTab:CreateToggle({
                 respawnService.followConnection:Disconnect()
                 respawnService.followConnection = nil
             end
-            FollowToggle:Set(false)
+            if FollowToggle then
+                FollowToggle:Set(false)
+            end
         end
         
         if respawnService.teleportConnection then
@@ -488,13 +496,7 @@ local TeleportToggle = MainTab:CreateToggle({
 
 local SettingsSection = MainTab:CreateSection("追踪设置")
 
--- 创建滑块时立即应用默认值
-respawnService.followSpeed = 500
-respawnService.followDistance = 3.9
-respawnService.followPosition = 350
-respawnService.followHeight = 0
-
-local Slider = MainTab:CreateSlider({
+local SpeedSlider = MainTab:CreateSlider({
    Name = "追踪速度",
    Range = {100, 2000},
    Increment = 500,
@@ -511,7 +513,7 @@ local Slider = MainTab:CreateSlider({
    end,
 })
 
-local Slider = MainTab:CreateSlider({
+local DistanceSlider = MainTab:CreateSlider({
    Name = "追踪距离",
    Range = {0.1, 10},
    Increment = 3.9,
@@ -528,7 +530,7 @@ local Slider = MainTab:CreateSlider({
    end,
 })
 
-local Slider = MainTab:CreateSlider({
+local PositionSlider = MainTab:CreateSlider({
    Name = "追踪位置",
    Range = {0, 360},
    Increment = 350,
@@ -552,7 +554,7 @@ local Slider = MainTab:CreateSlider({
    end,
 })
 
-local Slider = MainTab:CreateSlider({
+local HeightSlider = MainTab:CreateSlider({
    Name = "追踪高度",
    Range = {-5, 10},
    Increment = 0,
@@ -571,7 +573,7 @@ local Slider = MainTab:CreateSlider({
 
 local KeybindSection = MainTab:CreateSection("快捷键")
 
-local Keybind = MainTab:CreateKeybind({
+local RespawnKeybind = MainTab:CreateKeybind({
     Name = "快速复活快捷键",
     CurrentKeybind = "R",
     HoldToInteract = false,
@@ -589,7 +591,7 @@ local Keybind = MainTab:CreateKeybind({
     end,
 })
 
-local Keybind = MainTab:CreateKeybind({
+local FollowKeybind = MainTab:CreateKeybind({
     Name = "切换追踪快捷键",
     CurrentKeybind = "F",
     HoldToInteract = false,
@@ -608,7 +610,7 @@ local Keybind = MainTab:CreateKeybind({
     end,
 })
 
-local Keybind = MainTab:CreateKeybind({
+local TeleportKeybind = MainTab:CreateKeybind({
     Name = "切换传送快捷键",
     CurrentKeybind = "G",
     HoldToInteract = false,

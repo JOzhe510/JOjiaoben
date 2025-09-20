@@ -33,6 +33,24 @@ local respawnService = {
     teleportConnection = nil
 }
 
+-- 查找玩家函数（支持部分匹配）
+local function FindPlayerByName(name)
+    if not name or name == "" then return nil end
+    
+    name = name:lower()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local displayName = player.DisplayName:lower()
+            local userName = player.Name:lower()
+            
+            if userName:find(name) or displayName:find(name) then
+                return player
+            end
+        end
+    end
+    return nil
+end
+
 -- 原地复活系统初始化
 local function SetupRespawnSystem()
     respawnService.savedPositions = {}
@@ -124,24 +142,33 @@ local Toggle = MainTab:CreateToggle({
    end,
 })
 
--- 改为输入玩家名字
+-- 输入玩家名字（支持部分匹配）
 local PlayerInput = MainTab:CreateInput({
    Name = "输入玩家名字",
-   PlaceholderText = "输入要追踪的玩家名字",
+   PlaceholderText = "输入用户名或显示名（支持部分匹配）",
    RemoveTextAfterFocusLost = false,
    Callback = function(Text)
         if Text and Text ~= "" then
-            respawnService.followPlayer = Text
-            Rayfield:Notify({
-                Title = "玩家设置",
-                Content = "已设置目标玩家: " .. Text,
-                Duration = 3,
-            })
+            local targetPlayer = FindPlayerByName(Text)
+            if targetPlayer then
+                respawnService.followPlayer = targetPlayer.Name
+                Rayfield:Notify({
+                    Title = "玩家设置成功",
+                    Content = "已设置目标玩家: " .. targetPlayer.Name .. " (" .. targetPlayer.DisplayName .. ")",
+                    Duration = 3,
+                })
+            else
+                Rayfield:Notify({
+                    Title = "错误",
+                    Content = "找不到玩家: " .. Text,
+                    Duration = 3,
+                })
+            end
         end
    end,
 })
 
--- 修复追踪功能
+-- 修复追踪功能（使用速度参数）
 local FollowToggle = MainTab:CreateToggle({
    Name = "追踪玩家",
    CurrentValue = false,
@@ -165,7 +192,7 @@ local FollowToggle = MainTab:CreateToggle({
         end
         
         if respawnService.following then
-            if not respawnService.followPlayer or respawnService.followPlayer == "" then
+            if not respawnService.followPlayer then
                 Rayfield:Notify({
                     Title = "错误",
                     Content = "请先输入玩家名字",
@@ -198,20 +225,20 @@ local FollowToggle = MainTab:CreateToggle({
                 local localHumanoid = localChar:FindFirstChild("Humanoid")
                 
                 if targetRoot and localRoot and localHumanoid then
-                    local distance = (targetRoot.Position - localRoot.Position).Magnitude
+                    -- 计算目标位置（玩家后方）
+                    local targetCFrame = targetRoot.CFrame
+                    local behindOffset = targetCFrame.LookVector * -respawnService.followDistance
+                    local targetPosition = targetRoot.Position + behindOffset + Vector3.new(0, 1.5, 0)
                     
-                    if distance > respawnService.followDistance then
-                        local direction = (targetRoot.Position - localRoot.Position).Unit
-                        local targetPosition = targetRoot.Position - (direction * respawnService.followDistance)
-                        
-                        localHumanoid:MoveTo(targetPosition)
-                    end
+                    -- 使用速度参数移动
+                    local direction = (targetPosition - localRoot.Position).Unit
+                    localRoot.Velocity = direction * respawnService.followSpeed
                 end
             end)
             
             Rayfield:Notify({
                 Title = "追踪状态",
-                Content = "已开始追踪: " .. respawnService.followPlayer,
+                Content = "已开始追踪: " .. targetPlayer.Name,
                 Duration = 3,
             })
         else
@@ -224,7 +251,7 @@ local FollowToggle = MainTab:CreateToggle({
    end,
 })
 
--- 直接传送Toggle
+-- 直接传送Toggle（传送到玩家后方）
 local TeleportToggle = MainTab:CreateToggle({
    Name = "直接传送",
    CurrentValue = false,
@@ -248,7 +275,7 @@ local TeleportToggle = MainTab:CreateToggle({
         end
         
         if respawnService.teleporting then
-            if not respawnService.followPlayer or respawnService.followPlayer == "" then
+            if not respawnService.followPlayer then
                 Rayfield:Notify({
                     Title = "错误",
                     Content = "请先输入玩家名字",
@@ -280,8 +307,10 @@ local TeleportToggle = MainTab:CreateToggle({
                 local localRoot = localChar:FindFirstChild("HumanoidRootPart")
                 
                 if targetRoot and localRoot then
-                    local direction = (targetRoot.Position - localRoot.Position).Unit
-                    local targetPosition = targetRoot.Position - (direction * respawnService.followDistance)
+                    -- 传送到玩家后方
+                    local targetCFrame = targetRoot.CFrame
+                    local behindOffset = targetCFrame.LookVector * -respawnService.followDistance
+                    local targetPosition = targetRoot.Position + behindOffset + Vector3.new(0, 1.5, 0)
                     
                     localRoot.CFrame = CFrame.new(targetPosition, targetRoot.Position)
                 end
@@ -289,7 +318,7 @@ local TeleportToggle = MainTab:CreateToggle({
             
             Rayfield:Notify({
                 Title = "传送状态",
-                Content = "已开始传送: " .. respawnService.followPlayer,
+                Content = "已开始传送: " .. targetPlayer.Name,
                 Duration = 3,
             })
         else
@@ -306,25 +335,35 @@ local SettingsSection = MainTab:CreateSection("设置")
 
 local Slider = MainTab:CreateSlider({
    Name = "追踪速度",
-   Range = {10, 1000},
-   Increment = 1,
+   Range = {10, 500},
+   Increment = 10,
    Suffix = "速度",
    CurrentValue = 100,
    Flag = "FollowSpeedSlider",
    Callback = function(Value)
         respawnService.followSpeed = Value
+        Rayfield:Notify({
+            Title = "设置更新",
+            Content = "追踪速度设置为: " .. Value,
+            Duration = 2,
+        })
    end,
 })
 
 local Slider = MainTab:CreateSlider({
    Name = "追踪距离",
-   Range = {1, 50},
+   Range = {1, 20},
    Increment = 1,
    Suffix = "距离",
    CurrentValue = 3,
    Flag = "FollowDistanceSlider",
    Callback = function(Value)
         respawnService.followDistance = Value
+        Rayfield:Notify({
+            Title = "设置更新",
+            Content = "追踪距离设置为: " .. Value,
+            Duration = 2,
+        })
    end,
 })
 
@@ -354,7 +393,7 @@ local Keybind = MainTab:CreateKeybind({
     HoldToInteract = false,
     Flag = "ToggleFollowKeybind",
     Callback = function(Keybind)
-        if respawnService.followPlayer and respawnService.followPlayer ~= "" then
+        if respawnService.followPlayer then
             respawnService.following = not respawnService.following
             FollowToggle:Set(respawnService.following)
         else
@@ -373,7 +412,7 @@ local Keybind = MainTab:CreateKeybind({
     HoldToInteract = false,
     Flag = "ToggleTeleportKeybind",
     Callback = function(Keybind)
-        if respawnService.followPlayer and respawnService.followPlayer ~= "" then
+        if respawnService.followPlayer then
             respawnService.teleporting = not respawnService.teleporting
             TeleportToggle:Set(respawnService.teleporting)
         else
@@ -421,6 +460,6 @@ end)
 -- 初始通知
 Rayfield:Notify({
    Title = "脚本加载成功",
-   Content = "复活功能脚本已就绪",
+   Content = "复活功能脚本已就绪\n输入玩家用户名或显示名即可开始追踪",
    Duration = 5,
 })

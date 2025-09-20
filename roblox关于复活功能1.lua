@@ -31,6 +31,60 @@ local respawnService = {
     followConnection = nil
 }
 
+-- 原地复活系统初始化
+local function SetupRespawnSystem()
+    respawnService.savedPositions = {}
+    
+    local function SetupPlayer(player)
+        player.CharacterAdded:Connect(function(character)
+            local humanoid = character:WaitForChild("Humanoid")
+            
+            if respawnService.savedPositions[player] then
+                wait(0.1) 
+                local rootPart = character:FindFirstChild("HumanoidRootPart")
+                if rootPart then
+                    rootPart.CFrame = CFrame.new(respawnService.savedPositions[player])
+                end
+            end
+            
+            humanoid.Died:Connect(function()
+                local rootPart = character:FindFirstChild("HumanoidRootPart")
+                if rootPart then
+                    respawnService.savedPositions[player] = rootPart.Position
+                end
+                
+                if respawnService.autoRespawn then
+                    wait(2)
+                    player:LoadCharacter()
+                end
+            end)
+        end)
+        
+        if player.Character then
+            local humanoid = player.Character:WaitForChild("Humanoid")
+            humanoid.Died:Connect(function()
+                local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
+                if rootPart then
+                    respawnService.savedPositions[player] = rootPart.Position
+                end
+                
+                if respawnService.autoRespawn then
+                    wait(2)
+                    player:LoadCharacter()
+                end
+            end)
+        end
+    end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        SetupPlayer(player)
+    end
+
+    Players.PlayerAdded:Connect(SetupPlayer)
+end
+
+SetupRespawnSystem()
+
 local function updatePlayerList()
     local playerList = {"选择玩家"}
     for _, player in ipairs(Players:GetPlayers()) do
@@ -56,7 +110,7 @@ local Button = MainTab:CreateButton({
 local Button = MainTab:CreateButton({
    Name = "原地复活",
    Callback = function()
-   local Players = game:GetService("Players")
+        local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 while not LocalPlayer do
@@ -143,7 +197,7 @@ return {
     RespawnAtSavedPosition = RespawnAtSavedPosition,
     respawnService = respawnService
 }
-  end,
+   end,
 })
 
 local Toggle = MainTab:CreateToggle({
@@ -167,7 +221,7 @@ local Dropdown = MainTab:CreateDropdown({
 })
 
 local Toggle = MainTab:CreateToggle({
-   Name = "追踪玩家",
+   Name = "平滑追踪玩家",
    CurrentValue = false,
    Flag = "FollowToggle",
    Callback = function(Value)
@@ -236,7 +290,7 @@ local SettingsSection = MainTab:CreateSection("设置")
 
 local Slider = MainTab:CreateSlider({
    Name = "追踪速度",
-   Range = {10, 200},
+   Range = {10, 1000},
    Increment = 1,
    Suffix = "速度",
    CurrentValue = 100,
@@ -248,13 +302,31 @@ local Slider = MainTab:CreateSlider({
 
 local Slider = MainTab:CreateSlider({
    Name = "追踪距离",
-   Range = {1, 10},
+   Range = {1, 50},
    Increment = 1,
    Suffix = "距离",
    CurrentValue = 3,
    Flag = "FollowDistanceSlider",
    Callback = function(Value)
         respawnService.followDistance = Value
+   end,
+})
+
+local Input = MainTab:CreateInput({
+   Name = "传送高度偏移",
+   PlaceholderText = "0-10",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        -- 高度偏移设置
+   end,
+})
+
+local Input = MainTab:CreateInput({
+   Name = "传送角度偏移",
+   PlaceholderText = "0-360",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        -- 角度偏移设置
    end,
 })
 

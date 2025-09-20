@@ -42,6 +42,9 @@ local playerButtons = {}
 local currentPlayerLabel
 local playerListLabel
 
+-- 创建玩家列表容器
+local playerListContainer = nil
+
 -- 更新玩家列表
 local function UpdatePlayerList()
     playerList = {}
@@ -275,7 +278,7 @@ local Toggle = MainTab:CreateToggle({
                         respawnService.followHeight
                     )
                     
-                    localRoot.CFrame = CFrame.new(targetPosition)
+                    localRoot.CFrame = CFrame.new(localRoot.Position, targetPosition) * CFrame.new(0, 0, -respawnService.followDistance)
                 end
             end)
             

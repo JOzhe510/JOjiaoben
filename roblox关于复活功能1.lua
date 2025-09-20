@@ -942,6 +942,94 @@ while true do
     end
 end
 
+local Button = MainTab:CreateButton({
+   Name = "过速度检测",
+   Callback = function()
+   local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+-- 定义合理的最大瞬移距离阈值和速度范围
+local MAX_DISTANCE_THRESHOLD = 9999999 -- 单位为 studs
+local MIN_FLYING_SPEED = 9999999 -- 最小飞行速度，单位为 studs/秒
+local MAX_FLYING_SPEED = 9999999999 -- 最大飞行速度，单位为 studs/秒
+
+local function onPlayerAdded(player)
+    player.CharacterAdded:Connect(function(character)
+        local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+        local isFlying = false -- 飞行状态标志
+        local lastValidPosition = humanoidRootPart.Position -- 记录最后有效的飞行位置
+        local lastPositionUpdateTime = tick() -- 上次更新位置的时间戳
+        local smoothFactor = 0.5 -- 平滑因子，用于稳定飞行
+
+        local function updatePosition(currentPosition, targetPosition)
+            return Vector3.new(
+                currentPosition.X + (targetPosition.X - currentPosition.X) * smoothFactor,
+                currentPosition.Y + (targetPosition.Y - currentPosition.Y) * smoothFactor,
+                currentPosition.Z + (targetPosition.Z - currentPosition.Z) * smoothFactor
+            )
+        end
+
+        local function onHeartbeat()
+            if isFlying then
+                local currentTime = tick()
+                local timeElapsed = currentTime - lastPositionUpdateTime
+                if timeElapsed > 0 then
+                    local currentPosition = humanoidRootPart.Position
+                    local velocity = (currentPosition - lastValidPosition).magnitude / timeElapsed
+                    lastValidPosition = currentPosition
+                    lastPositionUpdateTime = currentTime
+
+                    -- 检查是否处于指定的速度范围内
+                    if velocity >= MIN_FLYING_SPEED and velocity <= MAX_FLYING_SPEED then
+                        -- 更新最后已知有效位置，假设飞行中的位置变化是合理的
+                        lastValidPosition = currentPosition
+                    else
+                        -- 如果速度不在指定范围内，检查是否有异常传送
+                        local distanceMoved = (currentPosition - lastValidPosition).magnitude
+                        if distanceMoved > MAX_DISTANCE_THRESHOLD then
+                            -- 如果移动距离超过了阈值，可能是异常传送，恢复到上一个有效位置
+                            humanoidRootPart.CFrame = CFrame.new(lastValidPosition)
+                        end
+                    end
+
+                    -- 应用平滑处理以稳定飞行
+                    humanoidRootPart.Position = updatePosition(humanoidRootPart.Position, currentPosition)
+                end
+            else
+                -- 当不是飞行状态时，直接更新最后有效位置
+                lastValidPosition = humanoidRootPart.Position
+                lastPositionUpdateTime = tick()
+            end
+        end
+
+        RunService.Heartbeat:Connect(onHeartbeat)
+
+        -- 设置飞行状态的方法
+        function setFlyingState(state)
+            isFlying = state
+            if not state then
+                -- 当停止飞行时，更新最后一次的有效位置
+                lastValidPosition = humanoidRootPart.Position
+                lastPositionUpdateTime = tick()
+            end
+        end
+
+        -- 提供给其他脚本调用的接口，例如当玩家开始或停止飞行时
+        player:SetAttribute("SetFlying", setFlyingState)
+        
+        -- 监听角色重生事件，重置飞行状态和位置
+        player.CharacterRemoving:Connect(function()
+            isFlying = false
+            lastValidPosition = nil
+            lastPositionUpdateTime = nil
+        end)
+    end)
+end
+
+Players.PlayerAdded:Connect(onPlayerAdded)>
+   end,
+})
+
 -- 初始通知
 Rayfield:Notify({
    Title = "脚本加载成功",

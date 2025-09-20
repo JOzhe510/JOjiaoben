@@ -39,7 +39,7 @@ local respawnService = {
 -- 玩家列表管理
 local playerList = {}
 local selectedPlayer = nil
-local playerButtons = {} -- 存储玩家按钮引用
+local playerButtonsContainer = nil -- 用于存储玩家按钮的容器
 
 -- 更新玩家列表
 local function UpdatePlayerList()
@@ -202,6 +202,19 @@ local Toggle = MainTab:CreateToggle({
 -- 创建玩家选择按钮列表
 local PlayerSelectionSection = MainTab:CreateSection("选择玩家")
 
+-- 创建玩家按钮容器
+local playerButtons = {}
+local function CreatePlayerButtonsContainer()
+    -- 如果容器已存在，先销毁它
+    if playerButtonsContainer then
+        playerButtonsContainer:Destroy()
+    end
+    
+    -- 创建新的容器
+    playerButtonsContainer = MainTab:CreateSection("玩家列表")
+    return playerButtonsContainer
+end
+
 -- 刷新玩家列表函数
 local function RefreshPlayerButtons()
     UpdatePlayerList()
@@ -212,9 +225,12 @@ local function RefreshPlayerButtons()
     end
     playerButtons = {}
     
+    -- 创建新的容器
+    local container = CreatePlayerButtonsContainer()
+    
     -- 创建新的玩家选择按钮
     for _, playerName in ipairs(playerList) do
-        local playerButton = MainTab:CreateButton({
+        local playerButton = container:CreateButton({
             Name = "选择: " .. playerName,
             Callback = function()
                 local targetPlayer = Players:FindFirstChild(playerName)
@@ -237,6 +253,11 @@ local function RefreshPlayerButtons()
             end,
         })
         table.insert(playerButtons, playerButton)
+    end
+    
+    -- 如果没有玩家，显示提示
+    if #playerList == 0 then
+        container:CreateLabel("当前没有其他玩家在线")
     end
 end
 
@@ -510,7 +531,7 @@ local Slider = MainTab:CreateSlider({
 local Slider = MainTab:CreateSlider({
    Name = "追踪位置",
    Range = {0, 360},
-   Increment = 180,
+   Increment = 350,
    Suffix = "度 (0=前,90=右,180=后,270=左)",
    CurrentValue = respawnService.followPosition,
    Flag = "FollowPositionSlider",

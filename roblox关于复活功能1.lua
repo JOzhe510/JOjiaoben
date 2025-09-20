@@ -26,8 +26,8 @@ local respawnService = {
     followPlayer = nil,
     following = false,
     teleporting = false,
-    followSpeed = 500, -- 增加默认速度
-    followDistance = 0.5, -- 减少默认距离，更贴近
+    followSpeed = 500,
+    followDistance = 0.5,
     followHeight = 1.5,
     followPosition = 180,
     savedPositions = {},
@@ -39,6 +39,7 @@ local respawnService = {
 -- 玩家列表管理
 local playerList = {}
 local selectedPlayer = nil
+local playerButtons = {} -- 存储玩家按钮引用
 
 -- 更新玩家列表
 local function UpdatePlayerList()
@@ -58,6 +59,7 @@ Players.PlayerAdded:Connect(function(player)
     if player ~= LocalPlayer then
         wait(0.5)
         UpdatePlayerList()
+        RefreshPlayerButtons()
     end
 end)
 
@@ -89,8 +91,10 @@ Players.PlayerRemoving:Connect(function(player)
         end
         respawnService.followPlayer = nil
         selectedPlayer = nil
+        CurrentPlayerLabel:Set("当前选择: 无")
     end
     UpdatePlayerList()
+    RefreshPlayerButtons()
 end)
 
 -- 计算追踪位置
@@ -202,15 +206,11 @@ local PlayerSelectionSection = MainTab:CreateSection("选择玩家")
 local function RefreshPlayerButtons()
     UpdatePlayerList()
     
-    -- 清除旧的按钮（如果有）
-    if MainTab then
-        for _, playerName in ipairs(playerList) do
-            local buttonName = "选择: " .. playerName
-            if MainTab[buttonName] then
-                MainTab[buttonName]:Destroy()
-            end
-        end
+    -- 清除旧的按钮
+    for _, button in pairs(playerButtons) do
+        button:Destroy()
     end
+    playerButtons = {}
     
     -- 创建新的玩家选择按钮
     for _, playerName in ipairs(playerList) do
@@ -221,6 +221,7 @@ local function RefreshPlayerButtons()
                 if targetPlayer then
                     selectedPlayer = playerName
                     respawnService.followPlayer = playerName
+                    CurrentPlayerLabel:Set("当前选择: " .. playerName)
                     Rayfield:Notify({
                         Title = "玩家选择成功",
                         Content = "已选择玩家: " .. targetPlayer.Name .. " (" .. (targetPlayer.DisplayName or targetPlayer.Name) .. ")",
@@ -235,6 +236,7 @@ local function RefreshPlayerButtons()
                 end
             end,
         })
+        table.insert(playerButtons, playerButton)
     end
 end
 
@@ -272,6 +274,7 @@ local FollowToggle = MainTab:CreateToggle({
                 respawnService.teleportConnection:Disconnect()
                 respawnService.teleportConnection = nil
             end
+            TeleportToggle:Set(false)
         end
         
         if respawnService.followConnection then
@@ -286,6 +289,7 @@ local FollowToggle = MainTab:CreateToggle({
                     Content = "请先选择玩家",
                     Duration = 3,
                 })
+                FollowToggle:Set(false)
                 return
             end
             
@@ -299,6 +303,7 @@ local FollowToggle = MainTab:CreateToggle({
                 respawnService.followPlayer = nil
                 selectedPlayer = nil
                 CurrentPlayerLabel:Set("当前选择: 无")
+                FollowToggle:Set(false)
                 return
             end
             
@@ -309,6 +314,7 @@ local FollowToggle = MainTab:CreateToggle({
                 local targetPlayer = Players:FindFirstChild(respawnService.followPlayer)
                 if not targetPlayer then
                     respawnService.following = false
+                    FollowToggle:Set(false)
                     return
                 end
                 
@@ -333,9 +339,9 @@ local FollowToggle = MainTab:CreateToggle({
                     local distance = (targetPosition - currentPosition).Magnitude
                     
                     -- 使用极高的速度确保即使目标快速移动也能跟上
-                    local actualSpeed = math.min(respawnService.followSpeed * 5, distance * 50) -- 大幅增加速度系数
+                    local actualSpeed = math.min(respawnService.followSpeed * 5, distance * 50)
                     
-                    if distance > 0.1 then -- 减少停止距离，更贴近
+                    if distance > 0.1 then
                         localRoot.Velocity = direction * actualSpeed
                     else
                         localRoot.Velocity = Vector3.new(0, 0, 0)
@@ -377,6 +383,7 @@ local TeleportToggle = MainTab:CreateToggle({
                 respawnService.followConnection:Disconnect()
                 respawnService.followConnection = nil
             end
+            FollowToggle:Set(false)
         end
         
         if respawnService.teleportConnection then
@@ -391,6 +398,7 @@ local TeleportToggle = MainTab:CreateToggle({
                     Content = "请先选择玩家",
                     Duration = 3,
                 })
+                TeleportToggle:Set(false)
                 return
             end
             
@@ -404,6 +412,7 @@ local TeleportToggle = MainTab:CreateToggle({
                 respawnService.followPlayer = nil
                 selectedPlayer = nil
                 CurrentPlayerLabel:Set("当前选择: 无")
+                TeleportToggle:Set(false)
                 return
             end
             
@@ -414,6 +423,7 @@ local TeleportToggle = MainTab:CreateToggle({
                 local targetPlayer = Players:FindFirstChild(respawnService.followPlayer)
                 if not targetPlayer then
                     respawnService.teleporting = false
+                    TeleportToggle:Set(false)
                     return
                 end
                 
@@ -457,12 +467,18 @@ local TeleportToggle = MainTab:CreateToggle({
 
 local SettingsSection = MainTab:CreateSection("追踪设置")
 
+-- 创建滑块时立即应用默认值
+respawnService.followSpeed = 500
+respawnService.followDistance = 0.5
+respawnService.followPosition = 180
+respawnService.followHeight = 1.5
+
 local Slider = MainTab:CreateSlider({
    Name = "追踪速度",
-   Range = {100, 2000}, -- 增加最大速度范围
+   Range = {100, 2000},
    Increment = 50,
    Suffix = "速度",
-   CurrentValue = 500, -- 设置默认值为500
+   CurrentValue = respawnService.followSpeed,
    Flag = "FollowSpeedSlider",
    Callback = function(Value)
         respawnService.followSpeed = Value
@@ -476,10 +492,10 @@ local Slider = MainTab:CreateSlider({
 
 local Slider = MainTab:CreateSlider({
    Name = "追踪距离",
-   Range = {0.1, 10}, -- 允许更小的距离
+   Range = {0.1, 10},
    Increment = 0.1,
    Suffix = "距离",
-   CurrentValue = 3.9, -- 设置默认值为0.5
+   CurrentValue = respawnService.followDistance,
    Flag = "FollowDistanceSlider",
    Callback = function(Value)
         respawnService.followDistance = Value
@@ -496,7 +512,7 @@ local Slider = MainTab:CreateSlider({
    Range = {0, 360},
    Increment = 5,
    Suffix = "度 (0=前,90=右,180=后,270=左)",
-   CurrentValue = 350,
+   CurrentValue = respawnService.followPosition,
    Flag = "FollowPositionSlider",
    Callback = function(Value)
         respawnService.followPosition = Value
@@ -520,7 +536,7 @@ local Slider = MainTab:CreateSlider({
    Range = {-5, 10},
    Increment = 0.5,
    Suffix = "高度",
-   CurrentValue = 0,
+   CurrentValue = respawnService.followHeight,
    Flag = "FollowHeightSlider",
    Callback = function(Value)
         respawnService.followHeight = Value

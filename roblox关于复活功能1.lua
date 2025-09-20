@@ -32,7 +32,8 @@ local respawnService = {
     followPosition = 350,
     savedPositions = {},
     followConnection = nil,
-    teleportConnection = nil
+    teleportConnection = nil,
+    autoFindNearest = false
 }
 
 -- 存储玩家按钮的表格
@@ -73,6 +74,44 @@ local function IsPlayerValid(playerName)
     return Players:FindFirstChild(playerName) ~= nil
 end
 
+-- 获取最近的玩家
+local function GetNearestPlayer()
+    local localChar = LocalPlayer.Character
+    if not localChar then return nil end
+    
+    local localRoot = localChar:FindFirstChild("HumanoidRootPart")
+    if not localRoot then return nil end
+    
+    local nearestPlayer = nil
+    local nearestDistance = math.huge
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+            if targetRoot then
+                local distance = (localRoot.Position - targetRoot.Position).Magnitude
+                if distance < nearestDistance then
+                    nearestDistance = distance
+                    nearestPlayer = player
+                end
+            end
+        end
+    end
+    
+    return nearestPlayer
+end
+
+-- 自动选择最近的玩家
+local function AutoSelectNearestPlayer()
+    local nearestPlayer = GetNearestPlayer()
+    if nearestPlayer then
+        respawnService.followPlayer = nearestPlayer.Name
+        currentPlayerLabel:Set("当前选择: " .. nearestPlayer.Name .. " (自动)")
+        return true
+    end
+    return false
+end
+
 -- 创建主标签页
 local MainTab = Window:CreateTab("🏠 复活功能", nil)
 
@@ -91,93 +130,16 @@ local Button = MainTab:CreateButton({
 local Button = MainTab:CreateButton({
    Name = "原地复活",
    Callback = function()
-        local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-
-while not LocalPlayer do
-    Players.PlayerAdded:Wait()
-    LocalPlayer = Players.LocalPlayer
-end
-
--- 原地复活系统
-local respawnService = {}
-respawnService.savedPositions = {}
-
-function respawnService:SetupPlayer(player)
-    player.CharacterAdded:Connect(function(character)
-        self:OnCharacterAdded(player, character)
-    end)
-    
-    if player.Character then
-        self:OnCharacterAdded(player, player.Character)
-    end
-end
-
-function respawnService:OnCharacterAdded(player, character)
-    local humanoid = character:WaitForChild("Humanoid")
-    
-    if self.savedPositions[player] then
-        wait(0.1) 
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        if rootPart then
-            rootPart.CFrame = CFrame.new(self.savedPositions[player])
-            print("传送 " .. player.Name .. " 到保存位置")
-        end
-    end
-    
-    humanoid.Died:Connect(function()
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        if rootPart then
-            self.savedPositions[player] = rootPart.Position
-            print("保存 " .. player.Name .. " 的位置")
+        if LocalPlayer.Character then
+            local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                respawnService.savedPositions[LocalPlayer] = rootPart.Position
+            end
         end
         
-        wait(5)
-        player:LoadCharacter()
-    end)
-end
-
--- 初始化原地复活系统
-for _, player in ipairs(Players:GetPlayers()) do
-    respawnService:SetupPlayer(player)
-end
-
-Players.PlayerAdded:Connect(function(player)
-    respawnService:SetupPlayer(player)
-end)
-
-print("原地复活系统初始化完成")
-
--- 原地复活按钮功能（如果需要按钮触发）
-local function RespawnAtSavedPosition()
-    if LocalPlayer.Character then
-        local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if rootPart then
-            respawnService.savedPositions[LocalPlayer] = rootPart.Position
-            print("保存当前位置用于复活")
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.Health = 0
         end
-    end
-    
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.Health = 0
-    end
-end
-
--- 如果需要键盘快捷键触发复活
-local UIS = game:GetService("UserInputService")
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    if input.KeyCode == Enum.KeyCode.R then -- 按R键触发原地复活
-        RespawnAtSavedPosition()
-    end
-end)
-
--- 导出函数供其他脚本使用
-return {
-    RespawnAtSavedPosition = RespawnAtSavedPosition,
-    respawnService = respawnService
-}
    end,
 })
 
@@ -284,6 +246,26 @@ local refreshButton = MainTab:CreateButton({
    end,
 })
 
+-- 自动选择最近玩家按钮
+local autoSelectButton = MainTab:CreateButton({
+   Name = "自动选择最近玩家",
+   Callback = function()
+        if AutoSelectNearestPlayer() then
+            Rayfield:Notify({
+                Title = "自动选择成功",
+                Content = "已自动选择最近的玩家",
+                Duration = 3,
+            })
+        else
+            Rayfield:Notify({
+                Title = "自动选择失败",
+                Content = "没有找到其他玩家",
+                Duration = 3,
+            })
+        end
+   end,
+})
+
 -- 初始更新玩家按钮
 UpdatePlayerButtons()
 
@@ -349,30 +331,44 @@ local followToggle = MainTab:CreateToggle({
         end
         
         if respawnService.following then
+            -- 如果没有选择玩家，自动选择最近的玩家
             if not respawnService.followPlayer or not IsPlayerValid(respawnService.followPlayer) then
-                respawnService.following = false
-                Rayfield:Notify({
-                    Title = "错误",
-                    Content = "请先选择有效玩家",
-                    Duration = 3,
-                })
-                return
+                if not AutoSelectNearestPlayer() then
+                    respawnService.following = false
+                    Rayfield:Notify({
+                        Title = "错误",
+                        Content = "没有找到可追踪的玩家",
+                        Duration = 3,
+                    })
+                    return
+                else
+                    Rayfield:Notify({
+                        Title = "自动选择",
+                        Content = "已自动选择最近的玩家进行追踪",
+                        Duration = 3,
+                    })
+                end
             end
             
             respawnService.followConnection = RunService.Heartbeat:Connect(function()
                 if not respawnService.following then return end
                 
+                -- 如果目标玩家无效，尝试重新选择最近的玩家
                 if not IsPlayerValid(respawnService.followPlayer) then
-                    respawnService.following = false
-                    Rayfield:Notify({
-                        Title = "追踪停止",
-                        Content = "目标玩家已离开游戏",
-                        Duration = 3,
-                    })
-                    return
+                    if not AutoSelectNearestPlayer() then
+                        respawnService.following = false
+                        Rayfield:Notify({
+                            Title = "追踪停止",
+                            Content = "目标玩家已离开且没有其他玩家",
+                            Duration = 3,
+                        })
+                        return
+                    end
                 end
                 
                 local targetPlayer = Players:FindFirstChild(respawnService.followPlayer)
+                if not targetPlayer then return end
+                
                 local targetChar = targetPlayer.Character
                 local localChar = LocalPlayer.Character
                 
@@ -425,30 +421,44 @@ local teleportToggle = MainTab:CreateToggle({
         end
         
         if respawnService.teleporting then
+            -- 如果没有选择玩家，自动选择最近的玩家
             if not respawnService.followPlayer or not IsPlayerValid(respawnService.followPlayer) then
-                respawnService.teleporting = false
-                Rayfield:Notify({
-                    Title = "错误",
-                    Content = "请先选择有效玩家",
-                    Duration = 3,
-                })
-                return
+                if not AutoSelectNearestPlayer() then
+                    respawnService.teleporting = false
+                    Rayfield:Notify({
+                        Title = "错误",
+                        Content = "没有找到可传送的玩家",
+                        Duration = 3,
+                    })
+                    return
+                else
+                    Rayfield:Notify({
+                        Title = "自动选择",
+                        Content = "已自动选择最近的玩家进行传送",
+                        Duration = 3,
+                    })
+                end
             end
             
             respawnService.teleportConnection = RunService.Heartbeat:Connect(function()
                 if not respawnService.teleporting then return end
                 
+                -- 如果目标玩家无效，尝试重新选择最近的玩家
                 if not IsPlayerValid(respawnService.followPlayer) then
-                    respawnService.teleporting = false
-                    Rayfield:Notify({
-                        Title = "传送停止",
-                        Content = "目标玩家已离开游戏",
-                        Duration = 3,
-                    })
-                    return
+                    if not AutoSelectNearestPlayer() then
+                        respawnService.teleporting = false
+                        Rayfield:Notify({
+                            Title = "传送停止",
+                            Content = "目标玩家已离开且没有其他玩家",
+                            Duration = 3,
+                        })
+                        return
+                    end
                 end
                 
                 local targetPlayer = Players:FindFirstChild(respawnService.followPlayer)
+                if not targetPlayer then return end
+                
                 local targetChar = targetPlayer.Character
                 local localChar = LocalPlayer.Character
                 
@@ -618,11 +628,21 @@ local Keybind = MainTab:CreateKeybind({
         if respawnService.followPlayer and IsPlayerValid(respawnService.followPlayer) then
             respawnService.following = not respawnService.following
         else
-            Rayfield:Notify({
-                Title = "错误",
-                Content = "请先选择有效玩家",
-                Duration = 3,
-            })
+            -- 如果没有选择玩家，自动选择最近的玩家
+            if AutoSelectNearestPlayer() then
+                respawnService.following = true
+                Rayfield:Notify({
+                    Title = "自动选择",
+                    Content = "已自动选择最近的玩家并开始追踪",
+                    Duration = 3,
+                })
+            else
+                Rayfield:Notify({
+                    Title = "错误",
+                    Content = "请先选择有效玩家或确保有其他玩家在线",
+                    Duration = 3,
+                })
+            end
         end
     end,
 })
@@ -635,11 +655,21 @@ local Keybind = MainTab:CreateKeybind({
         if respawnService.followPlayer and IsPlayerValid(respawnService.followPlayer) then
             respawnService.teleporting = not respawnService.teleporting
         else
-            Rayfield:Notify({
-                Title = "错误",
-                Content = "请先选择有效玩家",
-                Duration = 3,
-            })
+            -- 如果没有选择玩家，自动选择最近的玩家
+            if AutoSelectNearestPlayer() then
+                respawnService.teleporting = true
+                Rayfield:Notify({
+                    Title = "自动选择",
+                    Content = "已自动选择最近的玩家并开始传送",
+                    Duration = 3,
+                })
+            else
+                Rayfield:Notify({
+                    Title = "错误",
+                    Content = "请先选择有效玩家或确保有其他玩家在线",
+                    Duration = 3,
+                })
+            end
         end
     end,
 })
@@ -647,6 +677,6 @@ local Keybind = MainTab:CreateKeybind({
 -- 初始通知
 Rayfield:Notify({
    Title = "脚本加载成功",
-   Content = "复活功能脚本已就绪！\n自动检测玩家功能已启用\n追踪时角色会自动朝向目标",
+   Content = "复活功能脚本已就绪！\n自动检测玩家功能已启用\n追踪时角色会自动朝向目标\n未选择玩家时会自动追踪最近玩家",
    Duration = 6,
 })

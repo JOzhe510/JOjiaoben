@@ -941,6 +941,22 @@ while true do
         end
     end
 end
+   end,
+})
+
+local Button = MainTab:CreateButton({
+   Name = "甩飞",
+   Callback = function()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/JOzhe510/JOjiaoben/main/甩飞.lua"))()
+   end,
+})
+
+local Toggle = MainTab:CreateToggle({
+   Name = "防甩飞",
+   Callback = function()
+   loadstring(game:HttpGet('https://raw.githubusercontent.com/Linux6699/DaHubRevival/main/AntiFling.lua'))()
+   end,
+})
 
 -- 初始通知
 Rayfield:Notify({

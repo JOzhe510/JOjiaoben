@@ -941,8 +941,6 @@ while true do
         end
     end
 end
-   end,
-})
 
 local Button = MainTab:CreateButton({
    Name = "甩飞",

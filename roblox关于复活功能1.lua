@@ -958,12 +958,145 @@ local Button = MainTab:CreateButton({
    end,
 })
 
-local Toggle = MainTab:CreateToggle({
-   Name = "防甩飞",
+local Button = MainTab:CreateButton({
+   Name = "另一种甩飞，碰到就飞",
    Callback = function()
-   loadstring(game:HttpGet('https://raw.githubusercontent.com/Linux6699/DaHubRevival/main/AntiFling.lua'))()
+   loadstring(game:HttpGet(('https://raw.githubusercontent.com/0Ben1/fe/main/obf_5wpM7bBcOPspmX7lQ3m75SrYNWqxZ858ai3tJdEAId6jSI05IOUB224FQ0VSAswH.lua.txt'),true))()
    end,
 })
+
+local antiFlingEnabled = false
+local antiFlingConnection = nil
+
+-- 防甩飞功能
+local function setupAntiFling()
+    -- 如果已存在连接，先断开
+    if antiFlingConnection then
+        antiFlingConnection:Disconnect()
+        antiFlingConnection = nil
+    end
+    
+    local player = Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
+    local rootPart = character:WaitForChild("HumanoidRootPart")
+
+    -- 配置参数
+    local MAX_ALLOWED_VELOCITY = 100 -- 最大允许速度
+    local MAX_ANGULAR_VELOCITY = 5 -- 最大允许角速度
+    local ENABLE_DEBUG = false -- 启用调试信息
+
+    -- 存储上一帧的位置和速度
+    local lastPosition = rootPart.Position
+    local lastVelocity = Vector3.new(0, 0, 0)
+    
+    -- 连接运行时循环
+    antiFlingConnection = RunService.Heartbeat:Connect(function(deltaTime)
+        if not antiFlingEnabled or not character or not rootPart or not humanoid then
+            return
+        end
+        
+        -- 获取当前速度和位置
+        local currentVelocity = rootPart.Velocity
+        local currentPosition = rootPart.Position
+        
+        -- 计算速度变化率
+        local velocityDelta = (currentVelocity - lastVelocity).Magnitude
+        local speed = currentVelocity.Magnitude
+        
+        -- 检测异常速度
+        if speed > MAX_ALLOWED_VELOCITY then
+            -- 重置速度到允许范围内
+            local direction = currentVelocity.Unit
+            rootPart.Velocity = direction * MAX_ALLOWED_VELOCITY
+            
+            if ENABLE_DEBUG then
+                print("速度异常已修正: " .. math.floor(speed) .. " -> " .. MAX_ALLOWED_VELOCITY)
+            end
+        end
+        
+        -- 检测异常角速度
+        local angularVelocity = rootPart.AssemblyAngularVelocity.Magnitude
+        if angularVelocity > MAX_ANGULAR_VELOCITY then
+            rootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+            
+            if ENABLE_DEBUG then
+                print("角速度异常已修正: " .. angularVelocity)
+            end
+        end
+        
+        -- 更新上一帧数据
+        lastVelocity = rootPart.Velocity
+        lastPosition = currentPosition
+    end)
+    
+    -- 角色死亡时重新初始化
+    humanoid.Died:Connect(function()
+        if antiFlingConnection then
+            antiFlingConnection:Disconnect()
+            antiFlingConnection = nil
+        end
+        
+        wait(1) -- 等待角色重生
+        if antiFlingEnabled then
+            setupAntiFling()
+        end
+    end)
+end
+
+-- 防抓取功能（可选）
+local function preventGrab()
+    local character = LocalPlayer.Character
+    if character then
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Massless = true
+                part.CanCollide = false
+            end
+        end
+    end
+end
+
+-- 在您的Toggle回调函数中使用：
+local Toggle = MainTab:CreateToggle({
+   Name = "防甩飞",
+   CurrentValue = false,
+   Callback = function(Value)
+        antiFlingEnabled = Value
+        
+        if antiFlingEnabled then
+            setupAntiFling()
+            Rayfield:Notify({
+                Title = "防甩飞已启用",
+                Content = "已启用防甩飞功能",
+                Duration = 2,
+            })
+        else
+            if antiFlingConnection then
+                antiFlingConnection:Disconnect()
+                antiFlingConnection = nil
+            end
+            Rayfield:Notify({
+                Title = "防甩飞已禁用",
+                Content = "已禁用防甩飞功能",
+                Duration = 2,
+            })
+        end
+   end,
+})
+
+-- 角色重生时重新设置防甩飞
+LocalPlayer.CharacterAdded:Connect(function(character)
+    wait(0.5)
+    if antiFlingEnabled then
+        setupAntiFling()
+    end
+end)
+
+-- 初始设置（如果默认启用）
+if antiFlingEnabled then
+    setupAntiFling()
+end
 
 -- 初始通知
 Rayfield:Notify({

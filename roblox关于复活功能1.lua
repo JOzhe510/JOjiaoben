@@ -34,9 +34,17 @@ local respawnService = {
     followConnection = nil,
     teleportConnection = nil,
     autoFindNearest = false,
-    speedMode = "normal", -- 添加速度模式
-    walkSpeed = 16, -- 普通移动速度
-    tpWalkSpeed = 100 -- TP行走速度
+    speedMode = "normal",
+    walkSpeed = 16,
+    tpWalkSpeed = 100,
+    
+    -- 新增: 高级追踪参数
+    predictionEnabled = true, -- 启用位置预测
+    smoothingFactor = 0.2,    -- 平滑系数 (0-1)
+    maxPredictionTime = 0.3,  -- 最大预测时间(秒)
+    velocityMultiplier = 2, -- 速度乘数
+    lastTargetPositions = {}, -- 存储目标历史位置
+    lastUpdateTime = tick(),  -- 上次更新时间
 }
 
 -- 存储玩家按钮的表格
@@ -51,7 +59,7 @@ local function CalculateFollowPosition(targetRoot, distance, angle, height)
     local rightVector = targetRoot.CFrame.RightVector
     
     -- 计算相对于目标朝向的偏移
-    local forwardOffset = -math.cos(angleRad) * distance  -- 负号是因为LookVector是向前
+    local forwardOffset = -math.cos(angleRad) * distance
     local rightOffset = math.sin(angleRad) * distance
     
     local offset = (lookVector * forwardOffset) + (rightVector * rightOffset) + Vector3.new(0, height, 0)
@@ -115,6 +123,56 @@ local function AutoSelectNearestPlayer()
     return false
 end
 
+-- 高级追踪功能 - 预测目标位置
+local function PredictTargetPosition(targetRoot, targetVelocity)
+    if not respawnService.predictionEnabled or not targetVelocity then
+        return targetRoot.Position
+    end
+    
+    -- 计算预测时间 (基于距离和速度)
+    local predictionTime = math.min(
+        respawnService.maxPredictionTime,
+        respawnService.followDistance / math.max(targetVelocity.Magnitude, 1)
+    )
+    
+    -- 返回预测位置
+    return targetRoot.Position + (targetVelocity * predictionTime * respawnService.velocityMultiplier)
+end
+
+-- 平滑移动函数
+local function SmoothMove(localRoot, targetPosition, alpha)
+    local currentPosition = localRoot.Position
+    local smoothedPosition = currentPosition:Lerp(targetPosition, alpha)
+    localRoot.CFrame = CFrame.new(smoothedPosition)
+end
+
+-- 获取目标速度
+local function GetTargetVelocity(targetRoot)
+    local currentTime = tick()
+    local elapsedTime = currentTime - respawnService.lastUpdateTime
+    
+    if elapsedTime <= 0 then
+        return Vector3.new(0, 0, 0)
+    end
+    
+    -- 存储当前位置
+    if not respawnService.lastTargetPositions[targetRoot] then
+        respawnService.lastTargetPositions[targetRoot] = targetRoot.Position
+        respawnService.lastUpdateTime = currentTime
+        return Vector3.new(0, 0, 0)
+    end
+    
+    -- 计算速度
+    local lastPosition = respawnService.lastTargetPositions[targetRoot]
+    local velocity = (targetRoot.Position - lastPosition) / elapsedTime
+    
+    -- 更新历史数据
+    respawnService.lastTargetPositions[targetRoot] = targetRoot.Position
+    respawnService.lastUpdateTime = currentTime
+    
+    return velocity
+end
+
 -- 创建主标签页
 local MainTab = Window:CreateTab("🏠 复活功能", nil)
 
@@ -134,92 +192,92 @@ local Toggle = MainTab:CreateToggle({
    Name = "原地复活",
    Callback = function()
         local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+        local LocalPlayer = Players.LocalPlayer
 
-while not LocalPlayer do
-    Players.PlayerAdded:Wait()
-    LocalPlayer = Players.LocalPlayer
-end
-
--- 原地复活系统
-local respawnService = {}
-respawnService.savedPositions = {}
-
-function respawnService:SetupPlayer(player)
-    player.CharacterAdded:Connect(function(character)
-        self:OnCharacterAdded(player, character)
-    end)
-    
-    if player.Character then
-        self:OnCharacterAdded(player, player.Character)
-    end
-end
-
-function respawnService:OnCharacterAdded(player, character)
-    local humanoid = character:WaitForChild("Humanoid")
-    
-    if self.savedPositions[player] then
-        wait(0.1) 
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        if rootPart then
-            rootPart.CFrame = CFrame.new(self.savedPositions[player])
-            print("传送 " .. player.Name .. " 到保存位置")
+        while not LocalPlayer do
+            Players.PlayerAdded:Wait()
+            LocalPlayer = Players.LocalPlayer
         end
-    end
-    
-    humanoid.Died:Connect(function()
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        if rootPart then
-            self.savedPositions[player] = rootPart.Position
-            print("保存 " .. player.Name .. " 的位置")
+
+        -- 原地复活系统
+        local respawnService = {}
+        respawnService.savedPositions = {}
+
+        function respawnService:SetupPlayer(player)
+            player.CharacterAdded:Connect(function(character)
+                self:OnCharacterAdded(player, character)
+            end)
+            
+            if player.Character then
+                self:OnCharacterAdded(player, player.Character)
+            end
         end
-        
-        wait(5)
-        player:LoadCharacter()
-    end)
-end
 
--- 初始化原地复活系统
-for _, player in ipairs(Players:GetPlayers()) do
-    respawnService:SetupPlayer(player)
-end
-
-Players.PlayerAdded:Connect(function(player)
-    respawnService:SetupPlayer(player)
-end)
-
-print("原地复活系统初始化完成")
-
--- 原地复活按钮功能（如果需要按钮触发）
-local function RespawnAtSavedPosition()
-    if LocalPlayer.Character then
-        local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if rootPart then
-            respawnService.savedPositions[LocalPlayer] = rootPart.Position
-            print("保存当前位置用于复活")
+        function respawnService:OnCharacterAdded(player, character)
+            local humanoid = character:WaitForChild("Humanoid")
+            
+            if self.savedPositions[player] then
+                wait(0.1) 
+                local rootPart = character:FindFirstChild("HumanoidRootPart")
+                if rootPart then
+                    rootPart.CFrame = CFrame.new(self.savedPositions[player])
+                    print("传送 " .. player.Name .. " 到保存位置")
+                end
+            end
+            
+            humanoid.Died:Connect(function()
+                local rootPart = character:FindFirstChild("HumanoidRootPart")
+                if rootPart then
+                    self.savedPositions[player] = rootPart.Position
+                    print("保存 " .. player.Name .. " 的位置")
+                end
+                
+                wait(5)
+                player:LoadCharacter()
+            end)
         end
-    end
-    
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.Health = 0
-    end
-end
 
--- 如果需要键盘快捷键触发复活
-local UIS = game:GetService("UserInputService")
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    if input.KeyCode == Enum.KeyCode.R then -- 按R键触发原地复活
-        RespawnAtSavedPosition()
-    end
-end)
+        -- 初始化原地复活系统
+        for _, player in ipairs(Players:GetPlayers()) do
+            respawnService:SetupPlayer(player)
+        end
 
--- 导出函数供其他脚本使用
-return {
-    RespawnAtSavedPosition = RespawnAtSavedPosition,
-    respawnService = respawnService
-}
+        Players.PlayerAdded:Connect(function(player)
+            respawnService:SetupPlayer(player)
+        end)
+
+        print("原地复活系统初始化完成")
+
+        -- 原地复活按钮功能（如果需要按钮触发）
+        local function RespawnAtSavedPosition()
+            if LocalPlayer.Character then
+                local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if rootPart then
+                    respawnService.savedPositions[LocalPlayer] = rootPart.Position
+                    print("保存当前位置用于复活")
+                end
+            end
+            
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+                LocalPlayer.Character.Humanoid.Health = 0
+            end
+        end
+
+        -- 如果需要键盘快捷键触发复活
+        local UIS = game:GetService("UserInputService")
+        UIS.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            
+            if input.KeyCode == Enum.KeyCode.R then -- 按R键触发原地复活
+                RespawnAtSavedPosition()
+            end
+        end)
+
+        -- 导出函数供其他脚本使用
+        return {
+            RespawnAtSavedPosition = RespawnAtSavedPosition,
+            respawnService = respawnService
+        }
    end,
 })
 
@@ -238,7 +296,7 @@ local Section = MainTab:CreateSection("选择玩家")
 local currentPlayerLabel = MainTab:CreateLabel("当前选择: 无")
 
 -- 创建刷新选择按钮
-local clearSelectionButton = MainTab:CreateButton({
+local Button = MainTab:CreateButton({
    Name = "刷新选择的玩家",
    Callback = function()
         -- 停止追踪和传送
@@ -431,7 +489,7 @@ end
 
 SetupPlayerEvents()
 
--- 追踪功能
+-- 追踪功能 (优化版本)
 local Toggle = MainTab:CreateToggle({
    Name = "平滑追踪",
    CurrentValue = false,
@@ -491,6 +549,13 @@ local Toggle = MainTab:CreateToggle({
                 local localRoot = localChar:FindFirstChild("HumanoidRootPart")
                 
                 if targetRoot and localRoot then
+                    -- 获取目标速度用于预测
+                    local targetVelocity = GetTargetVelocity(targetRoot)
+                    
+                    -- 计算预测位置
+                    local predictedPosition = PredictTargetPosition(targetRoot, targetVelocity)
+                    
+                    -- 计算最终追踪位置
                     local targetPosition = CalculateFollowPosition(
                         targetRoot, 
                         respawnService.followDistance, 
@@ -498,8 +563,8 @@ local Toggle = MainTab:CreateToggle({
                         respawnService.followHeight
                     )
                     
-                    -- 移动到目标位置
-                    localRoot.CFrame = CFrame.new(targetPosition)
+                    -- 使用平滑移动
+                    SmoothMove(localRoot, targetPosition, respawnService.smoothingFactor)
                     
                     -- 强制角色朝向目标玩家
                     ForceLookAtTarget(localRoot, targetRoot)
@@ -521,7 +586,7 @@ local Toggle = MainTab:CreateToggle({
    end,
 })
 
--- 传送功能
+-- 传送功能 (优化版本)
 local Toggle = MainTab:CreateToggle({
    Name = "直接传送",
    CurrentValue = false,
@@ -581,6 +646,13 @@ local Toggle = MainTab:CreateToggle({
                 local localRoot = localChar:FindFirstChild("HumanoidRootPart")
                 
                 if targetRoot and localRoot then
+                    -- 获取目标速度用于预测
+                    local targetVelocity = GetTargetVelocity(targetRoot)
+                    
+                    -- 计算预测位置
+                    local predictedPosition = PredictTargetPosition(targetRoot, targetVelocity)
+                    
+                    -- 计算最终追踪位置
                     local targetPosition = CalculateFollowPosition(
                         targetRoot, 
                         respawnService.followDistance, 
@@ -588,7 +660,7 @@ local Toggle = MainTab:CreateToggle({
                         respawnService.followHeight
                     )
                     
-                    -- 移动到目标位置
+                    -- 直接传送到目标位置
                     localRoot.CFrame = CFrame.new(targetPosition)
                     
                     -- 强制角色朝向目标玩家
@@ -713,6 +785,91 @@ local Input = MainTab:CreateInput({
    end,
 })
 
+-- 高级追踪设置
+local Section = MainTab:CreateSection("高级追踪设置")
+
+local Toggle = MainTab:CreateToggle({
+   Name = "启用位置预测",
+   CurrentValue = true,
+   Callback = function(Value)
+        respawnService.predictionEnabled = Value
+        Rayfield:Notify({
+            Title = "位置预测",
+            Content = Value and "已启用位置预测" or "已禁用位置预测",
+            Duration = 2,
+        })
+   end,
+})
+
+local Input = MainTab:CreateInput({
+   Name = "平滑系数",
+   PlaceholderText = "输入平滑系数 (0.1-1.0, 默认: 0.2)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value >= 0.1 and value <= 1.0 then
+            respawnService.smoothingFactor = value
+            Rayfield:Notify({
+                Title = "平滑系数设置",
+                Content = "平滑系数设置为: " .. value,
+                Duration = 2,
+            })
+        else
+            Rayfield:Notify({
+                Title = "输入错误",
+                Content = "请输入0.1-1.0之间的数字",
+                Duration = 2,
+            })
+        end
+   end,
+})
+
+local Input = MainTab:CreateInput({
+   Name = "最大预测时间",
+   PlaceholderText = "输入最大预测时间(秒) (默认: 0.3)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value > 0 then
+            respawnService.maxPredictionTime = value
+            Rayfield:Notify({
+                Title = "预测时间设置",
+                Content = "最大预测时间设置为: " .. value .. "秒",
+                Duration = 2,
+            })
+        else
+            Rayfield:Notify({
+                Title = "输入错误",
+                Content = "请输入有效的数字",
+                Duration = 2,
+            })
+        end
+   end,
+})
+
+local Input = MainTab:CreateInput({
+   Name = "速度乘数",
+   PlaceholderText = "输入速度乘数 (默认: 1.1)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value > 0 then
+            respawnService.velocityMultiplier = value
+            Rayfield:Notify({
+                Title = "速度乘数设置",
+                Content = "速度乘数设置为: " .. value,
+                Duration = 2,
+            })
+        else
+            Rayfield:Notify({
+                Title = "输入错误",
+                Content = "请输入有效的数字",
+                Duration = 2,
+            })
+        end
+   end,
+})
+
 -- 快捷键
 local Section = MainTab:CreateSection("快捷键")
 
@@ -787,6 +944,7 @@ local Keybind = MainTab:CreateKeybind({
     end,
 })
 
+-- 速度调节标签页
 local MainTab = Window:CreateTab("速度调节", nil)
 local MainSection = MainTab:CreateSection("速度设置")
 
@@ -867,15 +1025,6 @@ local Button = MainTab:CreateButton({
    Name = "切换速度模式: 普通",
    Callback = ToggleSpeedMode
 })
-
--- 更新按钮文本的函数
-local function UpdateSpeedModeButton()
-    if speedModeButton then
-        local modeText = respawnService.speedMode == "normal" and "普通" or "TP行走"
-        -- 由于Rayfield可能没有直接设置按钮名称的方法，我们可以通过重新创建按钮来更新
-        -- 或者使用其他方式来更新UI
-    end
-end
 
 -- 普通速度调节
 local Input = MainTab:CreateInput({
@@ -989,86 +1138,82 @@ local function setupAntiFling()
     -- 存储上一帧的位置和速度
     local lastPosition = rootPart.Position
     local lastVelocity = Vector3.new(0, 0, 0)
-    
-    -- 连接运行时循环
-    antiFlingConnection = RunService.Heartbeat:Connect(function(deltaTime)
-        if not antiFlingEnabled or not character or not rootPart or not humanoid then
+    local lastTime = tick()
+
+    -- 防甩飞主循环
+    antiFlingConnection = game:GetService("RunService").Heartbeat:Connect(function()
+        if not antiFlingEnabled or not character or not rootPart then
             return
         end
-        
-        -- 获取当前速度和位置
-        local currentVelocity = rootPart.Velocity
-        local currentPosition = rootPart.Position
-        
-        -- 计算速度变化率
-        local velocityDelta = (currentVelocity - lastVelocity).Magnitude
-        local speed = currentVelocity.Magnitude
-        
-        -- 检测异常速度
-        if speed > MAX_ALLOWED_VELOCITY then
-            -- 重置速度到允许范围内
-            local direction = currentVelocity.Unit
-            rootPart.Velocity = direction * MAX_ALLOWED_VELOCITY
-            
-            if ENABLE_DEBUG then
-                print("速度异常已修正: " .. math.floor(speed) .. " -> " .. MAX_ALLOWED_VELOCITY)
-            end
-        end
-        
-        -- 检测异常角速度
+
+        local currentTime = tick()
+        local deltaTime = currentTime - lastTime
+        lastTime = currentTime
+
+        -- 计算当前速度和加速度
+        local currentVelocity = (rootPart.Position - lastPosition) / deltaTime
+        local acceleration = (currentVelocity - lastVelocity) / deltaTime
+
+        lastPosition = rootPart.Position
+        lastVelocity = currentVelocity
+
+        -- 计算角速度
         local angularVelocity = rootPart.AssemblyAngularVelocity.Magnitude
-        if angularVelocity > MAX_ANGULAR_VELOCITY then
-            rootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-            
+
+        -- 检测异常速度或加速度
+        if currentVelocity.Magnitude > MAX_ALLOWED_VELOCITY or 
+           acceleration.Magnitude > 500 or 
+           angularVelocity > MAX_ANGULAR_VELOCITY then
+
             if ENABLE_DEBUG then
-                print("角速度异常已修正: " .. angularVelocity)
+                print(string.format("检测到异常移动: 速度=%.2f, 加速度=%.2f, 角速度=%.2f", 
+                    currentVelocity.Magnitude, acceleration.Magnitude, angularVelocity))
+            end
+
+            -- 重置角色位置到安全位置
+            local success = pcall(function()
+                -- 尝试找到安全位置
+                local safePosition = workspace:FindPartOnRay(Ray.new(rootPart.Position + Vector3.new(0, 10, 0), Vector3.new(0, -20, 0)), character)
+                
+                if safePosition then
+                    rootPart.Velocity = Vector3.new(0, 0, 0)
+                    rootPart.RotVelocity = Vector3.new(0, 0, 0)
+                    rootPart.CFrame = CFrame.new(safePosition.Position + Vector3.new(0, 3, 0))
+                    
+                    if ENABLE_DEBUG then
+                        print("已重置角色位置到安全位置")
+                    end
+                end
+            end)
+
+            if not success and ENABLE_DEBUG then
+                warn("重置位置时出错")
             end
         end
-        
-        -- 更新上一帧数据
-        lastVelocity = rootPart.Velocity
-        lastPosition = currentPosition
     end)
-    
-    -- 角色死亡时重新初始化
-    humanoid.Died:Connect(function()
-        if antiFlingConnection then
-            antiFlingConnection:Disconnect()
-            antiFlingConnection = nil
-        end
-        
-        wait(1) -- 等待角色重生
-        if antiFlingEnabled then
-            setupAntiFling()
-        end
+
+    -- 监听角色变化
+    player.CharacterAdded:Connect(function(newCharacter)
+        character = newCharacter
+        humanoid = newCharacter:WaitForChild("Humanoid")
+        rootPart = newCharacter:WaitForChild("HumanoidRootPart")
+        lastPosition = rootPart.Position
+        lastVelocity = Vector3.new(0, 0, 0)
+        lastTime = tick()
     end)
 end
 
--- 防抓取功能（可选）
-local function preventGrab()
-    local character = LocalPlayer.Character
-    if character then
-        for _, part in pairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.Massless = true
-                part.CanCollide = false
-            end
-        end
-    end
-end
-
--- 在您的Toggle回调函数中使用：
+-- 创建防甩飞开关
 local Toggle = MainTab:CreateToggle({
-   Name = "防甩飞",
+   Name = "防甩飞保护",
    CurrentValue = false,
    Callback = function(Value)
         antiFlingEnabled = Value
-        
-        if antiFlingEnabled then
+        if Value then
             setupAntiFling()
             Rayfield:Notify({
                 Title = "防甩飞已启用",
-                Content = "已启用防甩飞功能",
+                Content = "已开启防甩飞保护功能",
                 Duration = 2,
             })
         else
@@ -1078,29 +1223,19 @@ local Toggle = MainTab:CreateToggle({
             end
             Rayfield:Notify({
                 Title = "防甩飞已禁用",
-                Content = "已禁用防甩飞功能",
+                Content = "已关闭防甩飞保护功能",
                 Duration = 2,
             })
         end
    end,
 })
 
--- 角色重生时重新设置防甩飞
-LocalPlayer.CharacterAdded:Connect(function(character)
-    wait(0.5)
-    if antiFlingEnabled then
-        setupAntiFling()
-    end
-end)
+-- 初始化防甩飞系统
+setupAntiFling()
 
--- 初始设置（如果默认启用）
-if antiFlingEnabled then
-    setupAntiFling()
-end
-
--- 初始通知
+-- 初始化脚本
 Rayfield:Notify({
-   Title = "脚本加载成功",
-   Content = "复活功能脚本已就绪！\n自动检测玩家功能已启用\n追踪时角色会自动朝向目标\n未选择玩家时会自动追踪最近玩家",
-   Duration = 6,
+    Title = "脚本加载成功",
+    Content = "复活功能脚本已加载完成！\n请先选择要追踪的玩家。",
+    Duration = 5,
 })

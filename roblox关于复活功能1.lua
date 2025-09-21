@@ -1389,7 +1389,7 @@ local Button = MainTab:CreateButton({
 })
 
 -- ==================== 防甩飞功能 ====================
-local MainSection = SpeedTab:CreateSection("防甩飞保护")
+local MainSection = MainTab:CreateSection("防甩飞保护")
 
 local antiFlingEnabled = false
 local antiFlingConnection = nil

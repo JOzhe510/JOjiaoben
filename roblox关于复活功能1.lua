@@ -1510,31 +1510,6 @@ local Toggle = MainTab:CreateToggle({
 -- 初始化防甩飞系统
 setupAntiFling()
 
--- 创建设置标签页
-local MianTab = Window:CreateTab("⚙️ 设置", nil)
-
-local MianSettings = MainTab:CreateSection("界面设置")
-
-local Dropdown = MainTab:CreateDropdown({
-   Name = "主题颜色",
-   Options = {"默认", "深色", "浅色", "蓝色", "绿色", "红色"},
-   CurrentOption = "默认",
-   Callback = function(Option)
-        Rayfield:SetTheme(Option)
-   end,
-})
-
-local Slider = MainTab:CreateSlider({
-   Name = "界面缩放",
-   Range = {70, 150},
-   Increment = 5,
-   Suffix = "%",
-   CurrentValue = 100,
-   Callback = function(Value)
-        Rayfield:SetScale(Value / 100)
-   end,
-})
-
 local MainSettings = MainTab:CreateSection("按键设置")
 
 local Keybind = MainTab:CreateKeybind({

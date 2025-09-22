@@ -493,10 +493,16 @@ local respawnService = {
     followPlayer = nil,
     following = false,
     teleporting = false,
+    -- 新增旋转追踪模式
+    rotating = false,
+    rotationSpeed = 500, -- 旋转速度 (度/秒)
+    rotationRadius = 5, -- 旋转半径
+    rotationHeight = 0, -- 旋转高度
+    currentRotationAngle = 0, -- 当前旋转角度
     followSpeed = 500,
     followDistance = 3.9,
     followHeight = 0,
-    followPosition = 350,
+    followPosition = 0,
     savedPositions = {},
     followConnection = nil,
     teleportConnection = nil,
@@ -1024,6 +1030,86 @@ local Toggle = MainTab:CreateToggle({
    end,
 })
 
+-- 旋转追踪功能
+local Toggle = MainTab:CreateToggle({
+   Name = "旋转追踪模式",
+   CurrentValue = false,
+   Callback = function(Value)
+        respawnService.rotating = Value
+        
+        if respawnService.rotationConnection then
+            respawnService.rotationConnection:Disconnect()
+            respawnService.rotationConnection = nil
+        end
+        
+        -- 如果开启旋转追踪，关闭其他追踪模式
+        if respawnService.rotating then
+            respawnService.following = false
+            respawnService.teleporting = false
+            
+            if respawnService.followConnection then
+                respawnService.followConnection:Disconnect()
+                respawnService.followConnection = nil
+            end
+            
+            if respawnService.teleportConnection then
+                respawnService.teleportConnection:Disconnect()
+                respawnService.teleportConnection = nil
+            end
+            
+            if not respawnService.followPlayer or not IsPlayerValid(respawnService.followPlayer) then
+                if not AutoSelectNearestPlayer() then
+                    respawnService.rotating = false
+                    return
+                end
+            end
+            
+            respawnService.rotationConnection = RunService.Heartbeat:Connect(function()
+                if not respawnService.rotating then return end
+                
+                if not IsPlayerValid(respawnService.followPlayer) then
+                    if not AutoSelectNearestPlayer() then
+                        respawnService.rotating = false
+                        return
+                    end
+                end
+                
+                local targetPlayer = Players:FindFirstChild(respawnService.followPlayer)
+                if not targetPlayer then return end
+                local targetChar = targetPlayer.Character
+                local localChar = LocalPlayer.Character
+                
+                if not targetChar or not localChar then return end
+                
+                local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+                local localRoot = localChar:FindFirstChild("HumanoidRootPart")
+                
+                if targetRoot and localRoot then
+                    -- 更新旋转角度
+                    respawnService.currentRotationAngle = (respawnService.currentRotationAngle + respawnService.rotationSpeed * 0.016) % 360
+                    
+                    -- 计算旋转位置
+                    local angleRad = math.rad(respawnService.currentRotationAngle)
+                    local offsetX = math.cos(angleRad) * respawnService.rotationRadius
+                    local offsetZ = math.sin(angleRad) * respawnService.rotationRadius
+                    
+                    local targetPosition = targetRoot.Position + Vector3.new(
+                        offsetX,
+                        respawnService.rotationHeight,
+                        offsetZ
+                    )
+                    
+                    -- 平滑移动到旋转位置
+                    SmoothMove(localRoot, targetPosition, respawnService.smoothingFactor)
+                    
+                    -- 始终面向目标
+                    ForceLookAtTarget(localRoot, targetRoot)
+                end
+            end)
+        end
+   end,
+})
+
 -- 传送功能
 local Toggle = MainTab:CreateToggle({
    Name = "直接传送",
@@ -1131,6 +1217,42 @@ local Input = MainTab:CreateInput({
         local value = tonumber(Text)
         if value then
             respawnService.followHeight = value
+        end
+   end,
+})
+
+local Input = MainTab:CreateInput({
+   Name = "旋转速度",
+   PlaceholderText = "输入旋转速度 (默认: 1)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value > 0 then
+            respawnService.rotationSpeed = value
+        end
+   end,
+})
+
+local Input = MainTab:CreateInput({
+   Name = "旋转半径",
+   PlaceholderText = "输入旋转半径 (默认: 5)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value > 0 then
+            respawnService.rotationRadius = value
+        end
+   end,
+})
+
+local Input = MainTab:CreateInput({
+   Name = "旋转高度",
+   PlaceholderText = "输入旋转高度 (默认: 3)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value then
+            respawnService.rotationHeight = value
         end
    end,
 })

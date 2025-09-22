@@ -43,7 +43,7 @@ local AimSettings = {
     PredictionEnabled = true,
     AimMode = "Camera",
     TeamCheck = true,
-    NearestAim = false
+    NearestAim = false,
     MaxDistance = math.huge,
 }
 

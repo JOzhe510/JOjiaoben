@@ -1668,29 +1668,11 @@ local function setupAntiFling()
 end
 
 -- 简单的防甩飞开关
-local Toggle = MainTab:CreateToggle({
+local Button = MainTab:CreateButton({
    Name = "防甩飞保护",
    CurrentValue = false,
-   Callback = function(Value)
-        antiFlingEnabled = Value
-        if Value then
-            setupAntiFling()
-            Rayfield:Notify({
-                Title = "防甩飞已启用",
-                Content = "防甩飞保护已开启，无需设置",
-                Duration = 2,
-            })
-        else
-            if antiFlingConnection then
-                antiFlingConnection:Disconnect()
-                antiFlingConnection = nil
-            end
-            Rayfield:Notify({
-                Title = "防甩飞已禁用",
-                Content = "防甩飞保护已关闭",
-                Duration = 2,
-            })
-        end
+   Callback = function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/Linux6699/DaHubRevival/main/AntiFling.lua'))()
    end,
 })
 

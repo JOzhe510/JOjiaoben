@@ -1512,97 +1512,96 @@ local Button = MainTab:CreateButton({
 
 -- ==================== 防甩飞功能 ====================
 local MainSection = MainTab:CreateSection("防甩飞保护")
-
 local antiFlingEnabled = false
 local antiFlingConnection = nil
 
--- 防甩飞功能
+-- 简单稳定的防甩飞功能
 local function setupAntiFling()
-    -- 如果已存在连接，先断开
     if antiFlingConnection then
         antiFlingConnection:Disconnect()
         antiFlingConnection = nil
     end
     
     local player = Players.LocalPlayer
-    local character = player.Character or player.CharacterAdded:Wait()
-    local humanoid = character:WaitForChild("Humanoid")
-    local rootPart = character:WaitForChild("HumanoidRootPart")
+    local character = player.Character
+    if not character then return end
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    
+    if not humanoid or not rootPart then return end
 
-    -- 配置参数
-    local MAX_ALLOWED_VELOCITY = 100 -- 最大允许速度
-    local MAX_ANGULAR_VELOCITY = 5 -- 最大允许角速度
-    local ENABLE_DEBUG = false -- 启用调试信息
+    -- 固定参数，不需要调节
+    local MAX_ALLOWED_VELOCITY = 200 -- 速度阈值
+    local MAX_ANGULAR_VELOCITY = 15 -- 角速度阈值
+    local checkCounter = 0 -- 检测计数器
 
-    -- 存储上一帧的位置和速度
-    local lastPosition = rootPart.Position
-    local lastVelocity = Vector3.new(0, 0, 0)
-    local lastTime = tick()
-
-    -- 防甩飞主循环
     antiFlingConnection = game:GetService("RunService").Heartbeat:Connect(function()
-        if not antiFlingEnabled or not character or not rootPart then
+        if not antiFlingEnabled or not character or not rootPart or not character:IsDescendantOf(workspace) then
             return
         end
 
-        local currentTime = tick()
-        local deltaTime = currentTime - lastTime
-        lastTime = currentTime
+        -- 每5帧检测一次，减少性能消耗
+        checkCounter = checkCounter + 1
+        if checkCounter < 5 then
+            return
+        end
+        checkCounter = 0
 
-        -- 计算当前速度和加速度
-        local currentVelocity = (rootPart.Position - lastPosition) / deltaTime
-        local acceleration = (currentVelocity - lastVelocity) / deltaTime
-
-        lastPosition = rootPart.Position
-        lastVelocity = currentVelocity
-
-        -- 计算角速度
+        local currentVelocity = rootPart.Velocity
         local angularVelocity = rootPart.AssemblyAngularVelocity.Magnitude
 
-        -- 检测异常速度或加速度
-        if currentVelocity.Magnitude > MAX_ALLOWED_VELOCITY or 
-           acceleration.Magnitude > 500 or 
-           angularVelocity > MAX_ANGULAR_VELOCITY then
-
-            if ENABLE_DEBUG then
-                print(string.format("检测到异常移动: 速度=%.2f, 加速度=%.2f, 角速度=%.2f", 
-                    currentVelocity.Magnitude, acceleration.Magnitude, angularVelocity))
-            end
-
-            -- 重置角色位置到安全位置
-            local success = pcall(function()
-                -- 尝试找到安全位置
-                local safePosition = workspace:FindPartOnRay(Ray.new(rootPart.Position + Vector3.new(0, 10, 0), Vector3.new(0, -20, 0)), character)
+        -- 只有当速度和角速度都异常时才触发保护
+        local isVelocityAbnormal = currentVelocity.Magnitude > MAX_ALLOWED_VELOCITY
+        local isAngularVelocityAbnormal = angularVelocity > MAX_ANGULAR_VELOCITY
+        
+        if isVelocityAbnormal and isAngularVelocityAbnormal then
+            -- 简单有效的保护措施
+            pcall(function()
+                -- 先减速
+                rootPart.Velocity = Vector3.new(0, math.min(0, currentVelocity.Y), 0)
+                rootPart.RotVelocity = Vector3.new(0, 0, 0)
                 
-                if safePosition then
+                -- 等待一下看看效果
+                task.wait(0.05)
+                
+                -- 如果还异常，传送到安全位置
+                if rootPart.Velocity.Magnitude > MAX_ALLOWED_VELOCITY then
+                    -- 寻找脚下的地面
+                    local rayOrigin = rootPart.Position
+                    local rayDirection = Vector3.new(0, -10, 0)
+                    
+                    local raycastParams = RaycastParams.new()
+                    raycastParams.FilterDescendantsInstances = {character}
+                    
+                    local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+                    
+                    if raycastResult then
+                        -- 传送到地面上方
+                        rootPart.CFrame = CFrame.new(raycastResult.Position + Vector3.new(0, 5, 0))
+                    else
+                        -- 找不到地面就传送到初始位置
+                        rootPart.CFrame = CFrame.new(0, 50, 0)
+                    end
+                    
+                    -- 最后清除所有速度
                     rootPart.Velocity = Vector3.new(0, 0, 0)
                     rootPart.RotVelocity = Vector3.new(0, 0, 0)
-                    rootPart.CFrame = CFrame.new(safePosition.Position + Vector3.new(0, 3, 0))
-                    
-                    if ENABLE_DEBUG then
-                        print("已重置角色位置到安全位置")
-                    end
                 end
             end)
-
-            if not success and ENABLE_DEBUG then
-                warn("重置位置时出错")
-            end
         end
     end)
 
-    -- 监听角色变化
+    -- 角色重生时重新设置
     player.CharacterAdded:Connect(function(newCharacter)
-        character = newCharacter
-        humanoid = newCharacter:WaitForChild("Humanoid")
-        rootPart = newCharacter:WaitForChild("HumanoidRootPart")
-        lastPosition = rootPart.Position
-        lastVelocity = Vector3.new(0, 0, 0)
-        lastTime = tick()
+        task.wait(1) -- 等待角色加载完成
+        if antiFlingEnabled then
+            setupAntiFling()
+        end
     end)
 end
 
--- 创建防甩飞开关
+-- 简单的防甩飞开关
 local Toggle = MainTab:CreateToggle({
    Name = "防甩飞保护",
    CurrentValue = false,
@@ -1612,7 +1611,7 @@ local Toggle = MainTab:CreateToggle({
             setupAntiFling()
             Rayfield:Notify({
                 Title = "防甩飞已启用",
-                Content = "已开启防甩飞保护功能",
+                Content = "防甩飞保护已开启，无需设置",
                 Duration = 2,
             })
         else
@@ -1622,15 +1621,12 @@ local Toggle = MainTab:CreateToggle({
             end
             Rayfield:Notify({
                 Title = "防甩飞已禁用",
-                Content = "已关闭防甩飞保护功能",
+                Content = "防甩飞保护已关闭",
                 Duration = 2,
             })
         end
    end,
 })
-
--- 初始化防甩飞系统
-setupAntiFling()
 
 local MainSettings = MainTab:CreateSection("按键设置")
 

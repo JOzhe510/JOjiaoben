@@ -346,7 +346,7 @@ local function FindTargetInView()
                     
                     closestAngle = angle
                     bestTarget = head
-end
+                end
             end
         end
     end

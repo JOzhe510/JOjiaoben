@@ -372,13 +372,27 @@ local function FindNearestTarget()
                 end
                 
                 if distance < minDistance then
-    -- 添加完整的逻辑
-    if AimSettings.WallCheck then
-        -- 墙壁检测逻辑...
-    end
-    minDistance = distance
-    nearestTarget = head
-end
+                    -- 墙壁检测
+                    if AimSettings.WallCheck then
+                        local rayOrigin = Camera.CFrame.Position
+                        local rayDirection = (head.Position - rayOrigin).Unit * (head.Position - rayOrigin).Magnitude
+                        
+                        local raycastParams = RaycastParams.new()
+                        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+                        raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                        raycastParams.IgnoreWater = true
+                        
+                        local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+                        if raycastResult then
+                            local hitPart = raycastResult.Instance
+                            if not hitPart:IsDescendantOf(player.Character) then
+                                continue  -- 有墙壁阻挡，跳过此目标
+                            end
+                        end
+                    end
+                    
+                    minDistance = distance
+                    nearestTarget = head
                 end
             end
         end
@@ -386,6 +400,7 @@ end
     
     return nearestTarget
 end
+
 -- 近距离目标选择
 local function FindNearestTarget()
     local nearestTarget = nil

@@ -44,6 +44,7 @@ local AimSettings = {
     AimMode = "Camera",
     TeamCheck = true,
     NearestAim = false
+    MaxDistance = math.huge,
 }
 
 local ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
@@ -313,6 +314,12 @@ local function FindTargetInView()
             local head = player.Character:FindFirstChild("Head")
             
             if humanoid and humanoid.Health > 0 and head then
+                -- 距离检查
+                local distance = (head.Position - Camera.CFrame.Position).Magnitude
+                if distance > AimSettings.MaxDistance then
+                    continue
+                end
+                
                 local cameraDirection = Camera.CFrame.LookVector
                 local targetDirection = (head.Position - Camera.CFrame.Position).Unit
                 local dotProduct = cameraDirection:Dot(targetDirection)
@@ -339,7 +346,7 @@ local function FindTargetInView()
                     
                     closestAngle = angle
                     bestTarget = head
-                end
+end
             end
         end
     end
@@ -347,6 +354,31 @@ local function FindTargetInView()
     return bestTarget
 end
 
+local function FindNearestTarget()
+    local nearestTarget = nil
+    local minDistance = math.huge
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and IsEnemy(player) then
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            local head = player.Character:FindFirstChild("Head")
+            
+            if humanoid and humanoid.Health > 0 and head then
+                local distance = (head.Position - Camera.CFrame.Position).Magnitude
+                
+                -- 距离检查
+                if distance > AimSettings.MaxDistance then
+                    continue
+                end
+                
+                if distance < minDistance then
+                end
+            end
+        end
+    end
+    
+    return nearestTarget
+end
 -- 近距离目标选择
 local function FindNearestTarget()
     local nearestTarget = nil
@@ -436,51 +468,38 @@ RunService.RenderStepped:Connect(function()
     
     if not AimSettings.Enabled then return end
     
+    -- 单锁模式逻辑不变
     if AimSettings.LockedTarget and AimSettings.LockSingleTarget then
         if not IsTargetValid(AimSettings.LockedTarget) then
             AimSettings.LockedTarget = nil
         end
     end
     
-    if not AimSettings.LockedTarget or not AimSettings.LockSingleTarget then
-        if AimSettings.NearestAim then
-            AimSettings.LockedTarget = FindNearestTarget()
+    -- 非单锁模式：极度粘黏的目标保持
+    if not AimSettings.LockSingleTarget then
+        -- 如果当前有锁定目标且有效，极大概率保持
+        if AimSettings.LockedTarget and IsTargetValid(AimSettings.LockedTarget) then
+            -- 只有目标死亡或离开游戏才会切换
+            -- 即使目标离开视野/FOV也保持锁定
         else
-            AimSettings.LockedTarget = FindTargetInView()
+            -- 当前目标无效，寻找新目标
+            if AimSettings.NearestAim then
+                AimSettings.LockedTarget = FindNearestTarget()
+            else
+                AimSettings.LockedTarget = FindTargetInView()
+            end
+        end
+    else
+        -- 单锁模式：目标无效时清除
+        if not AimSettings.LockedTarget or not IsTargetValid(AimSettings.LockedTarget) then
+            AimSettings.LockedTarget = nil
         end
     end
     
+    -- 瞄准逻辑
     if AimSettings.LockedTarget then
         local predictedPosition = CalculatePredictedPosition(AimSettings.LockedTarget)
         AimAtPosition(predictedPosition)
-    end
-end)
-
--- 玩家加入/离开事件
-Players.PlayerAdded:Connect(function(player)
-    task.wait(1)
-    UpdateESP()
-end)
-
-Players.PlayerRemoving:Connect(function(player)
-    local espId = player.UserId
-    if ESPHighlights[espId] then
-        pcall(function() ESPHighlights[espId]:Destroy() end)
-        ESPHighlights[espId] = nil
-    end
-    if ESPLabels[espId] then
-        pcall(function() 
-            ESPLabels[espId].nameLabel:Remove()
-            ESPLabels[espId].healthLabel:Remove()
-        end)
-        ESPLabels[espId] = nil
-    end
-    
-    if ESPConnections[player] then
-        for _, connection in ipairs(ESPConnections[player]) do
-            pcall(function() connection:Disconnect() end)
-        end
-        ESPConnections[player] = nil
     end
 end)
 
@@ -710,6 +729,20 @@ local Toggle = MainTab:CreateToggle({
         if Value then
             AimSettings.LockSingleTarget = false
             SingleTargetToggle:Set(false)
+        end
+   end,
+})
+
+local Input = MainTab:CreateInput({
+   Name = "自瞄距离限制",
+   PlaceholderText = "输入最大自瞄距离 (默认: 无限)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value > 0 then
+            AimSettings.MaxDistance = value
+        else
+            AimSettings.MaxDistance = math.huge -- 无限距离
         end
    end,
 })

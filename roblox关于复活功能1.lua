@@ -372,6 +372,13 @@ local function FindNearestTarget()
                 end
                 
                 if distance < minDistance then
+    -- 添加完整的逻辑
+    if AimSettings.WallCheck then
+        -- 墙壁检测逻辑...
+    end
+    minDistance = distance
+    nearestTarget = head
+end
                 end
             end
         end

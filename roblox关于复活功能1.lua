@@ -303,7 +303,7 @@ local function AimAtPosition(position)
     end
 end
 
--- 视角对准的目标选择
+-- 修复后的 FindTargetInView 函数
 local function FindTargetInView()
     local bestTarget = nil
     local closestAngle = math.rad(AimSettings.FOV / 2)
@@ -314,10 +314,10 @@ local function FindTargetInView()
             local head = player.Character:FindFirstChild("Head")
             
             if humanoid and humanoid.Health > 0 and head then
-                -- 距离检查
+                -- 距离检查（修复这里）
                 local distance = (head.Position - Camera.CFrame.Position).Magnitude
                 if distance > AimSettings.MaxDistance then
-                    continue
+                    continue  -- 使用 continue 而不是 return
                 end
                 
                 local cameraDirection = Camera.CFrame.LookVector
@@ -328,7 +328,7 @@ local function FindTargetInView()
                 if angle <= closestAngle then
                     if AimSettings.WallCheck then
                         local rayOrigin = Camera.CFrame.Position
-                        local rayDirection = (head.Position - rayOrigin).Unit * (head.Position - rayOrigin).Magnitude
+                        local rayDirection = (head.Position - rayOrigin).Unit * distance  -- 使用实际距离
                         
                         local raycastParams = RaycastParams.new()
                         raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
@@ -354,6 +354,7 @@ local function FindTargetInView()
     return bestTarget
 end
 
+-- 删除重复的 FindNearestTarget 函数，只保留一个
 local function FindNearestTarget()
     local nearestTarget = nil
     local minDistance = math.huge
@@ -366,16 +367,16 @@ local function FindNearestTarget()
             if humanoid and humanoid.Health > 0 and head then
                 local distance = (head.Position - Camera.CFrame.Position).Magnitude
                 
-                -- 距离检查
+                -- 距离检查（修复这里）
                 if distance > AimSettings.MaxDistance then
-                    continue
+                    continue  -- 使用 continue 而不是跳过
                 end
                 
                 if distance < minDistance then
                     -- 墙壁检测
                     if AimSettings.WallCheck then
                         local rayOrigin = Camera.CFrame.Position
-                        local rayDirection = (head.Position - rayOrigin).Unit * (head.Position - rayOrigin).Magnitude
+                        local rayDirection = (head.Position - rayOrigin).Unit * distance  -- 使用实际距离
                         
                         local raycastParams = RaycastParams.new()
                         raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
@@ -386,7 +387,7 @@ local function FindNearestTarget()
                         if raycastResult then
                             local hitPart = raycastResult.Instance
                             if not hitPart:IsDescendantOf(player.Character) then
-                                continue  -- 有墙壁阻挡，跳过此目标
+                                continue
                             end
                         end
                     end
@@ -763,8 +764,18 @@ local Input = MainTab:CreateInput({
         local value = tonumber(Text)
         if value and value > 0 then
             AimSettings.MaxDistance = value
+            Rayfield:Notify({
+                Title = "自瞄距离设置成功",
+                Content = "最大自瞄距离: " .. value .. " 单位",
+                Duration = 3,
+            })
         else
-            AimSettings.MaxDistance = math.huge -- 无限距离
+            AimSettings.MaxDistance = math.huge
+            Rayfield:Notify({
+                Title = "自瞄距离重置",
+                Content = "自瞄距离限制已取消 (无限距离)",
+                Duration = 3,
+            })
         end
    end,
 })

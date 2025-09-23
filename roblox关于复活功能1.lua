@@ -592,20 +592,20 @@ local respawnService = {
     followPlayer = nil,
     following = false,
     teleporting = false,
-    rotating = false,   -- 修复：移到这里定义
-    
+    rotating = false,
+
     -- 平滑追踪设置
     followSpeed = 500,
     followDistance = 3.9,
     followHeight = 0,
     followPosition = 0,
-    
+
     -- 旋转追踪设置
     rotationSpeed = 100,
     rotationRadius = 5,
     rotationHeight = 0,
     currentRotationAngle = 0,
-    
+
     -- 通用设置
     savedPositions = {},
     followConnection = nil,
@@ -622,7 +622,7 @@ local respawnService = {
     lastUpdateTime = tick(),
     autoFaceWhileTracking = false,
     faceSpeedWhileTracking = 1.0,
-    
+
     -- 速度设置（从AimSettings移动过来）
     useCustomSpeed = false,
     customWalkSpeed = 16,

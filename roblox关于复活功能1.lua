@@ -594,14 +594,6 @@ local respawnService = {
     teleporting = false,
     rotating = false,   -- 修复：移到这里定义
     
-    -- 现在定义 respawnService 表
-local respawnService = {
-    autoRespawn = false,
-    followPlayer = nil,
-    following = false,
-    teleporting = false,
-    rotating = false,
-    
     -- 平滑追踪设置
     followSpeed = 500,
     followDistance = 3.9,

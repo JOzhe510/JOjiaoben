@@ -1582,9 +1582,6 @@ local Button = MainTab:CreateButton({
    end,
 })
 
--- 初始化玩家列表
-RefreshPlayerButton.Callback()
-
 Rayfield:Notify({
     Title = "系统加载成功",
     Content = "自瞄和追踪功能已加载完成",

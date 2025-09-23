@@ -1238,6 +1238,99 @@ local Button = MainTab:CreateButton({
    end,
 })
 
+local Toggle = MainTab:CreateToggle({
+   Name = "原地复活"
+   Callback = function()
+   local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+while not LocalPlayer do
+    Players.PlayerAdded:Wait()
+    LocalPlayer = Players.LocalPlayer
+end
+
+-- 原地复活系统
+local respawnService = {}
+respawnService.savedPositions = {}
+
+function respawnService:SetupPlayer(player)
+    player.CharacterAdded:Connect(function(character)
+        self:OnCharacterAdded(player, character)
+    end)
+    
+    if player.Character then
+        self:OnCharacterAdded(player, player.Character)
+    end
+end
+
+function respawnService:OnCharacterAdded(player, character)
+    local humanoid = character:WaitForChild("Humanoid")
+    
+    if self.savedPositions[player] then
+        wait(0.1) 
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            rootPart.CFrame = CFrame.new(self.savedPositions[player])
+            print("传送 " .. player.Name .. " 到保存位置")
+        end
+    end
+    
+    humanoid.Died:Connect(function()
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            self.savedPositions[player] = rootPart.Position
+            print("保存 " .. player.Name .. " 的位置")
+        end
+        
+        wait(5)
+        player:LoadCharacter()
+    end)
+end
+
+-- 初始化原地复活系统
+for _, player in ipairs(Players:GetPlayers()) do
+    respawnService:SetupPlayer(player)
+end
+
+Players.PlayerAdded:Connect(function(player)
+    respawnService:SetupPlayer(player)
+end)
+
+print("原地复活系统初始化完成")
+
+-- 原地复活按钮功能（如果需要按钮触发）
+local function RespawnAtSavedPosition()
+    if LocalPlayer.Character then
+        local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            respawnService.savedPositions[LocalPlayer] = rootPart.Position
+            print("保存当前位置用于复活")
+        end
+    end
+    
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.Health = 0
+    end
+end
+
+-- 如果需要键盘快捷键触发复活
+local UIS = game:GetService("UserInputService")
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.R then -- 按R键触发原地复活
+        RespawnAtSavedPosition()
+    end
+end)
+
+-- 导出函数供其他脚本使用
+return {
+    RespawnAtSavedPosition = RespawnAtSavedPosition,
+    respawnService = respawnService
+}
+   end,
+})
+
 -- 平滑追踪按钮
 local Toggle = MainTab:CreateToggle({
    Name = "平滑追踪",
@@ -1361,21 +1454,14 @@ local Input = MainTab:CreateInput({
 })
 
 -- 玩家选择部分
-local MainSection = MainTab:CreateSection("选择玩家")
-
-local currentPlayerLabel = MainTab:CreateLabel("当前选择: 无")
-
--- ==================== 玩家选择系统 ====================
-local playerButtons = {}
-local currentSelectedPlayer = nil
-
--- 玩家选择部分
 local MainSection = MainTab:CreateSection("在线玩家列表")
 
+-- 只创建一个当前选择标签
 local currentPlayerLabel = MainTab:CreateLabel("当前选择: 无")
 
 -- 修复：玩家列表显示
 local function UpdatePlayerList()
+    -- 清除旧的玩家按钮
     for _, button in pairs(playerButtons) do
         button:Destroy()
     end
@@ -1388,7 +1474,7 @@ local function UpdatePlayerList()
     
     for i, player in ipairs(players) do
         if player ~= LocalPlayer then
-            local button = TrackTab:CreateButton({
+            local button = MainTab:CreateButton({  -- 修复：使用正确的tab引用
                 Name = player.Name .. (player == currentSelectedPlayer and " (已选择)" or ""),
                 Callback = function()
                     respawnService.followPlayer = player.Name
@@ -1404,7 +1490,7 @@ local function UpdatePlayerList()
                         Duration = 3,
                     })
                     
-                    UpdatePlayerList()
+                    UpdatePlayerList()  -- 刷新列表显示选中状态
                 end,
             })
             table.insert(playerButtons, button)
@@ -1460,8 +1546,6 @@ local Button = MainTab:CreateButton({
         UpdatePlayerList()
    end,
 })
-
-currentPlayerLabel = MainTab:CreateLabel("当前选择: 无")
 
 -- 初始化玩家列表
 UpdatePlayerList()

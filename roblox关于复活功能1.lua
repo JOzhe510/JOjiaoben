@@ -1246,105 +1246,181 @@ local MainSection = MainTab:CreateSection("选择玩家")
 
 local currentPlayerLabel = MainTab:CreateLabel("当前选择: 无")
 
-local Button = MainTab:CreateButton({
-   Name = "刷新选择的玩家",
-   Callback = function()
-        if respawnService.following then
-            respawnService.following = false
-            if respawnService.followConnection then
-                respawnService.followConnection:Disconnect()
-                respawnService.followConnection = nil
-            end
-        end
-        
-        if respawnService.teleporting then
-            respawnService.teleporting = false
-            if respawnService.teleportConnection then
-                respawnService.teleportConnection:Disconnect()
-                respawnService.teleportConnection = nil
-            end
-        end
-        
-        if respawnService.rotating then
-            respawnService.rotating = false
-            if respawnService.followConnection then
-                respawnService.followConnection:Disconnect()
-                respawnService.followConnection = nil
-            end
-        end
-        
-        respawnService.followPlayer = nil
-        currentPlayerLabel:Set("当前选择: 无")
-        
-        for _, button in ipairs(playerButtons) do
-            button:Destroy()
-        end
-        playerButtons = {}
-        
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer then
-                local playerButton = TrackingTab:CreateButton({
-                    Name = "选择: " .. player.Name,
-                    Callback = function()
+-- ==================== 玩家选择系统 ====================
+local playerButtons = {}
+local currentSelectedPlayer = nil
+
+-- 玩家选择部分
+local MainSection = MainTab:CreateSection("在线玩家列表")
+
+local currentPlayerLabel = MainTab:CreateLabel("当前选择: 无")
+
+-- 刷新玩家列表函数
+local function RefreshPlayerList()
+    -- 清除现有按钮
+    for _, button in ipairs(playerButtons) do
+        button:Destroy()
+    end
+    playerButtons = {}
+    
+    -- 获取所有玩家（不按团队检测）
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            -- 创建玩家选择按钮
+            local playerButton = PlayerTab:CreateButton({
+                Name = "选择: " .. player.Name .. " (" .. player.DisplayName .. ")",
+                Callback = function()
+                    currentSelectedPlayer = player
+                    currentPlayerLabel:Set("当前选择: " .. player.Name)
+                    
+                    -- 更新追踪系统的目标玩家
+                    if respawnService then
                         respawnService.followPlayer = player.Name
-                        currentPlayerLabel:Set("当前选择: " .. player.Name)
-                    end,
-                })
-                table.insert(playerButtons, playerButton)
-            end
+                    end
+                    
+                    Rayfield:Notify({
+                        Title = "玩家选择成功",
+                        Content = "已选择玩家: " .. player.Name,
+                        Duration = 3,
+                    })
+                end,
+            })
+            table.insert(playerButtons, playerButton)
         end
-   end,
+    end
+    
+    -- 如果没有其他玩家，显示提示
+    if #Players:GetPlayers() <= 1 then
+        local noPlayersLabel = PlayerTab:CreateLabel("服务器中没有其他玩家")
+        table.insert(playerButtons, noPlayersLabel)
+    end
+end
+
+-- 自动刷新按钮
+local Button = MainTab:CreateButton({
+    Name = "刷新玩家列表",
+    Callback = function()
+        RefreshPlayerList()
+        Rayfield:Notify({
+            Title = "玩家列表已刷新",
+            Content = "已更新在线玩家列表",
+            Duration = 2,
+        })
+    end,
 })
 
+-- 清除选择按钮
 local Button = MainTab:CreateButton({
-   Name = "自动选择最近玩家",
-   Callback = function()
+    Name = "清除选择",
+    Callback = function()
+        currentSelectedPlayer = nil
+        currentPlayerLabel:Set("当前选择: 无")
+        
+        -- 清除追踪系统的目标玩家
+        if respawnService then
+            respawnService.followPlayer = nil
+        end
+        
+        Rayfield:Notify({
+            Title = "选择已清除",
+            Content = "已清除玩家选择",
+            Duration = 2,
+        })
+    end,
+})
+
+-- 玩家加入/离开时自动刷新
+local function onPlayerAdded(player)
+    if player ~= LocalPlayer then
+        task.wait(1) -- 等待玩家完全加载
+        RefreshPlayerList()
+    end
+end
+
+local function onPlayerRemoving(player)
+    if player == currentSelectedPlayer then
+        currentSelectedPlayer = nil
+        currentPlayerLabel:Set("当前选择: 无")
+        
+        if respawnService then
+            respawnService.followPlayer = nil
+        end
+    end
+    task.wait(0.5) -- 短暂延迟后刷新
+    RefreshPlayerList()
+end
+
+-- 监听玩家加入和离开
+Players.PlayerAdded:Connect(onPlayerAdded)
+Players.PlayerRemoving:Connect(onPlayerRemoving)
+
+-- 初始刷新玩家列表
+task.spawn(function()
+    task.wait(2) -- 等待游戏完全加载
+    RefreshPlayerList()
+end)
+
+-- 获取当前选择玩家的函数（供其他功能调用）
+local function GetSelectedPlayer()
+    return currentSelectedPlayer
+end
+
+-- 自动选择最近玩家的函数
+local function AutoSelectNearestPlayer()
+    local localChar = LocalPlayer.Character
+    if not localChar then return false end
+    
+    local localRoot = localChar:FindFirstChild("HumanoidRootPart")
+    if not localRoot then return false end
+    
+    local nearestPlayer = nil
+    local nearestDistance = math.huge
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+            if targetRoot then
+                local distance = (localRoot.Position - targetRoot.Position).Magnitude
+                if distance < nearestDistance then
+                    nearestDistance = distance
+                    nearestPlayer = player
+                end
+            end
+        end
+    end
+    
+    if nearestPlayer then
+        currentSelectedPlayer = nearestPlayer
+        currentPlayerLabel:Set("当前选择: " .. nearestPlayer.Name .. " (自动)")
+        
+        if respawnService then
+            respawnService.followPlayer = nearestPlayer.Name
+        end
+        
+        return true
+    end
+    
+    return false
+end
+
+-- 自动选择按钮
+local Button = MainTab:CreateButton({
+    Name = "自动选择最近玩家",
+    Callback = function()
         if AutoSelectNearestPlayer() then
             Rayfield:Notify({
                 Title = "自动选择成功",
-                Content = "已选择最近的玩家: " .. respawnService.followPlayer,
+                Content = "已选择最近的玩家: " .. currentSelectedPlayer.Name,
                 Duration = 3,
             })
         else
             Rayfield:Notify({
                 Title = "自动选择失败",
-                Content = "没有找到可追踪的玩家",
+                Content = "没有找到可选择的玩家",
                 Duration = 3,
             })
         end
-   end,
-})
-
-local Button = MainTab:CreateButton({
-   Name = "清除选择",
-   Callback = function()
-        respawnService.followPlayer = nil
-        currentPlayerLabel:Set("当前选择: 无")
-        
-        if respawnService.following then
-            respawnService.following = false
-            if respawnService.followConnection then
-                respawnService.followConnection:Disconnect()
-                respawnService.followConnection = nil
-            end
-        end
-        
-        if respawnService.teleporting then
-            respawnService.teleporting = false
-            if respawnService.teleportConnection then
-                respawnService.teleportConnection:Disconnect()
-                respawnService.teleportConnection = nil
-            end
-        end
-        
-        if respawnService.rotating then
-            respawnService.rotating = false
-            if respawnService.followConnection then
-                respawnService.followConnection:Disconnect()
-                respawnService.followConnection = nil
-            end
-        end
-   end,
+    end,
 })
 
 -- 追踪设置部分

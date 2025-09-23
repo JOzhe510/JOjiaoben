@@ -762,34 +762,6 @@ local function StartDirectTeleport()
     end)
 end
 
-    -- 修复的旋转追踪模式
-    rotating = false,
-    rotationSpeed = 100, -- 降低旋转速度防止乱飘
-    rotationRadius = 5, -- 旋转半径
-    rotationHeight = 0, -- 旋转高度
-    currentRotationAngle = 0, -- 当前旋转角度
-    followSpeed = 500,
-    followDistance = 3.9,
-    followHeight = 0,
-    followPosition = 0,
-    savedPositions = {},
-    followConnection = nil,
-    teleportConnection = nil,
-    autoFindNearest = false,
-    speedMode = "normal",
-    walkSpeed = 16,
-    tpWalkSpeed = 100,
-    predictionEnabled = true,
-    smoothingFactor = 0.2,
-    maxPredictionTime = 0.3,
-    velocityMultiplier = 2,
-    lastTargetPositions = {},
-    lastUpdateTime = tick(),
-    -- 新增：追踪时自动朝向目标（可开关）
-    autoFaceWhileTracking = false,
-    faceSpeedWhileTracking = 1.0,
-}
-
 -- 速度控制函数
 local function UpdateSpeed()
     local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")

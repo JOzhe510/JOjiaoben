@@ -45,6 +45,12 @@ local AimSettings = {
     TeamCheck = true,
     NearestAim = false,
     MaxDistance = math.huge,
+    -- 新增自动朝向设置
+    AutoFaceTarget = false,
+    FaceSpeed = 1.0, -- 朝向速度 (0.1-1.0)
+    FaceMode = "Selected", -- Selected/Nearest
+    ShowTargetRay = true,
+    RayColor = Color3.fromRGB(255, 0, 255),
 }
 
 local ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
@@ -58,6 +64,13 @@ Circle.Position = ScreenCenter
 Circle.Transparency = 1
 Circle.NumSides = 64
 Circle.Filled = false
+
+-- 目标射线
+local TargetRay = Drawing.new("Line")
+TargetRay.Visible = false
+TargetRay.Color = AimSettings.RayColor
+TargetRay.Thickness = 2
+TargetRay.Transparency = 1
 
 local TargetHistory = {}
 local ESPHighlights = {}
@@ -303,7 +316,7 @@ local function AimAtPosition(position)
     end
 end
 
--- 修复后的 FindTargetInView 函数
+-- 修复距离检查的 FindTargetInView 函数
 local function FindTargetInView()
     local bestTarget = nil
     local closestAngle = math.rad(AimSettings.FOV / 2)
@@ -314,10 +327,10 @@ local function FindTargetInView()
             local head = player.Character:FindFirstChild("Head")
             
             if humanoid and humanoid.Health > 0 and head then
-                -- 距离检查（修复这里）
+                -- 修复距离检查（使用米为单位）
                 local distance = (head.Position - Camera.CFrame.Position).Magnitude
                 if distance > AimSettings.MaxDistance then
-                    continue  -- 使用 continue 而不是 return
+                    continue
                 end
                 
                 local cameraDirection = Camera.CFrame.LookVector
@@ -328,7 +341,7 @@ local function FindTargetInView()
                 if angle <= closestAngle then
                     if AimSettings.WallCheck then
                         local rayOrigin = Camera.CFrame.Position
-                        local rayDirection = (head.Position - rayOrigin).Unit * distance  -- 使用实际距离
+                        local rayDirection = (head.Position - rayOrigin).Unit * distance
                         
                         local raycastParams = RaycastParams.new()
                         raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
@@ -354,7 +367,7 @@ local function FindTargetInView()
     return bestTarget
 end
 
--- 删除重复的 FindNearestTarget 函数，只保留一个
+-- 修复距离检查的 FindNearestTarget 函数
 local function FindNearestTarget()
     local nearestTarget = nil
     local minDistance = math.huge
@@ -365,60 +378,16 @@ local function FindNearestTarget()
             local head = player.Character:FindFirstChild("Head")
             
             if humanoid and humanoid.Health > 0 and head then
+                -- 修复距离检查（使用米为单位）
                 local distance = (head.Position - Camera.CFrame.Position).Magnitude
-                
-                -- 距离检查（修复这里）
                 if distance > AimSettings.MaxDistance then
-                    continue  -- 使用 continue 而不是跳过
+                    continue
                 end
-                
-                if distance < minDistance then
-                    -- 墙壁检测
-                    if AimSettings.WallCheck then
-                        local rayOrigin = Camera.CFrame.Position
-                        local rayDirection = (head.Position - rayOrigin).Unit * distance  -- 使用实际距离
-                        
-                        local raycastParams = RaycastParams.new()
-                        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-                        raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
-                        raycastParams.IgnoreWater = true
-                        
-                        local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-                        if raycastResult then
-                            local hitPart = raycastResult.Instance
-                            if not hitPart:IsDescendantOf(player.Character) then
-                                continue
-                            end
-                        end
-                    end
-                    
-                    minDistance = distance
-                    nearestTarget = head
-                end
-            end
-        end
-    end
-    
-    return nearestTarget
-end
-
--- 近距离目标选择
-local function FindNearestTarget()
-    local nearestTarget = nil
-    local minDistance = math.huge
-    
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and IsEnemy(player) then
-            local humanoid = player.Character:FindFirstChild("Humanoid")
-            local head = player.Character:FindFirstChild("Head")
-            
-            if humanoid and humanoid.Health > 0 and head then
-                local distance = (head.Position - Camera.CFrame.Position).Magnitude
                 
                 if distance < minDistance then
                     if AimSettings.WallCheck then
                         local rayOrigin = Camera.CFrame.Position
-                        local rayDirection = (head.Position - rayOrigin).Unit * (head.Position - rayOrigin).Magnitude
+                        local rayDirection = (head.Position - rayOrigin).Unit * distance
                         
                         local raycastParams = RaycastParams.new()
                         raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
@@ -475,7 +444,68 @@ local function IsTargetValid(target)
         return false
     end
     
+    -- 距离检查（确保目标在最大距离内）
+    local distance = (target.Position - Camera.CFrame.Position).Magnitude
+    if distance > AimSettings.MaxDistance then
+        return false
+    end
+    
     return true
+end
+
+-- 自动朝向目标函数
+local function AutoFaceTarget()
+    if not AimSettings.AutoFaceTarget or not LocalPlayer.Character then
+        TargetRay.Visible = false
+        return
+    end
+    
+    local localRoot = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not localRoot then return end
+    
+    local targetHead = nil
+    
+    -- 根据模式选择目标
+    if AimSettings.FaceMode == "Selected" and AimSettings.LockedTarget then
+        targetHead = AimSettings.LockedTarget
+    elseif AimSettings.FaceMode == "Nearest" then
+        targetHead = FindNearestTarget()
+    end
+    
+    if not targetHead or not IsTargetValid(targetHead) then
+        TargetRay.Visible = false
+        return
+    end
+    
+    -- 计算目标位置
+    local targetPosition = targetHead.Position
+    if AimSettings.PredictionEnabled then
+        targetPosition = CalculatePredictedPosition(targetHead)
+    end
+    
+    -- 快速朝向目标（使用最高速度）
+    local direction = (targetPosition - localRoot.Position).Unit
+    local currentLook = localRoot.CFrame.LookVector
+    local newLook = (currentLook * (1 - AimSettings.FaceSpeed) + direction * AimSettings.FaceSpeed).Unit
+    
+    localRoot.CFrame = CFrame.new(localRoot.Position, localRoot.Position + newLook)
+    
+    -- 显示目标射线
+    if AimSettings.ShowTargetRay then
+        local targetPos2D, targetVisible = Camera:WorldToViewportPoint(targetPosition)
+        local localPos2D = Camera:WorldToViewportPoint(localRoot.Position)
+        
+        if targetVisible then
+            TargetRay.From = Vector2.new(localPos2D.X, localPos2D.Y)
+            TargetRay.To = Vector2.new(targetPos2D.X, targetPos2D.Y)
+            TargetRay.Visible = true
+            TargetRay.Color = AimSettings.RayColor
+        else
+            TargetRay.Visible = false
+        end
+    else
+        TargetRay.Visible = false
+    end
 end
 
 -- 自瞄主循环
@@ -489,21 +519,37 @@ RunService.RenderStepped:Connect(function()
         end
     end
     
+    -- 执行自动朝向
+    AutoFaceTarget()
+    
     if not AimSettings.Enabled then return end
     
-    -- 单锁模式逻辑不变
+    -- 改进的自瞄逻辑：减少粘黏度，增加距离检查
     if AimSettings.LockedTarget and AimSettings.LockSingleTarget then
         if not IsTargetValid(AimSettings.LockedTarget) then
             AimSettings.LockedTarget = nil
         end
     end
     
-    -- 非单锁模式：极度粘黏的目标保持
+    -- 非单锁模式：改进的目标切换逻辑
     if not AimSettings.LockSingleTarget then
-        -- 如果当前有锁定目标且有效，极大概率保持
+        -- 只有当当前目标无效或超出距离时才切换
         if AimSettings.LockedTarget and IsTargetValid(AimSettings.LockedTarget) then
-            -- 只有目标死亡或离开游戏才会切换
-            -- 即使目标离开视野/FOV也保持锁定
+            -- 检查目标是否仍然在FOV内
+            local cameraDirection = Camera.CFrame.LookVector
+            local targetDirection = (AimSettings.LockedTarget.Position - Camera.CFrame.Position).Unit
+            local dotProduct = cameraDirection:Dot(targetDirection)
+            local angle = math.acos(math.clamp(dotProduct, -1, 1))
+            local fovRad = math.rad(AimSettings.FOV / 2)
+            
+            if angle > fovRad then
+                -- 目标离开FOV，寻找新目标
+                if AimSettings.NearestAim then
+                    AimSettings.LockedTarget = FindNearestTarget()
+                else
+                    AimSettings.LockedTarget = FindTargetInView()
+                end
+            end
         else
             -- 当前目标无效，寻找新目标
             if AimSettings.NearestAim then
@@ -558,6 +604,9 @@ local respawnService = {
     velocityMultiplier = 2,
     lastTargetPositions = {},
     lastUpdateTime = tick(),
+    -- 新增：追踪时自动朝向目标（可开关）
+    autoFaceWhileTracking = false,
+    faceSpeedWhileTracking = 1.0,
 }
 
 local playerButtons = {}
@@ -576,10 +625,14 @@ local function CalculateFollowPosition(targetRoot, distance, angle, height)
     return targetRoot.Position + offset
 end
 
+-- 修改后的 ForceLookAtTarget 函数，增加速度控制
 local function ForceLookAtTarget(localRoot, targetRoot)
-    if localRoot and targetRoot then
+    if localRoot and targetRoot and respawnService.autoFaceWhileTracking then
         local direction = (targetRoot.Position - localRoot.Position).Unit
-        localRoot.CFrame = CFrame.new(localRoot.Position, localRoot.Position + direction)
+        local currentLook = localRoot.CFrame.LookVector
+        local newLook = (currentLook * (1 - respawnService.faceSpeedWhileTracking) + direction * respawnService.faceSpeedWhileTracking).Unit
+        
+        localRoot.CFrame = CFrame.new(localRoot.Position, localRoot.Position + newLook)
     end
 end
 
@@ -756,8 +809,58 @@ local Toggle = MainTab:CreateToggle({
    end,
 })
 
+-- 新增自动朝向设置
+local Toggle = MainTab:CreateToggle({
+   Name = "自动朝向目标",
+   CurrentValue = false,
+   Callback = function(Value)
+        AimSettings.AutoFaceTarget = Value
+   end,
+})
+
+local Dropdown = MainTab:CreateDropdown({
+   Name = "朝向目标模式",
+   Options = {"选定目标", "最近目标"},
+   CurrentOption = "选定目标",
+   Callback = function(Option)
+        AimSettings.FaceMode = Option == "选定目标" and "Selected" or "Nearest"
+   end,
+})
+
 local Input = MainTab:CreateInput({
-   Name = "自瞄距离限制",
+   Name = "朝向速度 (0.1-1.0)",
+   PlaceholderText = "输入朝向速度 (默认: 1.0)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value >= 0.1 and value <= 1.0 then
+            AimSettings.FaceSpeed = value
+        end
+   end,
+})
+
+local Toggle = MainTab:CreateToggle({
+   Name = "显示目标射线",
+   CurrentValue = true,
+   Callback = function(Value)
+        AimSettings.ShowTargetRay = Value
+   end,
+})
+
+local Input = MainTab:CreateInput({
+   Name = "射线颜色 (R,G,B)",
+   PlaceholderText = "输入RGB颜色 如: 255,0,255",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local r, g, b = Text:match("(%d+),(%d+),(%d+)")
+        if r and g and b then
+            AimSettings.RayColor = Color3.fromRGB(tonumber(r), tonumber(g), tonumber(b))
+        end
+   end,
+})
+
+local Input = MainTab:CreateInput({
+   Name = "自瞄距离限制 (米)",
    PlaceholderText = "输入最大自瞄距离 (默认: 无限)",
    RemoveTextAfterFocusLost = false,
    Callback = function(Text)
@@ -766,7 +869,7 @@ local Input = MainTab:CreateInput({
             AimSettings.MaxDistance = value
             Rayfield:Notify({
                 Title = "自瞄距离设置成功",
-                Content = "最大自瞄距离: " .. value .. " 单位",
+                Content = "最大自瞄距离: " .. value .. " 米",
                 Duration = 3,
             })
         else
@@ -842,97 +945,24 @@ local Button = MainTab:CreateButton({
    end,
 })
 
+-- 修改追踪功能，增加自动朝向选项
 local Toggle = MainTab:CreateToggle({
-   Name = "原地复活",
+   Name = "追踪时自动朝向",
    CurrentValue = false,
-   Callback = function()
-        local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+   Callback = function(Value)
+        respawnService.autoFaceWhileTracking = Value
+   end,
+})
 
-while not LocalPlayer do
-    Players.PlayerAdded:Wait()
-    LocalPlayer = Players.LocalPlayer
-end
-
--- 原地复活系统
-local respawnService = {}
-respawnService.savedPositions = {}
-
-function respawnService:SetupPlayer(player)
-    player.CharacterAdded:Connect(function(character)
-        self:OnCharacterAdded(player, character)
-    end)
-    
-    if player.Character then
-        self:OnCharacterAdded(player, player.Character)
-    end
-end
-
-function respawnService:OnCharacterAdded(player, character)
-    local humanoid = character:WaitForChild("Humanoid")
-    
-    if self.savedPositions[player] then
-        wait(0.1) 
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        if rootPart then
-            rootPart.CFrame = CFrame.new(self.savedPositions[player])
-            print("传送 " .. player.Name .. " 到保存位置")
+local Input = MainTab:CreateInput({
+   Name = "追踪朝向速度 (0.1-1.0)",
+   PlaceholderText = "输入追踪朝向速度 (默认: 1.0)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value >= 0.1 and value <= 1.0 then
+            respawnService.faceSpeedWhileTracking = value
         end
-    end
-    
-    humanoid.Died:Connect(function()
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        if rootPart then
-            self.savedPositions[player] = rootPart.Position
-            print("保存 " .. player.Name .. " 的位置")
-        end
-        
-        wait(5)
-        player:LoadCharacter()
-    end)
-end
-
--- 初始化原地复活系统
-for _, player in ipairs(Players:GetPlayers()) do
-    respawnService:SetupPlayer(player)
-end
-
-Players.PlayerAdded:Connect(function(player)
-    respawnService:SetupPlayer(player)
-end)
-
-print("原地复活系统初始化完成")
-
--- 原地复活按钮功能（如果需要按钮触发）
-local function RespawnAtSavedPosition()
-    if LocalPlayer.Character then
-        local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if rootPart then
-            respawnService.savedPositions[LocalPlayer] = rootPart.Position
-            print("保存当前位置用于复活")
-        end
-    end
-    
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.Health = 0
-    end
-end
-
--- 如果需要键盘快捷键触发复活
-local UIS = game:GetService("UserInputService")
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    if input.KeyCode == Enum.KeyCode.R then -- 按R键触发原地复活
-        RespawnAtSavedPosition()
-    end
-end)
-
--- 导出函数供其他脚本使用
-return {
-    RespawnAtSavedPosition = RespawnAtSavedPosition,
-    respawnService = respawnService
-}
    end,
 })
 
@@ -1000,7 +1030,7 @@ function UpdatePlayerButtons()
     end
     
     for _, playerName in ipairs(players) do
-        local button = MainTab:CreateButton({
+        local button = TrackingTab:CreateButton({
             Name = "选择: " .. playerName,
             Callback = function()
                 if IsPlayerValid(playerName) then
@@ -1015,7 +1045,7 @@ function UpdatePlayerButtons()
     end
     
     if #players == 0 then
-        local label = MainTab:CreateLabel("当前没有其他玩家在线")
+        local label = TrackingTab:CreateLabel("当前没有其他玩家在线")
         table.insert(playerButtons, label)
     end
 end
@@ -1036,7 +1066,7 @@ local Button = MainTab:CreateButton({
    end,
 })
 
--- 追踪功能
+-- 追踪功能（已修改包含自动朝向）
 local Toggle = MainTab:CreateToggle({
    Name = "平滑追踪",
    CurrentValue = false,
@@ -1057,128 +1087,50 @@ local Toggle = MainTab:CreateToggle({
             end
             
             respawnService.followConnection = RunService.Heartbeat:Connect(function()
-                if not respawnService.following then return end
-                
-                if not IsPlayerValid(respawnService.followPlayer) then
-                    if not AutoSelectNearestPlayer() then
-                        respawnService.following = false
-                        return
-                    end
-                end
-                
-                local targetPlayer = Players:FindFirstChild(respawnService.followPlayer)
-                if not targetPlayer then return end
-                
-                local targetChar = targetPlayer.Character
-                local localChar = LocalPlayer.Character
-                
-                if not targetChar or not localChar then return end
-                
-                local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
-                local localRoot = localChar:FindFirstChild("HumanoidRootPart")
-                
-                if targetRoot and localRoot then
-                    local targetVelocity = GetTargetVelocity(targetRoot)
-                    local predictedPosition = PredictTargetPosition(targetRoot, targetVelocity)
-                    
-                    local targetPosition = CalculateFollowPosition(
-                        targetRoot, 
-                        respawnService.followDistance, 
-                        respawnService.followPosition, 
-                        respawnService.followHeight
-                    )
-                    
-                    SmoothMove(localRoot, targetPosition, respawnService.smoothingFactor)
-                    ForceLookAtTarget(localRoot, targetRoot)
-                end
-            end)
-        end
-   end,
-})
-
--- 旋转追踪功能
-local Toggle = MainTab:CreateToggle({
-   Name = "旋转追踪模式",
-   CurrentValue = false,
-   Callback = function(Value)
-        respawnService.rotating = Value
-        
-        if respawnService.rotationConnection then
-            respawnService.rotationConnection:Disconnect()
-            respawnService.rotationConnection = nil
-        end
-        
-        -- 如果开启旋转追踪，关闭其他追踪模式
-        if respawnService.rotating then
-            respawnService.following = false
-            respawnService.teleporting = false
-            
-            if respawnService.followConnection then
-                respawnService.followConnection:Disconnect()
-                respawnService.followConnection = nil
-            end
-            
-            if respawnService.teleportConnection then
-                respawnService.teleportConnection:Disconnect()
-                respawnService.teleportConnection = nil
-            end
-            
-            if not respawnService.followPlayer or not IsPlayerValid(respawnService.followPlayer) then
-                if not AutoSelectNearestPlayer() then
-                    respawnService.rotating = false
+                if not respawnService.following then
+                    respawnService.followConnection:Disconnect()
+                    respawnService.followConnection = nil
                     return
                 end
-            end
-            
-            respawnService.rotationConnection = RunService.Heartbeat:Connect(function()
-                if not respawnService.rotating then return end
                 
-                if not IsPlayerValid(respawnService.followPlayer) then
-                    if not AutoSelectNearestPlayer() then
-                        respawnService.rotating = false
-                        return
-                    end
-                end
+                local localChar = LocalPlayer.Character
+                if not localChar then return end
+                
+                local localRoot = localChar:FindFirstChild("HumanoidRootPart")
+                if not localRoot then return end
                 
                 local targetPlayer = Players:FindFirstChild(respawnService.followPlayer)
-                if not targetPlayer then return end
-                local targetChar = targetPlayer.Character
-                local localChar = LocalPlayer.Character
-                
-                if not targetChar or not localChar then return end
-                
-                local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
-                local localRoot = localChar:FindFirstChild("HumanoidRootPart")
-                
-                if targetRoot and localRoot then
-                    -- 更新旋转角度
-                    respawnService.currentRotationAngle = (respawnService.currentRotationAngle + respawnService.rotationSpeed * 0.016) % 360
-                    
-                    -- 计算旋转位置
-                    local angleRad = math.rad(respawnService.currentRotationAngle)
-                    local offsetX = math.cos(angleRad) * respawnService.rotationRadius
-                    local offsetZ = math.sin(angleRad) * respawnService.rotationRadius
-                    
-                    local targetPosition = targetRoot.Position + Vector3.new(
-                        offsetX,
-                        respawnService.rotationHeight,
-                        offsetZ
-                    )
-                    
-                    -- 平滑移动到旋转位置
-                    SmoothMove(localRoot, targetPosition, respawnService.smoothingFactor)
-                    
-                    -- 始终面向目标
-                    ForceLookAtTarget(localRoot, targetRoot)
+                if not targetPlayer or not targetPlayer.Character then
+                    respawnService.following = false
+                    respawnService.followConnection:Disconnect()
+                    respawnService.followConnection = nil
+                    return
                 end
+                
+                local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if not targetRoot then return end
+                
+                local targetVelocity = GetTargetVelocity(targetRoot)
+                local predictedPosition = PredictTargetPosition(targetRoot, targetVelocity)
+                
+                local followPosition = CalculateFollowPosition(
+                    targetRoot, 
+                    respawnService.followDistance, 
+                    respawnService.currentRotationAngle, 
+                    respawnService.followHeight
+                )
+                
+                SmoothMove(localRoot, followPosition, respawnService.smoothingFactor)
+                
+                -- 新增：追踪时自动朝向目标
+                ForceLookAtTarget(localRoot, targetRoot)
             end)
         end
    end,
 })
 
--- 传送功能
-local Toggle = MainTab:CreateToggle({
-   Name = "直接传送",
+local Toggle = TrackingTab:CreateToggle({
+   Name = "传送追踪",
    CurrentValue = false,
    Callback = function(Value)
         respawnService.teleporting = Value
@@ -1197,59 +1149,50 @@ local Toggle = MainTab:CreateToggle({
             end
             
             respawnService.teleportConnection = RunService.Heartbeat:Connect(function()
-                if not respawnService.teleporting then return end
-                
-                if not IsPlayerValid(respawnService.followPlayer) then
-                    if not AutoSelectNearestPlayer() then
-                        respawnService.teleporting = false
-                        return
-                    end
+                if not respawnService.teleporting then
+                    respawnService.teleportConnection:Disconnect()
+                    respawnService.teleportConnection = nil
+                    return
                 end
+                
+                local localChar = LocalPlayer.Character
+                if not localChar then return end
+                
+                local localRoot = localChar:FindFirstChild("HumanoidRootPart")
+                if not localRoot then return end
                 
                 local targetPlayer = Players:FindFirstChild(respawnService.followPlayer)
-                if not targetPlayer then return end
-                
-                local targetChar = targetPlayer.Character
-                local localChar = LocalPlayer.Character
-                
-                if not targetChar or not localChar then return end
-                
-                local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
-                local localRoot = localChar:FindFirstChild("HumanoidRootPart")
-                
-                if targetRoot and localRoot then
-                    local targetVelocity = GetTargetVelocity(targetRoot)
-                    local predictedPosition = PredictTargetPosition(targetRoot, targetVelocity)
-                    
-                    local targetPosition = CalculateFollowPosition(
-                        targetRoot, 
-                        respawnService.followDistance, 
-                        respawnService.followPosition, 
-                        respawnService.followHeight
-                    )
-                    
-                    localRoot.CFrame = CFrame.new(targetPosition)
-                    ForceLookAtTarget(localRoot, targetRoot)
+                if not targetPlayer or not targetPlayer.Character then
+                    respawnService.teleporting = false
+                    respawnService.teleportConnection:Disconnect()
+                    respawnService.teleportConnection = nil
+                    return
                 end
+                
+                local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if not targetRoot then return end
+                
+                local targetVelocity = GetTargetVelocity(targetRoot)
+                local predictedPosition = PredictTargetPosition(targetRoot, targetVelocity)
+                
+                local followPosition = CalculateFollowPosition(
+                    targetRoot, 
+                    respawnService.followDistance, 
+                    respawnService.currentRotationAngle, 
+                    respawnService.followHeight
+                )
+                
+                localRoot.CFrame = CFrame.new(followPosition)
+                
+                -- 新增：追踪时自动朝向目标
+                ForceLookAtTarget(localRoot, targetRoot)
             end)
         end
    end,
 })
 
--- 追踪设置
-local MainSettings = MainTab:CreateSection("追踪设置")
-
-local Input = MainTab:CreateInput({
-   Name = "追踪速度",
-   PlaceholderText = "输入追踪速度 (默认: 500)",
-   RemoveTextAfterFocusLost = false,
-   Callback = function(Text)
-        local value = tonumber(Text)
-        if value and value > 0 then
-            respawnService.followSpeed = value
-        end
-   end,
-})
+-- 追踪设置部分
+local MainSection = MainTab:CreateSection("追踪设置")
 
 local Input = MainTab:CreateInput({
    Name = "追踪距离",
@@ -1259,18 +1202,6 @@ local Input = MainTab:CreateInput({
         local value = tonumber(Text)
         if value and value > 0 then
             respawnService.followDistance = value
-        end
-   end,
-})
-
-local Input = MainTab:CreateInput({
-   Name = "追踪位置",
-   PlaceholderText = "输入追踪角度 (0-360度, 默认: 350)",
-   RemoveTextAfterFocusLost = false,
-   Callback = function(Text)
-        local value = tonumber(Text)
-        if value and value >= 0 and value <= 360 then
-            respawnService.followPosition = value
         end
    end,
 })
@@ -1288,55 +1219,8 @@ local Input = MainTab:CreateInput({
 })
 
 local Input = MainTab:CreateInput({
-   Name = "旋转速度",
-   PlaceholderText = "输入旋转速度 (默认: 1)",
-   RemoveTextAfterFocusLost = false,
-   Callback = function(Text)
-        local value = tonumber(Text)
-        if value and value > 0 then
-            respawnService.rotationSpeed = value
-        end
-   end,
-})
-
-local Input = MainTab:CreateInput({
-   Name = "旋转半径",
-   PlaceholderText = "输入旋转半径 (默认: 5)",
-   RemoveTextAfterFocusLost = false,
-   Callback = function(Text)
-        local value = tonumber(Text)
-        if value and value > 0 then
-            respawnService.rotationRadius = value
-        end
-   end,
-})
-
-local Input = MainTab:CreateInput({
-   Name = "旋转高度",
-   PlaceholderText = "输入旋转高度 (默认: 3)",
-   RemoveTextAfterFocusLost = false,
-   Callback = function(Text)
-        local value = tonumber(Text)
-        if value then
-            respawnService.rotationHeight = value
-        end
-   end,
-})
-
--- 高级追踪设置
-local MainSettings = MainTab:CreateSection("高级追踪设置")
-
-local Toggle = MainTab:CreateToggle({
-   Name = "启用位置预测",
-   CurrentValue = true,
-   Callback = function(Value)
-        respawnService.predictionEnabled = Value
-   end,
-})
-
-local Input = MainTab:CreateInput({
-   Name = "平滑系数",
-   PlaceholderText = "输入平滑系数 (0.1-1.0, 默认: 0.2)",
+   Name = "平滑系数 (0.1-1.0)",
+   PlaceholderText = "输入平滑系数 (默认: 0.2)",
    RemoveTextAfterFocusLost = false,
    Callback = function(Text)
         local value = tonumber(Text)
@@ -1346,9 +1230,17 @@ local Input = MainTab:CreateInput({
    end,
 })
 
+local Toggle = MainTab:CreateToggle({
+   Name = "追踪预判",
+   CurrentValue = true,
+   Callback = function(Value)
+        respawnService.predictionEnabled = Value
+   end,
+})
+
 local Input = MainTab:CreateInput({
-   Name = "最大预测时间",
-   PlaceholderText = "输入最大预测时间(秒) (默认: 0.3)",
+   Name = "最大预判时间",
+   PlaceholderText = "输入最大预判时间 (默认: 0.3)",
    RemoveTextAfterFocusLost = false,
    Callback = function(Text)
         local value = tonumber(Text)
@@ -1360,7 +1252,7 @@ local Input = MainTab:CreateInput({
 
 local Input = MainTab:CreateInput({
    Name = "速度乘数",
-   PlaceholderText = "输入速度乘数 (默认: 1.1)",
+   PlaceholderText = "输入速度乘数 (默认: 2)",
    RemoveTextAfterFocusLost = false,
    Callback = function(Text)
         local value = tonumber(Text)
@@ -1370,358 +1262,37 @@ local Input = MainTab:CreateInput({
    end,
 })
 
--- 速度模式选择
-local Dropdown = MainTab:CreateDropdown({
-   Name = "速度模式",
-   Options = {"正常", "快速", "极速"},
-   CurrentOption = "正常",
-   Callback = function(Option)
-        respawnService.speedMode = Option
-        if Option == "正常" then
-            respawnService.walkSpeed = 16
-            respawnService.tpWalkSpeed = 100
-        elseif Option == "快速" then
-            respawnService.walkSpeed = 32
-            respawnService.tpWalkSpeed = 200
-        elseif Option == "极速" then
-            respawnService.walkSpeed = 64
-            respawnService.tpWalkSpeed = 400
-        end
-   end,
-})
-
 -- 初始化玩家列表
 UpdatePlayerButtons()
 
--- 玩家变化监听
+-- 玩家加入/离开时更新列表
 Players.PlayerAdded:Connect(function()
-    wait(1)
+    task.wait(1)
     UpdatePlayerButtons()
 end)
 
 Players.PlayerRemoving:Connect(function()
-    wait(1)
+    task.wait(1)
     UpdatePlayerButtons()
 end)
 
-local MainTab = Window:CreateTab("🚀 速度调节", nil)
-local MainSection = MainTab:CreateSection("速度设置")
-
--- TP行走模式的连接变量
-local tpWalkConnection = nil
-
--- 应用速度设置的函数
-local function ApplySpeedSettings()
-    if not LocalPlayer.Character then return end
-    
-    local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
-    if not humanoid then return end
-    
-    if respawnService.speedMode == "normal" then
-        humanoid.WalkSpeed = respawnService.walkSpeed or 16
-    else
-        humanoid.WalkSpeed = 16 -- 重置为默认速度，TP行走模式不使用WalkSpeed
-    end
-end
-
--- TP行走模式的实现
-local function StartTPWalk()
-    if tpWalkConnection then
-        tpWalkConnection:Disconnect()
-        tpWalkConnection = nil
-    end
-    
-    tpWalkConnection = RunService.Heartbeat:Connect(function()
-        if respawnService.speedMode ~= "tpwalk" or not LocalPlayer.Character then
-            if tpWalkConnection then
-                tpWalkConnection:Disconnect()
-                tpWalkConnection = nil
-            end
-            return
-        end
-        
-        local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
-        local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        
-        if humanoid and rootPart and humanoid.MoveDirection.Magnitude > 0 then
-            -- 获取移动方向
-            local moveDirection = humanoid.MoveDirection
-            -- 计算移动距离
-            local moveDistance = (respawnService.tpWalkSpeed or 100) * 0.016 -- 每帧移动距离
-            -- 移动角色
-            rootPart.CFrame = rootPart.CFrame + moveDirection * moveDistance
-        end
-    end)
-end
-
--- 速度模式切换函数
-local function ToggleSpeedMode()
-    if respawnService.speedMode == "normal" then
-        respawnService.speedMode = "tpwalk"
-        Rayfield:Notify({
-            Title = "速度模式已切换",
-            Content = "当前模式: TP行走模式",
-            Duration = 2,
-        })
-        StartTPWalk()
-    else
-        respawnService.speedMode = "normal"
-        Rayfield:Notify({
-            Title = "速度模式已切换",
-            Content = "当前模式: 普通模式",
-            Duration = 2,
-        })
-        if tpWalkConnection then
-            tpWalkConnection:Disconnect()
-            tpWalkConnection = nil
-        end
-    end
-    ApplySpeedSettings()
-end
-
--- 添加速度模式切换按钮
-local Button = MainTab:CreateButton({
-   Name = "切换速度模式: 普通",
-   Callback = ToggleSpeedMode
-})
-
--- 普通速度调节
-local Input = MainTab:CreateInput({
-   Name = "普通移动速度",
-   PlaceholderText = "输入移动速度 (默认: 16)",
-   RemoveTextAfterFocusLost = false,
-   Callback = function(Text)
-        local value = tonumber(Text)
-        if value and value >= 0 then
-            respawnService.walkSpeed = value
-            
-            -- 如果当前是普通模式，立即应用速度
-            if respawnService.speedMode == "normal" and LocalPlayer.Character then
-                local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
-                if humanoid then
-                    humanoid.WalkSpeed = value
-                end
-            end
-            
-            Rayfield:Notify({
-                Title = "设置更新",
-                Content = "普通移动速度设置为: " .. value,
-                Duration = 2,
-            })
-        else
-            Rayfield:Notify({
-                Title = "输入错误",
-                Content = "请输入有效的数字",
-                Duration = 2,
-            })
-        end
-   end,
-})
-
--- TP行走速度调节
-local Input = MainTab:CreateInput({
-   Name = "TP行走速度",
-   PlaceholderText = "输入TP行走速度 (默认: 100)",
-   RemoveTextAfterFocusLost = false,
-   Callback = function(Text)
-        local value = tonumber(Text)
-        if value and value >= 0 then
-            respawnService.tpWalkSpeed = value
-            Rayfield:Notify({
-                Title = "设置更新",
-                Content = "TP行走速度设置为: " .. value,
-                Duration = 2,
-            })
-        else
-            Rayfield:Notify({
-                Title = "输入错误",
-                Content = "请输入有效的数字",
-                Duration = 2,
-            })
-        end
-   end,
-})
-
--- 监听角色变化
-LocalPlayer.CharacterAdded:Connect(function(character)
-    wait(0.5) -- 等待角色完全加载
-    ApplySpeedSettings()
-    if respawnService.speedMode == "tpwalk" then
-        StartTPWalk()
-    end
-end)
-
--- 如果已经有角色，立即应用设置
-if LocalPlayer.Character then
-    ApplySpeedSettings()
-    if respawnService.speedMode == "tpwalk" then
-        StartTPWalk()
-    end
-end
-
--- ==================== 甩飞功能部分 ====================
-local MainSection = MainTab:CreateSection("甩飞功能")
-
-local Button = MainTab:CreateButton({
-   Name = "甩飞功能1",
-   Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/JOzhe510/JOjiaoben/main/甩飞.lua"))()
-   end,
-})
-
-local Button = MainTab:CreateButton({
-   Name = "甩飞功能2 (碰到就飞)",
-   Callback = function()
-        loadstring(game:HttpGet(('https://raw.githubusercontent.com/0Ben1/fe/main/obf_5wpM7bBcOPspmX7lQ3m75SrYNWqxZ858ai3tJdEAId6jSI05IOUB224FQ0VSAswH.lua.txt'),true))()
-   end,
-})
-
--- ==================== 防甩飞功能 ====================
-local MainSection = MainTab:CreateSection("防甩飞保护")
-local antiFlingEnabled = false
-local antiFlingConnection = nil
-
--- 简单稳定的防甩飞功能
-local function setupAntiFling()
-    if antiFlingConnection then
-        antiFlingConnection:Disconnect()
-        antiFlingConnection = nil
-    end
-    
-    local player = Players.LocalPlayer
-    local character = player.Character
-    if not character then return end
-    
-    local humanoid = character:FindFirstChild("Humanoid")
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    
-    if not humanoid or not rootPart then return end
-
-    -- 固定参数，不需要调节
-    local MAX_ALLOWED_VELOCITY = 200 -- 速度阈值
-    local MAX_ANGULAR_VELOCITY = 15 -- 角速度阈值
-    local checkCounter = 0 -- 检测计数器
-
-    antiFlingConnection = game:GetService("RunService").Heartbeat:Connect(function()
-        if not antiFlingEnabled or not character or not rootPart or not character:IsDescendantOf(workspace) then
-            return
-        end
-
-        -- 每5帧检测一次，减少性能消耗
-        checkCounter = checkCounter + 1
-        if checkCounter < 5 then
-            return
-        end
-        checkCounter = 0
-
-        local currentVelocity = rootPart.Velocity
-        local angularVelocity = rootPart.AssemblyAngularVelocity.Magnitude
-
-        -- 只有当速度和角速度都异常时才触发保护
-        local isVelocityAbnormal = currentVelocity.Magnitude > MAX_ALLOWED_VELOCITY
-        local isAngularVelocityAbnormal = angularVelocity > MAX_ANGULAR_VELOCITY
-        
-        if isVelocityAbnormal and isAngularVelocityAbnormal then
-            -- 简单有效的保护措施
-            pcall(function()
-                -- 先减速
-                rootPart.Velocity = Vector3.new(0, math.min(0, currentVelocity.Y), 0)
-                rootPart.RotVelocity = Vector3.new(0, 0, 0)
-                
-                -- 等待一下看看效果
-                task.wait(0.05)
-                
-                -- 如果还异常，传送到安全位置
-                if rootPart.Velocity.Magnitude > MAX_ALLOWED_VELOCITY then
-                    -- 寻找脚下的地面
-                    local rayOrigin = rootPart.Position
-                    local rayDirection = Vector3.new(0, -10, 0)
-                    
-                    local raycastParams = RaycastParams.new()
-                    raycastParams.FilterDescendantsInstances = {character}
-                    
-                    local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-                    
-                    if raycastResult then
-                        -- 传送到地面上方
-                        rootPart.CFrame = CFrame.new(raycastResult.Position + Vector3.new(0, 5, 0))
-                    else
-                        -- 找不到地面就传送到初始位置
-                        rootPart.CFrame = CFrame.new(0, 50, 0)
-                    end
-                    
-                    -- 最后清除所有速度
-                    rootPart.Velocity = Vector3.new(0, 0, 0)
-                    rootPart.RotVelocity = Vector3.new(0, 0, 0)
-                end
-            end)
-        end
-    end)
-
-    -- 角色重生时重新设置
-    player.CharacterAdded:Connect(function(newCharacter)
-        task.wait(1) -- 等待角色加载完成
-        if antiFlingEnabled then
-            setupAntiFling()
-        end
-    end)
-end
-
--- 简单的防甩飞开关
-local Button = MainTab:CreateButton({
-   Name = "防甩飞保护",
-   CurrentValue = false,
-   Callback = function()
-        loadstring(game:HttpGet('https://raw.githubusercontent.com/Linux6699/DaHubRevival/main/AntiFling.lua'))()
-   end,
-})
-
-local MainSettings = MainTab:CreateSection("按键设置")
-
-local Keybind = MainTab:CreateKeybind({
-   Name = "自瞄按键",
-   CurrentKeybind = "Q",
-   HoldToInteract = false,
-   Callback = function(Keybind)
-        AimSettings.Enabled = not AimSettings.Enabled
-        AimToggle:Set(AimSettings.Enabled)
-   end,
-})
-
-local Keybind = MainTab:CreateKeybind({
-   Name = "ESP按键",
-   CurrentKeybind = "E",
-   HoldToInteract = false,
-   Callback = function(Keybind)
-        AimSettings.ESPEnabled = not AimSettings.ESPEnabled
-        ESPToggle:Set(AimSettings.ESPEnabled)
-        UpdateESP()
-   end,
-})
-
-local Keybind = MainTab:CreateKeybind({
-   Name = "追踪按键",
-   CurrentKeybind = "F",
-   HoldToInteract = false,
-   Callback = function(Keybind)
-        respawnService.following = not respawnService.following
-        FollowToggle:Set(respawnService.following)
-   end,
-})
-
-local Keybind = MainTab:CreateKeybind({
-   Name = "传送按键",
-   CurrentKeybind = "T",
-   HoldToInteract = false,
-   Callback = function(Keybind)
-        respawnService.teleporting = not respawnService.teleporting
-        TeleportToggle:Set(respawnService.teleporting)
-   end,
-})
-
 Rayfield:Notify({
-    Title = "脚本加载成功",
-    Content = "🔥 终极功能系统已加载完成！",
-    Duration = 6.5,
-    Image = nil,
+    Title = "🔥 终极功能系统已加载",
+    Content = "自瞄+追踪功能已准备就绪！",
+    Duration = 6,
+    Image = 4483362458,
+    Actions = {
+        Ignore = {
+            Name = "好的",
+            Callback = function()
+            end
+        },
+    },
 })
+
+-- 清理函数
+game:BindToClose(function()
+    ClearESP()
+    Circle:Remove()
+    TargetRay:Remove()
+end)

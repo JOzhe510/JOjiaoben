@@ -629,7 +629,122 @@ local respawnService = {
     customTpSpeed = 100,
 }
 
--- 平滑追踪功能
+-- 修复：添加缺失的函数
+local function IsPlayerValid(playerName)
+    if not playerName or playerName == "" then
+        return false
+    end
+    return Players:FindFirstChild(playerName) ~= nil
+end
+
+local function GetTargetVelocity(targetRoot)
+    local currentTime = tick()
+    local elapsedTime = currentTime - respawnService.lastUpdateTime
+    
+    if elapsedTime <= 0 then
+        return Vector3.new(0, 0, 0)
+    end
+    
+    if not respawnService.lastTargetPositions[targetRoot] then
+        respawnService.lastTargetPositions[targetRoot] = targetRoot.Position
+        respawnService.lastUpdateTime = currentTime
+        return Vector3.new(0, 0, 0)
+    end
+    
+    local lastPosition = respawnService.lastTargetPositions[targetRoot]
+    local velocity = (targetRoot.Position - lastPosition) / elapsedTime
+    
+    respawnService.lastTargetPositions[targetRoot] = targetRoot.Position
+    respawnService.lastUpdateTime = currentTime
+    
+    return velocity
+end
+
+local function PredictTargetPosition(targetRoot, targetVelocity)
+    if not respawnService.predictionEnabled or not targetVelocity then
+        return targetRoot.Position
+    end
+    
+    local predictionTime = math.min(
+        respawnService.maxPredictionTime,
+        respawnService.followDistance / math.max(targetVelocity.Magnitude, 1)
+    )
+    
+    return targetRoot.Position + (targetVelocity * predictionTime * respawnService.velocityMultiplier)
+end
+
+local function ForceLookAtTarget(localRoot, targetRoot)
+    if localRoot and targetRoot and respawnService.autoFaceWhileTracking then
+        local direction = (targetRoot.Position - localRoot.Position).Unit
+        local currentLook = localRoot.CFrame.LookVector
+        
+        local horizontalDirection = Vector3.new(direction.X, 0, direction.Z).Unit
+        local newLook = (currentLook * (1 - respawnService.faceSpeedWhileTracking) + horizontalDirection * respawnService.faceSpeedWhileTracking).Unit
+        
+        localRoot.CFrame = CFrame.new(localRoot.Position, localRoot.Position + newLook)
+    end
+end
+
+local function CalculateFollowPosition(targetRoot, distance, angle, height)
+    local angleRad = math.rad(angle)
+    
+    local lookVector = targetRoot.CFrame.LookVector
+    local rightVector = targetRoot.CFrame.RightVector
+    
+    local forwardOffset = -math.cos(angleRad) * distance
+    local rightOffset = math.sin(angleRad) * distance
+    
+    local offset = (lookVector * forwardOffset) + (rightVector * rightOffset) + Vector3.new(0, height, 0)
+    
+    return targetRoot.Position + offset
+end
+
+local function GetNearestPlayer()
+    local localChar = LocalPlayer.Character
+    if not localChar then return nil end
+    
+    local localRoot = localChar:FindFirstChild("HumanoidRootPart")
+    if not localRoot then return nil end
+    
+    local nearestPlayer = nil
+    local nearestDistance = math.huge
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+            if targetRoot then
+                local distance = (localRoot.Position - targetRoot.Position).Magnitude
+                if distance < nearestDistance then
+                    nearestDistance = distance
+                    nearestPlayer = player
+                end
+            end
+        end
+    end
+    
+    return nearestPlayer
+end
+
+-- 修复：添加缺失的变量声明
+local currentPlayerLabel
+local currentSelectedPlayer = nil
+local playerButtons = {}
+
+-- 修复：添加自动选择玩家函数
+local function AutoSelectNearestPlayer()
+    local nearestPlayer = GetNearestPlayer()
+    if nearestPlayer then
+        respawnService.followPlayer = nearestPlayer.Name
+        currentSelectedPlayer = nearestPlayer
+        if currentPlayerLabel then
+            currentPlayerLabel:Set("当前选择: " .. nearestPlayer.Name .. " (自动)")
+        end
+        return true
+    end
+    return false
+end
+
+-- 修复：平滑追踪功能
 local function StartSmoothTracking()
     if respawnService.followConnection then
         respawnService.followConnection:Disconnect()
@@ -669,13 +784,9 @@ local function StartSmoothTracking()
         local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
         if not targetRoot then return end
         
-        -- 获取目标速度用于预判
         local targetVelocity = GetTargetVelocity(targetRoot)
-        
-        -- 计算预判位置
         local predictedPosition = PredictTargetPosition(targetRoot, targetVelocity)
         
-        -- 计算追踪位置（考虑角度和高度）
         local angleRad = math.rad(respawnService.followPosition)
         local lookVector = targetRoot.CFrame.LookVector
         local rightVector = targetRoot.CFrame.RightVector
@@ -686,24 +797,20 @@ local function StartSmoothTracking()
         local offset = (lookVector * forwardOffset) + (rightVector * rightOffset) + Vector3.new(0, respawnService.followHeight, 0)
         local targetFollowPosition = predictedPosition + offset
         
-        -- 平滑移动到目标位置
         local distance = (localRoot.Position - targetFollowPosition).Magnitude
-        local moveSpeed = math.min(respawnService.followSpeed, distance * 10) -- 动态速度调整
+        local moveSpeed = math.min(respawnService.followSpeed, distance * 10)
         
         if distance > 0.1 then
             local direction = (targetFollowPosition - localRoot.Position).Unit
-            local newPosition = localRoot.Position + (direction * moveSpeed * 0.016) -- 基于帧时间
+            local newPosition = localRoot.Position + (direction * moveSpeed * 0.016)
             
-            -- 应用平滑移动
             localRoot.CFrame = CFrame.new(newPosition)
-            
-            -- 自动朝向目标
             ForceLookAtTarget(localRoot, targetRoot)
         end
     end)
 end
 
--- 直接传送功能
+-- 修复：直接传送功能
 local function StartDirectTeleport()
     if respawnService.teleportConnection then
         respawnService.teleportConnection:Disconnect()
@@ -743,7 +850,6 @@ local function StartDirectTeleport()
         local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
         if not targetRoot then return end
         
-        -- 计算传送位置（直接传送到玩家后面）
         local angleRad = math.rad(respawnService.followPosition)
         local lookVector = targetRoot.CFrame.LookVector
         local rightVector = targetRoot.CFrame.RightVector
@@ -754,13 +860,26 @@ local function StartDirectTeleport()
         local offset = (lookVector * forwardOffset) + (rightVector * rightOffset) + Vector3.new(0, respawnService.followHeight, 0)
         local teleportPosition = targetRoot.Position + offset
         
-        -- 直接传送
         localRoot.CFrame = CFrame.new(teleportPosition)
-        
-        -- 自动朝向目标
         ForceLookAtTarget(localRoot, targetRoot)
     end)
 end
+
+local function UpdateSpeed()
+    local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    if respawnService.speedMode == "normal" then
+        humanoid.WalkSpeed = respawnService.useCustomSpeed and respawnService.customWalkSpeed or respawnService.walkSpeed
+    else
+        humanoid.WalkSpeed = respawnService.useCustomSpeed and respawnService.customTpSpeed or respawnService.tpWalkSpeed
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(function(character)
+    task.wait(0.5)
+    UpdateSpeed()
+end)
 
 -- 速度控制函数
 local function UpdateSpeed()
@@ -1255,27 +1374,28 @@ local MainSection = MainTab:CreateSection("在线玩家列表")
 
 local currentPlayerLabel = MainTab:CreateLabel("当前选择: 无")
 
--- 刷新玩家列表函数
-local function RefreshPlayerList()
-    -- 清除现有按钮
-    for _, button in ipairs(playerButtons) do
+-- 修复：玩家列表显示
+local function UpdatePlayerList()
+    for _, button in pairs(playerButtons) do
         button:Destroy()
     end
     playerButtons = {}
     
-    -- 获取所有玩家（不按团队检测）
-    for _, player in ipairs(Players:GetPlayers()) do
+    local players = Players:GetPlayers()
+    table.sort(players, function(a, b)
+        return a.Name:lower() < b.Name:lower()
+    end)
+    
+    for i, player in ipairs(players) do
         if player ~= LocalPlayer then
-            -- 创建玩家选择按钮
-            local playerButton = PlayerTab:CreateButton({
-                Name = "选择: " .. player.Name .. " (" .. player.DisplayName .. ")",
+            local button = TrackTab:CreateButton({
+                Name = player.Name .. (player == currentSelectedPlayer and " (已选择)" or ""),
                 Callback = function()
+                    respawnService.followPlayer = player.Name
                     currentSelectedPlayer = player
-                    currentPlayerLabel:Set("当前选择: " .. player.Name)
                     
-                    -- 更新追踪系统的目标玩家
-                    if respawnService then
-                        respawnService.followPlayer = player.Name
+                    if currentPlayerLabel then
+                        currentPlayerLabel:Set("当前选择: " .. player.Name)
                     end
                     
                     Rayfield:Notify({
@@ -1283,136 +1403,37 @@ local function RefreshPlayerList()
                         Content = "已选择玩家: " .. player.Name,
                         Duration = 3,
                     })
+                    
+                    UpdatePlayerList()
                 end,
             })
-            table.insert(playerButtons, playerButton)
+            table.insert(playerButtons, button)
         end
-    end
-    
-    -- 如果没有其他玩家，显示提示
-    if #Players:GetPlayers() <= 1 then
-        local noPlayersLabel = PlayerTab:CreateLabel("服务器中没有其他玩家")
-        table.insert(playerButtons, noPlayersLabel)
     end
 end
 
--- 自动刷新按钮
 local Button = MainTab:CreateButton({
-    Name = "刷新玩家列表",
-    Callback = function()
-        RefreshPlayerList()
+   Name = "刷新玩家列表",
+   Callback = function()
+        UpdatePlayerList()
         Rayfield:Notify({
             Title = "玩家列表已刷新",
             Content = "已更新在线玩家列表",
-            Duration = 2,
+            Duration = 3,
         })
-    end,
+   end,
 })
 
--- 清除选择按钮
 local Button = MainTab:CreateButton({
-    Name = "清除选择",
-    Callback = function()
-        currentSelectedPlayer = nil
-        currentPlayerLabel:Set("当前选择: 无")
-        
-        -- 清除追踪系统的目标玩家
-        if respawnService then
-            respawnService.followPlayer = nil
-        end
-        
-        Rayfield:Notify({
-            Title = "选择已清除",
-            Content = "已清除玩家选择",
-            Duration = 2,
-        })
-    end,
-})
-
--- 玩家加入/离开时自动刷新
-local function onPlayerAdded(player)
-    if player ~= LocalPlayer then
-        task.wait(1) -- 等待玩家完全加载
-        RefreshPlayerList()
-    end
-end
-
-local function onPlayerRemoving(player)
-    if player == currentSelectedPlayer then
-        currentSelectedPlayer = nil
-        currentPlayerLabel:Set("当前选择: 无")
-        
-        if respawnService then
-            respawnService.followPlayer = nil
-        end
-    end
-    task.wait(0.5) -- 短暂延迟后刷新
-    RefreshPlayerList()
-end
-
--- 监听玩家加入和离开
-Players.PlayerAdded:Connect(onPlayerAdded)
-Players.PlayerRemoving:Connect(onPlayerRemoving)
-
--- 初始刷新玩家列表
-task.spawn(function()
-    task.wait(2) -- 等待游戏完全加载
-    RefreshPlayerList()
-end)
-
--- 获取当前选择玩家的函数（供其他功能调用）
-local function GetSelectedPlayer()
-    return currentSelectedPlayer
-end
-
--- 自动选择最近玩家的函数
-local function AutoSelectNearestPlayer()
-    local localChar = LocalPlayer.Character
-    if not localChar then return false end
-    
-    local localRoot = localChar:FindFirstChild("HumanoidRootPart")
-    if not localRoot then return false end
-    
-    local nearestPlayer = nil
-    local nearestDistance = math.huge
-    
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
-            if targetRoot then
-                local distance = (localRoot.Position - targetRoot.Position).Magnitude
-                if distance < nearestDistance then
-                    nearestDistance = distance
-                    nearestPlayer = player
-                end
-            end
-        end
-    end
-    
-    if nearestPlayer then
-        currentSelectedPlayer = nearestPlayer
-        currentPlayerLabel:Set("当前选择: " .. nearestPlayer.Name .. " (自动)")
-        
-        if respawnService then
-            respawnService.followPlayer = nearestPlayer.Name
-        end
-        
-        return true
-    end
-    
-    return false
-end
-
--- 自动选择按钮
-local Button = MainTab:CreateButton({
-    Name = "自动选择最近玩家",
-    Callback = function()
+   Name = "自动选择最近玩家",
+   Callback = function()
         if AutoSelectNearestPlayer() then
             Rayfield:Notify({
                 Title = "自动选择成功",
-                Content = "已选择最近的玩家: " .. currentSelectedPlayer.Name,
+                Content = "已选择最近玩家: " .. respawnService.followPlayer,
                 Duration = 3,
             })
+            UpdatePlayerList()
         else
             Rayfield:Notify({
                 Title = "自动选择失败",
@@ -1420,8 +1441,48 @@ local Button = MainTab:CreateButton({
                 Duration = 3,
             })
         end
-    end,
+   end,
 })
+
+local Button = MainTab:CreateButton({
+   Name = "清除选择",
+   Callback = function()
+        respawnService.followPlayer = nil
+        currentSelectedPlayer = nil
+        if currentPlayerLabel then
+            currentPlayerLabel:Set("当前选择: 无")
+        end
+        Rayfield:Notify({
+            Title = "选择已清除",
+            Content = "已清除玩家选择",
+            Duration = 3,
+        })
+        UpdatePlayerList()
+   end,
+})
+
+currentPlayerLabel = MainTab:CreateLabel("当前选择: 无")
+
+-- 初始化玩家列表
+UpdatePlayerList()
+
+-- 玩家加入/离开事件
+Players.PlayerAdded:Connect(function()
+    task.wait(1)
+    UpdatePlayerList()
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    if player == currentSelectedPlayer then
+        respawnService.followPlayer = nil
+        currentSelectedPlayer = nil
+        if currentPlayerLabel then
+            currentPlayerLabel:Set("当前选择: 无")
+        end
+    end
+    task.wait(0.5)
+    UpdatePlayerList()
+end)
 
 -- 追踪设置部分
 local MainSection = MainTab:CreateSection("追踪设置")

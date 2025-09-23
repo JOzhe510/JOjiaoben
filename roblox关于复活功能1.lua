@@ -1239,7 +1239,7 @@ local Button = MainTab:CreateButton({
 })
 
 local Toggle = MainTab:CreateToggle({
-   Name = "原地复活"
+   Name = "原地复活",
    Callback = function()
    local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer

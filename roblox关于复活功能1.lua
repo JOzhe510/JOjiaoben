@@ -45,12 +45,19 @@ local AimSettings = {
     TeamCheck = true,
     NearestAim = false,
     MaxDistance = math.huge,
-    -- 新增自动朝向设置
+    -- 修复的自动朝向设置 - 只控制水平旋转
     AutoFaceTarget = false,
-    FaceSpeed = 1.0, -- 朝向速度 (0.1-1.0)
-    FaceMode = "Selected", -- Selected/Nearest
+    FaceSpeed = 1.0,
+    FaceMode = "Selected",
     ShowTargetRay = true,
     RayColor = Color3.fromRGB(255, 0, 255),
+    -- 新增速度控制变量
+    walkSpeed = 16,           -- 普通行走速度
+    tpWalkSpeed = 100,        -- TP行走速度
+    speedMode = "normal",     -- 速度模式: normal/tp
+    useCustomSpeed = false,   -- 是否使用自定义速度
+    customWalkSpeed = 16,     -- 自定义普通速度
+    customTpSpeed = 100,      -- 自定义TP速度
 }
 
 local ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
@@ -453,7 +460,7 @@ local function IsTargetValid(target)
     return true
 end
 
--- 自动朝向目标函数
+-- 修复的自动朝向目标函数 - 只控制水平旋转
 local function AutoFaceTarget()
     if not AimSettings.AutoFaceTarget or not LocalPlayer.Character then
         TargetRay.Visible = false
@@ -483,12 +490,16 @@ local function AutoFaceTarget()
         targetPosition = CalculatePredictedPosition(targetHead)
     end
     
-    -- 快速朝向目标（使用最高速度）
+    -- 修复：只控制水平旋转，保持垂直角度不变
     local direction = (targetPosition - localRoot.Position).Unit
-    local currentLook = localRoot.CFrame.LookVector
-    local newLook = (currentLook * (1 - AimSettings.FaceSpeed) + direction * AimSettings.FaceSpeed).Unit
+    local currentCFrame = localRoot.CFrame
     
-    localRoot.CFrame = CFrame.new(localRoot.Position, localRoot.Position + newLook)
+    -- 只使用X和Z分量来保持水平旋转，忽略Y分量
+    local horizontalDirection = Vector3.new(direction.X, 0, direction.Z).Unit
+    
+    -- 保持原有的垂直位置
+    local newCFrame = CFrame.new(localRoot.Position, localRoot.Position + horizontalDirection)
+    localRoot.CFrame = newCFrame
     
     -- 显示目标射线
     if AimSettings.ShowTargetRay then
@@ -581,9 +592,174 @@ local respawnService = {
     followPlayer = nil,
     following = false,
     teleporting = false,
-    -- 新增旋转追踪模式
+    following = false,  -- 平滑追踪状态
+    teleporting = false, -- 直接传送状态
+    rotating = false,   -- 旋转追踪状态
+    -- 平滑追踪设置
+    followSpeed = 500,      -- 追踪速度
+    followDistance = 3.9,   -- 追踪距离
+    followHeight = 0,       -- 追踪高度
+    followPosition = 0,     -- 追踪角度位置
+    -- 旋转追踪设置
+    rotationSpeed = 100,    -- 旋转速度
+    rotationRadius = 5,     -- 旋转半径
+    rotationHeight = 0,     -- 旋转高度
+    currentRotationAngle = 0,
+    
+    -- 通用设置
+    savedPositions = {},
+    followConnection = nil,
+    teleportConnection = nil,
+    autoFindNearest = false,
+    speedMode = "normal",
+    walkSpeed = 16,
+    tpWalkSpeed = 100,
+    predictionEnabled = true,
+    smoothingFactor = 0.2,
+    maxPredictionTime = 0.3,
+    velocityMultiplier = 2,
+    lastTargetPositions = {},
+    lastUpdateTime = tick(),
+    autoFaceWhileTracking = false,
+    faceSpeedWhileTracking = 1.0,
+}
+
+-- 平滑追踪功能
+local function StartSmoothTracking()
+    if respawnService.followConnection then
+        respawnService.followConnection:Disconnect()
+        respawnService.followConnection = nil
+    end
+    
+    respawnService.following = true
+    respawnService.teleporting = false
+    respawnService.rotating = false
+    
+    respawnService.followConnection = RunService.Heartbeat:Connect(function()
+        if not respawnService.following then
+            respawnService.followConnection:Disconnect()
+            respawnService.followConnection = nil
+            return
+        end
+        
+        local localChar = LocalPlayer.Character
+        if not localChar then return end
+        
+        local localRoot = localChar:FindFirstChild("HumanoidRootPart")
+        if not localRoot then return end
+        
+        if not respawnService.followPlayer or not IsPlayerValid(respawnService.followPlayer) then
+            if not AutoSelectNearestPlayer() then
+                respawnService.following = false
+                return
+            end
+        end
+        
+        local targetPlayer = Players:FindFirstChild(respawnService.followPlayer)
+        if not targetPlayer or not targetPlayer.Character then
+            respawnService.following = false
+            return
+        end
+        
+        local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not targetRoot then return end
+        
+        -- 获取目标速度用于预判
+        local targetVelocity = GetTargetVelocity(targetRoot)
+        
+        -- 计算预判位置
+        local predictedPosition = PredictTargetPosition(targetRoot, targetVelocity)
+        
+        -- 计算追踪位置（考虑角度和高度）
+        local angleRad = math.rad(respawnService.followPosition)
+        local lookVector = targetRoot.CFrame.LookVector
+        local rightVector = targetRoot.CFrame.RightVector
+        
+        local forwardOffset = -math.cos(angleRad) * respawnService.followDistance
+        local rightOffset = math.sin(angleRad) * respawnService.followDistance
+        
+        local offset = (lookVector * forwardOffset) + (rightVector * rightOffset) + Vector3.new(0, respawnService.followHeight, 0)
+        local targetFollowPosition = predictedPosition + offset
+        
+        -- 平滑移动到目标位置
+        local distance = (localRoot.Position - targetFollowPosition).Magnitude
+        local moveSpeed = math.min(respawnService.followSpeed, distance * 10) -- 动态速度调整
+        
+        if distance > 0.1 then
+            local direction = (targetFollowPosition - localRoot.Position).Unit
+            local newPosition = localRoot.Position + (direction * moveSpeed * 0.016) -- 基于帧时间
+            
+            -- 应用平滑移动
+            localRoot.CFrame = CFrame.new(newPosition)
+            
+            -- 自动朝向目标
+            ForceLookAtTarget(localRoot, targetRoot)
+        end
+    end)
+end
+
+-- 直接传送功能
+local function StartDirectTeleport()
+    if respawnService.teleportConnection then
+        respawnService.teleportConnection:Disconnect()
+        respawnService.teleportConnection = nil
+    end
+    
+    respawnService.teleporting = true
+    respawnService.following = false
+    respawnService.rotating = false
+    
+    respawnService.teleportConnection = RunService.Heartbeat:Connect(function()
+        if not respawnService.teleporting then
+            respawnService.teleportConnection:Disconnect()
+            respawnService.teleportConnection = nil
+            return
+        end
+        
+        local localChar = LocalPlayer.Character
+        if not localChar then return end
+        
+        local localRoot = localChar:FindFirstChild("HumanoidRootPart")
+        if not localRoot then return end
+        
+        if not respawnService.followPlayer or not IsPlayerValid(respawnService.followPlayer) then
+            if not AutoSelectNearestPlayer() then
+                respawnService.teleporting = false
+                return
+            end
+        end
+        
+        local targetPlayer = Players:FindFirstChild(respawnService.followPlayer)
+        if not targetPlayer or not targetPlayer.Character then
+            respawnService.teleporting = false
+            return
+        end
+        
+        local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not targetRoot then return end
+        
+        -- 计算传送位置（直接传送到玩家后面）
+        local angleRad = math.rad(respawnService.followPosition)
+        local lookVector = targetRoot.CFrame.LookVector
+        local rightVector = targetRoot.CFrame.RightVector
+        
+        local forwardOffset = -math.cos(angleRad) * respawnService.followDistance
+        local rightOffset = math.sin(angleRad) * respawnService.followDistance
+        
+        local offset = (lookVector * forwardOffset) + (rightVector * rightOffset) + Vector3.new(0, respawnService.followHeight, 0)
+        local teleportPosition = targetRoot.Position + offset
+        
+        -- 直接传送
+        localRoot.CFrame = CFrame.new(teleportPosition)
+        
+        -- 自动朝向目标
+        ForceLookAtTarget(localRoot, targetRoot)
+    end)
+end
+
+    -- 修复的旋转追踪模式
     rotating = false,
-    rotationSpeed = 500, -- 旋转速度 (度/秒)
+    rotationSpeed = 100, -- 降低旋转速度防止乱飘
     rotationRadius = 5, -- 旋转半径
     rotationHeight = 0, -- 旋转高度
     currentRotationAngle = 0, -- 当前旋转角度
@@ -609,6 +785,24 @@ local respawnService = {
     faceSpeedWhileTracking = 1.0,
 }
 
+-- 速度控制函数
+local function UpdateSpeed()
+    local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    if respawnService.speedMode == "normal" then
+        humanoid.WalkSpeed = respawnService.useCustomSpeed and respawnService.customWalkSpeed or respawnService.walkSpeed
+    else -- tp模式
+        humanoid.WalkSpeed = respawnService.useCustomSpeed and respawnService.customTpSpeed or respawnService.tpWalkSpeed
+    end
+end
+
+-- 角色添加时自动应用速度设置
+LocalPlayer.CharacterAdded:Connect(function(character)
+    task.wait(0.5) -- 等待角色完全加载
+    UpdateSpeed()
+end)
+
 local playerButtons = {}
 
 local function CalculateFollowPosition(targetRoot, distance, angle, height)
@@ -630,7 +824,10 @@ local function ForceLookAtTarget(localRoot, targetRoot)
     if localRoot and targetRoot and respawnService.autoFaceWhileTracking then
         local direction = (targetRoot.Position - localRoot.Position).Unit
         local currentLook = localRoot.CFrame.LookVector
-        local newLook = (currentLook * (1 - respawnService.faceSpeedWhileTracking) + direction * respawnService.faceSpeedWhileTracking).Unit
+        
+        -- 只控制水平旋转，保持垂直角度不变
+        local horizontalDirection = Vector3.new(direction.X, 0, direction.Z).Unit
+        local newLook = (currentLook * (1 - respawnService.faceSpeedWhileTracking) + horizontalDirection * respawnService.faceSpeedWhileTracking).Unit
         
         localRoot.CFrame = CFrame.new(localRoot.Position, localRoot.Position + newLook)
     end
@@ -809,7 +1006,7 @@ local Toggle = MainTab:CreateToggle({
    end,
 })
 
--- 新增自动朝向设置
+-- 修复的自动朝向设置
 local Toggle = MainTab:CreateToggle({
    Name = "自动朝向目标",
    CurrentValue = false,
@@ -934,7 +1131,7 @@ local Button = MainTab:CreateButton({
 -- 复活系统部分
 local MainTab = Window:CreateTab("😱追踪功能", nil)
 
-local MainSection = MainTab:CreateSection("复活系统")
+local MainSection = MainTab:CreateSection("追踪系统")
 
 local Button = MainTab:CreateButton({
    Name = "立即自杀",
@@ -944,6 +1141,107 @@ local Button = MainTab:CreateButton({
         end
    end,
 })
+
+-- 平滑追踪按钮
+local Toggle = MainTab:CreateToggle({
+   Name = "平滑追踪",
+   CurrentValue = false,
+   Callback = function(Value)
+        if Value then
+            StartSmoothTracking()
+        else
+            respawnService.following = false
+            if respawnService.followConnection then
+                respawnService.followConnection:Disconnect()
+                respawnService.followConnection = nil
+            end
+        end
+   end,
+})
+
+-- 直接传送按钮
+local Toggle = MainTab:CreateToggle({
+   Name = "直接传送",
+   CurrentValue = false,
+   Callback = function(Value)
+        if Value then
+            StartDirectTeleport()
+        else
+            respawnService.teleporting = false
+            if respawnService.teleportConnection then
+                respawnService.teleportConnection:Disconnect()
+                respawnService.teleportConnection = nil
+            end
+        end
+   end,
+})
+
+-- 新增旋转追踪功能
+local Toggle = MainTab:CreateToggle({
+   Name = "旋转追踪",
+   CurrentValue = false,
+   Callback = function(Value)
+        respawnService.rotating = Value
+        
+        if respawnService.followConnection then
+            respawnService.followConnection:Disconnect()
+            respawnService.followConnection = nil
+        end
+        
+        if respawnService.rotating then
+            if not respawnService.followPlayer or not IsPlayerValid(respawnService.followPlayer) then
+                if not AutoSelectNearestPlayer() then
+                    respawnService.rotating = false
+                    return
+                end
+            end
+            
+            respawnService.followConnection = RunService.Heartbeat:Connect(function()
+                if not respawnService.rotating then
+                    respawnService.followConnection:Disconnect()
+                    respawnService.followConnection = nil
+                    return
+                end
+                
+                local localChar = LocalPlayer.Character
+                if not localChar then return end
+                
+                local localRoot = localChar:FindFirstChild("HumanoidRootPart")
+                if not localRoot then return end
+                
+                local targetPlayer = Players:FindFirstChild(respawnService.followPlayer)
+                if not targetPlayer or not targetPlayer.Character then
+                    respawnService.rotating = false
+                    respawnService.followConnection:Disconnect()
+                    respawnService.followConnection = nil
+                    return
+                end
+                
+                local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if not targetRoot then return end
+                
+                -- 更新旋转角度
+                respawnService.currentRotationAngle = respawnService.currentRotationAngle + respawnService.rotationSpeed * 0.01
+                if respawnService.currentRotationAngle >= 360 then
+                    respawnService.currentRotationAngle = 0
+                end
+                
+                local followPosition = CalculateFollowPosition(
+                    targetRoot, 
+                    respawnService.rotationRadius, 
+                    respawnService.currentRotationAngle, 
+                    respawnService.rotationHeight
+                )
+                
+                localRoot.CFrame = CFrame.new(followPosition)
+                
+                -- 追踪时自动朝向目标
+                ForceLookAtTarget(localRoot, targetRoot)
+            end)
+        end
+   end,
+})
+
 
 -- 修改追踪功能，增加自动朝向选项
 local Toggle = MainTab:CreateToggle({
@@ -990,25 +1288,59 @@ local Button = MainTab:CreateButton({
             end
         end
         
+        if respawnService.rotating then
+            respawnService.rotating = false
+            if respawnService.followConnection then
+                respawnService.followConnection:Disconnect()
+                respawnService.followConnection = nil
+            end
+        end
+        
         respawnService.followPlayer = nil
         currentPlayerLabel:Set("当前选择: 无")
+        
+        for _, button in ipairs(playerButtons) do
+            button:Destroy()
+        end
+        playerButtons = {}
+        
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local playerButton = TrackingTab:CreateButton({
+                    Name = "选择: " .. player.Name,
+                    Callback = function()
+                        respawnService.followPlayer = player.Name
+                        currentPlayerLabel:Set("当前选择: " .. player.Name)
+                    end,
+                })
+                table.insert(playerButtons, playerButton)
+            end
+        end
    end,
 })
 
-function UpdatePlayerButtons()
-    for _, button in ipairs(playerButtons) do
-        button:Destroy()
-    end
-    playerButtons = {}
-    
-    local players = {}
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            table.insert(players, player.Name)
+local Button = MainTab:CreateButton({
+   Name = "自动选择最近玩家",
+   Callback = function()
+        if AutoSelectNearestPlayer() then
+            Rayfield:Notify({
+                Title = "自动选择成功",
+                Content = "已选择最近的玩家: " .. respawnService.followPlayer,
+                Duration = 3,
+            })
+        else
+            Rayfield:Notify({
+                Title = "自动选择失败",
+                Content = "没有找到可追踪的玩家",
+                Duration = 3,
+            })
         end
-    end
-    
-    if respawnService.followPlayer and not IsPlayerValid(respawnService.followPlayer) then
+   end,
+})
+
+local Button = MainTab:CreateButton({
+   Name = "清除选择",
+   Callback = function()
         respawnService.followPlayer = nil
         currentPlayerLabel:Set("当前选择: 无")
         
@@ -1027,166 +1359,13 @@ function UpdatePlayerButtons()
                 respawnService.teleportConnection = nil
             end
         end
-    end
-    
-    for _, playerName in ipairs(players) do
-        local button = TrackingTab:CreateButton({
-            Name = "选择: " .. playerName,
-            Callback = function()
-                if IsPlayerValid(playerName) then
-                    respawnService.followPlayer = playerName
-                    currentPlayerLabel:Set("当前选择: " .. playerName)
-                else
-                    UpdatePlayerButtons()
-                end
-            end,
-        })
-        table.insert(playerButtons, button)
-    end
-    
-    if #players == 0 then
-        local label = TrackingTab:CreateLabel("当前没有其他玩家在线")
-        table.insert(playerButtons, label)
-    end
-end
-
-local Button = MainTab:CreateButton({
-   Name = "刷新玩家列表",
-   Callback = function()
-        UpdatePlayerButtons()
-   end,
-})
-
-local Button = MainTab:CreateButton({
-   Name = "自动选择最近玩家",
-   Callback = function()
-        if AutoSelectNearestPlayer() then
-        else
-        end
-   end,
-})
-
--- 追踪功能（已修改包含自动朝向）
-local Toggle = MainTab:CreateToggle({
-   Name = "平滑追踪",
-   CurrentValue = false,
-   Callback = function(Value)
-        respawnService.following = Value
         
-        if respawnService.followConnection then
-            respawnService.followConnection:Disconnect()
-            respawnService.followConnection = nil
-        end
-        
-        if respawnService.following then
-            if not respawnService.followPlayer or not IsPlayerValid(respawnService.followPlayer) then
-                if not AutoSelectNearestPlayer() then
-                    respawnService.following = false
-                    return
-                end
+        if respawnService.rotating then
+            respawnService.rotating = false
+            if respawnService.followConnection then
+                respawnService.followConnection:Disconnect()
+                respawnService.followConnection = nil
             end
-            
-            respawnService.followConnection = RunService.Heartbeat:Connect(function()
-                if not respawnService.following then
-                    respawnService.followConnection:Disconnect()
-                    respawnService.followConnection = nil
-                    return
-                end
-                
-                local localChar = LocalPlayer.Character
-                if not localChar then return end
-                
-                local localRoot = localChar:FindFirstChild("HumanoidRootPart")
-                if not localRoot then return end
-                
-                local targetPlayer = Players:FindFirstChild(respawnService.followPlayer)
-                if not targetPlayer or not targetPlayer.Character then
-                    respawnService.following = false
-                    respawnService.followConnection:Disconnect()
-                    respawnService.followConnection = nil
-                    return
-                end
-                
-                local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if not targetRoot then return end
-                
-                local targetVelocity = GetTargetVelocity(targetRoot)
-                local predictedPosition = PredictTargetPosition(targetRoot, targetVelocity)
-                
-                local followPosition = CalculateFollowPosition(
-                    targetRoot, 
-                    respawnService.followDistance, 
-                    respawnService.currentRotationAngle, 
-                    respawnService.followHeight
-                )
-                
-                SmoothMove(localRoot, followPosition, respawnService.smoothingFactor)
-                
-                -- 新增：追踪时自动朝向目标
-                ForceLookAtTarget(localRoot, targetRoot)
-            end)
-        end
-   end,
-})
-
-local Toggle = TrackingTab:CreateToggle({
-   Name = "传送追踪",
-   CurrentValue = false,
-   Callback = function(Value)
-        respawnService.teleporting = Value
-        
-        if respawnService.teleportConnection then
-            respawnService.teleportConnection:Disconnect()
-            respawnService.teleportConnection = nil
-        end
-        
-        if respawnService.teleporting then
-            if not respawnService.followPlayer or not IsPlayerValid(respawnService.followPlayer) then
-                if not AutoSelectNearestPlayer() then
-                    respawnService.teleporting = false
-                    return
-                end
-            end
-            
-            respawnService.teleportConnection = RunService.Heartbeat:Connect(function()
-                if not respawnService.teleporting then
-                    respawnService.teleportConnection:Disconnect()
-                    respawnService.teleportConnection = nil
-                    return
-                end
-                
-                local localChar = LocalPlayer.Character
-                if not localChar then return end
-                
-                local localRoot = localChar:FindFirstChild("HumanoidRootPart")
-                if not localRoot then return end
-                
-                local targetPlayer = Players:FindFirstChild(respawnService.followPlayer)
-                if not targetPlayer or not targetPlayer.Character then
-                    respawnService.teleporting = false
-                    respawnService.teleportConnection:Disconnect()
-                    respawnService.teleportConnection = nil
-                    return
-                end
-                
-                local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if not targetRoot then return end
-                
-                local targetVelocity = GetTargetVelocity(targetRoot)
-                local predictedPosition = PredictTargetPosition(targetRoot, targetVelocity)
-                
-                local followPosition = CalculateFollowPosition(
-                    targetRoot, 
-                    respawnService.followDistance, 
-                    respawnService.currentRotationAngle, 
-                    respawnService.followHeight
-                )
-                
-                localRoot.CFrame = CFrame.new(followPosition)
-                
-                -- 新增：追踪时自动朝向目标
-                ForceLookAtTarget(localRoot, targetRoot)
-            end)
         end
    end,
 })
@@ -1194,105 +1373,220 @@ local Toggle = TrackingTab:CreateToggle({
 -- 追踪设置部分
 local MainSection = MainTab:CreateSection("追踪设置")
 
+-- 追踪速度（用于平滑追踪）
 local Input = MainTab:CreateInput({
-   Name = "追踪距离",
-   PlaceholderText = "输入追踪距离 (默认: 3.9)",
+   Name = "追踪速度 (1-2000)",
+   PlaceholderText = "输入追踪速度 (默认: 500)",
    RemoveTextAfterFocusLost = false,
    Callback = function(Text)
         local value = tonumber(Text)
-        if value and value > 0 then
-            respawnService.followDistance = value
+        if value and value >= 1 and value <= 2000 then
+            respawnService.followSpeed = value
+            Rayfield:Notify({
+                Title = "追踪速度已更新",
+                Content = "新速度: " .. value,
+                Duration = 2,
+            })
         end
    end,
 })
 
+-- 追踪高度（用于所有追踪模式）
 local Input = MainTab:CreateInput({
-   Name = "追踪高度",
+   Name = "追踪高度 (-10 到 500)",
    PlaceholderText = "输入追踪高度 (默认: 0)",
    RemoveTextAfterFocusLost = false,
    Callback = function(Text)
         local value = tonumber(Text)
-        if value then
+        if value and value >= -10 and value <= 500 then
             respawnService.followHeight = value
+            Rayfield:Notify({
+                Title = "追踪高度已更新",
+                Content = "新高度: " .. value,
+                Duration = 2,
+            })
+        end
+   end,
+})
+
+-- 追踪角度（用于所有追踪模式）
+local Input = MainTab:CreateInput({
+   Name = "追踪角度 (0-360)",
+   PlaceholderText = "输入追踪角度 (默认: 0)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value >= 0 and value <= 360 then
+            respawnService.followPosition = value
+            Rayfield:Notify({
+                Title = "追踪角度已更新",
+                Content = "新角度: " .. value .. "°",
+                Duration = 2,
+            })
+        end
+   end,
+})
+
+-- 追踪距离（用于所有追踪模式）
+local Input = MainTab:CreateInput({
+   Name = "追踪距离 (1-50)",
+   PlaceholderText = "输入追踪距离 (默认: 3.9)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value >= 1 and value <= 50 then
+            respawnService.followDistance = value
+            Rayfield:Notify({
+                Title = "追踪距离已更新",
+                Content = "新距离: " .. value,
+                Duration = 2,
+            })
         end
    end,
 })
 
 local Input = MainTab:CreateInput({
-   Name = "平滑系数 (0.1-1.0)",
-   PlaceholderText = "输入平滑系数 (默认: 0.2)",
+   Name = "旋转速度 (1-2000)",
+   PlaceholderText = "输入旋转速度 (默认: 100)",
    RemoveTextAfterFocusLost = false,
    Callback = function(Text)
         local value = tonumber(Text)
-        if value and value >= 0.1 and value <= 1.0 then
-            respawnService.smoothingFactor = value
+        if value and value >= 1 and value <= 2000 then
+            respawnService.rotationSpeed = value
         end
    end,
 })
 
+local Input = MainTab:CreateInput({
+   Name = "旋转半径 (1-20)",
+   PlaceholderText = "输入旋转半径 (默认: 5)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value >= 1 and value <= 20 then
+            respawnService.rotationRadius = value
+        end
+   end,
+})
+
+local Input = MainTab:CreateInput({
+   Name = "旋转高度 (-10 到 500)",
+   PlaceholderText = "输入旋转高度 (默认: 0)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value >= -10 and value <= 500 then
+            respawnService.rotationHeight = value
+        end
+   end,
+})
+
+-- 创建主标签页
+local MainTab = Window:CreateTab("速度修改", nil)
+
+-- 自瞄系统部分
+local MainSection = MainTab:CreateSection("速度系统")
+
+-- 速度模式切换
 local Toggle = MainTab:CreateToggle({
-   Name = "追踪预判",
-   CurrentValue = true,
+   Name = "TP行走模式",
+   CurrentValue = false,
    Callback = function(Value)
-        respawnService.predictionEnabled = Value
+        respawnService.speedMode = Value and "tp" or "normal"
+        UpdateSpeed()
+        Rayfield:Notify({
+            Title = "速度模式已切换",
+            Content = "当前模式: " .. (respawnService.speedMode == "normal" and "普通" or "TP"),
+            Duration = 2,
+        })
    end,
 })
 
+-- 使用自定义速度开关
+local Toggle = MainTab:CreateToggle({
+   Name = "使用普通速度",
+   CurrentValue = false,
+   Callback = function(Value)
+        respawnService.useCustomSpeed = Value
+        UpdateSpeed()
+        Rayfield:Notify({
+            Title = "自定义速度设置",
+            Content = Value and "已启用自定义速度" or "已使用默认速度",
+            Duration = 2,
+        })
+   end,
+})
+
+-- 普通速度输入
 local Input = MainTab:CreateInput({
-   Name = "最大预判时间",
-   PlaceholderText = "输入最大预判时间 (默认: 0.3)",
+   Name = "普通行走速度",
+   PlaceholderText = "输入普通速度 (默认: 16)",
    RemoveTextAfterFocusLost = false,
    Callback = function(Text)
         local value = tonumber(Text)
         if value and value > 0 then
-            respawnService.maxPredictionTime = value
+            respawnService.customWalkSpeed = value
+            if respawnService.useCustomSpeed and respawnService.speedMode == "normal" then
+                UpdateSpeed()
+                Rayfield:Notify({
+                    Title = "普通速度已更新",
+                    Content = "新速度: " .. value,
+                    Duration = 2,
+                })
+            end
         end
    end,
 })
 
+-- TP速度输入
 local Input = MainTab:CreateInput({
-   Name = "速度乘数",
-   PlaceholderText = "输入速度乘数 (默认: 2)",
+   Name = "TP行走速度",
+   PlaceholderText = "输入TP速度 (默认: 100)",
    RemoveTextAfterFocusLost = false,
    Callback = function(Text)
         local value = tonumber(Text)
         if value and value > 0 then
-            respawnService.velocityMultiplier = value
+            respawnService.customTpSpeed = value
+            if respawnService.useCustomSpeed and respawnService.speedMode == "tp" then
+                UpdateSpeed()
+                Rayfield:Notify({
+                    Title = "TP速度已更新",
+                    Content = "新速度: " .. value,
+                    Duration = 2,
+                })
+            end
         end
+   end,
+})
+
+local MainSection = MainTab:CreateSection("甩飞系统")
+
+local Button = MainTab:CreateButton({
+   Name = "碰到就飞",
+   Callback = function()
+   loadstring(game:HttpGet(('https://raw.githubusercontent.com/0Ben1/fe/main/obf_5wpM7bBcOPspmX7lQ3m75SrYNWqxZ858ai3tJdEAId6jSI05IOUB224FQ0VSAswH.lua.txt'),true))()
+  end,
+})
+
+local Button = MainTab:CreateButton({
+   Name = "单甩",
+   Callback = function()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/JOzhe510/JOjiaoben/main/甩飞.lua"))()
+   end,
+})
+
+local Button = MainTab:CreateButton({
+   Name = "防甩飞",
+   Callback = function()
+   loadstring(game:HttpGet('https://raw.githubusercontent.com/Linux6699/DaHubRevival/main/AntiFling.lua'))()
    end,
 })
 
 -- 初始化玩家列表
-UpdatePlayerButtons()
-
--- 玩家加入/离开时更新列表
-Players.PlayerAdded:Connect(function()
-    task.wait(1)
-    UpdatePlayerButtons()
-end)
-
-Players.PlayerRemoving:Connect(function()
-    task.wait(1)
-    UpdatePlayerButtons()
-end)
+RefreshPlayerButton.Callback()
 
 Rayfield:Notify({
-    Title = "🔥 终极功能系统已加载",
-    Content = "自瞄+追踪功能已准备就绪！",
-    Duration = 6,
-    Image = 4483362458,
-    Actions = {
-        Ignore = {
-            Name = "好的",
-            Callback = function()
-            end
-        },
-    },
+    Title = "系统加载成功",
+    Content = "自瞄和追踪功能已加载完成",
+    Duration = 5,
 })
-
--- 清理函数
-game:BindToClose(function()
-    ClearESP()
-    Circle:Remove()
-    TargetRay:Remove()
-end)

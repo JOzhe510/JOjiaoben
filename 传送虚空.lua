@@ -43,7 +43,7 @@ titleLabel.Name = "TitleLabel"
 titleLabel.Size = UDim2.new(1, -60, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "虚空传送"
+titleLabel.Text = "虚空传送器"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Font = Enum.Font.GothamBold
@@ -104,6 +104,25 @@ local deleteCorner = Instance.new("UICorner")
 deleteCorner.CornerRadius = UDim.new(0, 4)
 deleteCorner.Parent = deleteButton
 
+-- 创建小型开启UI按钮（初始隐藏）
+local openUIButton = Instance.new("TextButton")
+openUIButton.Name = "OpenUIButton"
+openUIButton.Size = UDim2.new(0, 80, 0, 30)
+openUIButton.Position = UDim2.new(0, 10, 0, 10)
+openUIButton.BackgroundColor3 = Color3.fromRGB(60, 60, 180)
+openUIButton.BorderSizePixel = 0
+openUIButton.Text = "打开菜单"
+openUIButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+openUIButton.Font = Enum.Font.Gotham
+openUIButton.TextSize = 12
+openUIButton.Visible = false -- 初始隐藏
+openUIButton.Parent = screenGui
+
+-- 开启按钮圆角
+local openCorner = Instance.new("UICorner")
+openCorner.CornerRadius = UDim.new(0, 6)
+openCorner.Parent = openUIButton
+
 -- 按钮悬停效果
 local function setupButtonHover(button)
     local originalColor = button.BackgroundColor3
@@ -121,15 +140,23 @@ end
 setupButtonHover(closeButton)
 setupButtonHover(teleportButton)
 setupButtonHover(deleteButton)
+setupButtonHover(openUIButton)
 
 -- 关闭按钮功能
 closeButton.MouseButton1Click:Connect(function()
-    screenGui.Enabled = not screenGui.Enabled -- 切换显示/隐藏
+    mainFrame.Visible = false -- 隐藏主界面
+    openUIButton.Visible = true -- 显示开启按钮
 end)
 
--- 删除按钮功能
+-- 开启按钮功能
+openUIButton.MouseButton1Click:Connect(function()
+    mainFrame.Visible = true -- 显示主界面
+    openUIButton.Visible = false -- 隐藏开启按钮
+end)
+
+-- 删除按钮功能（永久删除）
 deleteButton.MouseButton1Click:Connect(function()
-    screenGui:Destroy() -- 完全删除UI
+    screenGui:Destroy() -- 完全删除UI，无法恢复
 end)
 
 -- 传送功能
@@ -138,7 +165,7 @@ teleportButton.MouseButton1Click:Connect(function()
     if character then
         local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
         if humanoidRootPart then
-            -- 传送到虚空位置（Y坐标设为-500，确保低于地图）
+            -- 简单传送到虚空位置
             game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-99400.13482163, -1000.1116714, 85.14746118)
             
             -- 显示传送成功提示
@@ -154,17 +181,4 @@ end)
 -- 将GUI添加到玩家界面
 screenGui.Parent = playerGui
 
--- 可选：添加一个重新打开UI的命令（如果UI被关闭但没有删除）
-game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    if input.KeyCode == Enum.KeyCode.U then -- 按U键重新打开UI
-        if screenGui and not screenGui.Parent then
-            screenGui.Parent = playerGui
-        elseif screenGui then
-            screenGui.Enabled = not screenGui.Enabled
-        end
-    end
-end)
-
-print("虚空传送UI已加载！按U键可以显示/隐藏界面")
+print("虚空传送UI已加载！")

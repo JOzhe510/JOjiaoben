@@ -43,7 +43,7 @@ titleLabel.Name = "TitleLabel"
 titleLabel.Size = UDim2.new(1, -60, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "虚空传送器"
+titleLabel.Text = "虚空传送"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Font = Enum.Font.GothamBold
@@ -139,7 +139,7 @@ teleportButton.MouseButton1Click:Connect(function()
         local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
         if humanoidRootPart then
             -- 传送到虚空位置（Y坐标设为-500，确保低于地图）
-            humanoidRootPart.CFrame = CFrame.new(0, -500, 0)
+            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-99400.13482163, -1000.1116714, 85.14746118)
             
             -- 显示传送成功提示
             local message = Instance.new("Message")

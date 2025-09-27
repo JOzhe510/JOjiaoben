@@ -1331,6 +1331,137 @@ return {
    end,
 })
 
+local Button = MainTab:CreateButton({
+   Name = "保存当前位置",
+   Callback = function()
+        -- 保存玩家位置和传送设置的全局表
+local PlayerData = {}
+
+-- 初始化玩家数据
+local function initializePlayerData(player)
+    PlayerData[player.UserId] = {
+        savedPosition = nil,  -- 保存的位置
+        enableTeleport = false  -- 是否启用复活传送
+    }
+end
+
+-- 保存当前位置的函数
+local function saveCurrentPosition(player)
+    local character = player.Character
+    if not character then
+        warn("玩家角色不存在，无法保存位置")
+        return false
+    end
+    
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then
+        warn("找不到HumanoidRootPart，无法保存位置")
+        return false
+    end
+    
+    -- 保存当前位置到玩家数据
+    PlayerData[player.UserId].savedPosition = humanoidRootPart.Position
+    print("已保存玩家 " .. player.Name .. " 的位置: " .. tostring(humanoidRootPart.Position))
+    return true
+end
+   end,
+})
+
+local Toggle = MainTab:CreateToggle({
+   Name = "自动传送保持位置",
+   Callback = function()
+        PlayerData[player.UserId].enableTeleport = enable
+    local status = enable and "开启" or "关闭"
+    print("玩家 " .. player.Name .. " 的复活传送已" .. status)
+end
+
+-- 玩家加入游戏时初始化数据
+game.Players.PlayerAdded:Connect(function(player)
+    initializePlayerData(player)
+    
+    -- 监听玩家聊天命令
+    player.Chatted:Connect(function(message)
+        local userId = player.UserId
+        local command = message:lower()
+        
+        if command == "/save" then
+            -- 保存当前位置
+            if saveCurrentPosition(player) then
+                -- 可选：给玩家发送提示消息
+            end
+            
+        elseif command == "/tp on" then
+            -- 开启复活传送
+            toggleTeleport(player, true)
+            
+        elseif command == "/tp off" then
+            -- 关闭复活传送
+            toggleTeleport(player, false)
+            
+        elseif command == "/void" then
+            -- 传送到虚空
+            local character = player.Character
+            if character then
+                local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                if humanoidRootPart then
+                    local currentPosition = humanoidRootPart.Position
+                    local voidPosition = Vector3.new(currentPosition.X, -500, currentPosition.Z)
+                    humanoidRootPart.CFrame = CFrame.new(voidPosition)
+                    print("已将玩家 " .. player.Name .. " 传送至虚空")
+                end
+            end
+        end
+    end)
+end)
+
+-- 玩家离开游戏时清理数据
+game.Players.PlayerRemoving:Connect(function(player)
+    PlayerData[player.UserId] = nil
+end)
+
+-- 复活时传送处理
+game.Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function(character)
+        -- 等待角色完全加载
+        wait(0.5)
+        
+        local userId = player.UserId
+        local playerData = PlayerData[userId]
+        
+        -- 检查是否启用传送且有保存的位置
+        if playerData and playerData.enableTeleport and playerData.savedPosition then
+            local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+            if humanoidRootPart then
+                -- 执行传送
+                humanoidRootPart.CFrame = CFrame.new(playerData.savedPosition)
+                print("已将玩家 " .. player.Name .. " 传送至保存的位置")
+                
+                -- 可选：传送后自动关闭传送功能，避免重复传送
+                -- playerData.enableTeleport = false
+            end
+        end
+    end)
+end)
+   end,
+})
+
+local Button = MainTab:CreateButton({
+   Name = "传送虚空",
+   Callback = function()
+        local function teleportToDeepVoid(player)
+    local character = player.Character
+    if character then
+        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+        if humanoidRootPart then
+            -- 直接传送到Y=-1000的深度虚空
+            humanoidRootPart.CFrame = CFrame.new(0, -1000, 0)
+            print("已将玩家 " .. player.Name .. " 传送至深度虚空")
+        end
+    end
+end
+   end,
+})
+
 -- 平滑追踪按钮
 local Toggle = MainTab:CreateToggle({
    Name = "平滑追踪",

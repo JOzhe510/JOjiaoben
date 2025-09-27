@@ -159,42 +159,9 @@ deleteButton.MouseButton1Click:Connect(function()
     screenGui:Destroy() -- 完全删除UI，无法恢复
 end)
 
--- 修正的传送功能
+-- 简化的传送功能 - 直接执行你提供的代码
 teleportButton.MouseButton1Click:Connect(function()
-    local character = player.Character
-    if character then
-        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-        if humanoidRootPart then
-            -- 确保角色存在且可以传送
-            if character:FindFirstChild("Humanoid") then
-                -- 使用更可靠的传送方法
-                local success, errorMessage = pcall(function()
-                    
-                    -- 传送到虚空位置
-                    game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-99400.13482163, -1000.1116714, 85.14746118)
-                    
-                    -- 等待一小会儿再取消锚定
-                    wait(0.1)
-                    humanoidRootPart.Anchored = false
-                end)
-                
-                if success then
-                    -- 显示传送成功提示
-                    local message = Instance.new("Message")
-                    message.Text = "已传送到虚空！"
-                    message.Parent = workspace
-                    wait(2)
-                    message:Destroy()
-                else
-                    warn("传送失败: " .. tostring(errorMessage))
-                end
-            end
-        else
-            warn("找不到HumanoidRootPart")
-        end
-    else
-        warn("角色不存在")
-    end
+    game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-99400.13482163, -1000.1116714, 85.14746118)
 end)
 
 -- 将GUI添加到玩家界面

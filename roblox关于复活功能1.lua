@@ -1426,7 +1426,7 @@ local Toggle = MainTab:CreateToggle({
 local Button = MainTab:CreateButton({
    Name = "传送虚空",
    Callback = function()
-   game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-9940.13482163, -100.1116714, 85.14746118)
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/JOzhe510/JOjiaoben/main/传送虚空.lua"))()
    end,
 })
 

@@ -1331,40 +1331,26 @@ return {
    end,
 })
 
+-- 保存当前位置功能：
+local function saveCurrentPosition()
+    local character = LocalPlayer.Character
+    if character then
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            respawnService.savedPosition = rootPart.Position
+            Rayfield:Notify({
+                Title = "位置已保存",
+                Content = "当前位置已保存用于复活",
+                Duration = 3,
+            })
+        end
+    end
+end
+
 local Button = MainTab:CreateButton({
    Name = "保存当前位置",
-   Callback = function()
-        -- 保存玩家位置和传送设置的全局表
-local PlayerData = {}
-
--- 初始化玩家数据
-local function initializePlayerData(player)
-    PlayerData[player.UserId] = {
-        savedPosition = nil,  -- 保存的位置
-        enableTeleport = false  -- 是否启用复活传送
-    }
-end
-
--- 保存当前位置的函数
-local function saveCurrentPosition(player)
-    local character = player.Character
-    if not character then
-        warn("玩家角色不存在，无法保存位置")
-        return false
-    end
-    
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then
-        warn("找不到HumanoidRootPart，无法保存位置")
-        return false
-    end
-    
-    -- 保存当前位置到玩家数据
-    PlayerData[player.UserId].savedPosition = humanoidRootPart.Position
-    print("已保存玩家 " .. player.Name .. " 的位置: " .. tostring(humanoidRootPart.Position))
-    return true
-end
-   end,
+   Callback = saveCurrentPosition  -- 直接引用函数
+   end
 })
 
 local Toggle = MainTab:CreateToggle({

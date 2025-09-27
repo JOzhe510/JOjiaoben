@@ -1366,6 +1366,26 @@ local Button = MainTab:CreateButton({
    end,
 })
 
+local Button = MainTab:CreateButton({
+   Name = "取消保存位置",
+   Callback = function()
+        if PlayerData.savedPosition then
+            PlayerData.savedPosition = nil
+            Rayfield:Notify({
+                Title = "位置已清除",
+                Content = "已清除保存的位置数据",
+                Duration = 3,
+            })
+        else
+            Rayfield:Notify({
+                Title = "无保存位置",
+                Content = "没有找到保存的位置数据",
+                Duration = 3,
+            })
+        end
+   end,
+})
+
 local Toggle = MainTab:CreateToggle({
    Name = "自动传送保持位置",
    CurrentValue = false,
@@ -1410,11 +1430,20 @@ local Button = MainTab:CreateButton({
         if character then
             local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
             if humanoidRootPart then
-                humanoidRootPart.CFrame = CFrame.new(0, -1000, 0)
+                -- 先禁用角色的物理特性防止拉回
+                humanoidRootPart.Anchored = true
+                
+                -- 传送到极深虚空
+                humanoidRootPart.CFrame = CFrame.new(0, -100000, 0)
+                
+                -- 延迟一小段时间后取消锚定，但保持位置
+                task.wait(0.5)
+                humanoidRootPart.Anchored = false
+                
                 Rayfield:Notify({
                     Title = "传送成功",
-                    Content = "已传送至虚空",
-                    Duration = 3,
+                    Content = "已传送至深度虚空（防拉回）",
+                    Duration = 5,
                 })
             end
         end

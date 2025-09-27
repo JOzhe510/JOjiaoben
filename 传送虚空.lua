@@ -71,7 +71,8 @@ closeCorner.Parent = closeButton
 -- 存储变量
 local savedPosition = nil -- 保存的传送位置
 local preVoidPosition = nil -- 传送虚空前的位置
-local voidPosition = CFrame.new(-9940.13482163, -100.1116714, 85.14746118) -- 虚空位置
+local voidBasePosition = Vector3.new(-9940.13482163, -100.1116714, 85.14746118) -- 虚空基础位置
+local currentVoidHeight = 0 -- 当前虚空高度偏移
 
 -- 虚空传送按钮
 local teleportButton = Instance.new("TextButton")
@@ -147,7 +148,7 @@ heightLabel.Name = "HeightLabel"
 heightLabel.Size = UDim2.new(1, 0, 0, 20)
 heightLabel.Position = UDim2.new(0, 0, 0, 5)
 heightLabel.BackgroundTransparency = 1
-heightLabel.Text = "虚空高度调节"
+heightLabel.Text = "虚空高度调节 (当前: 0)"
 heightLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 heightLabel.TextXAlignment = Enum.TextXAlignment.Center
 heightLabel.Font = Enum.Font.Gotham
@@ -306,6 +307,29 @@ teleportToSavedButton.MouseButton1Click:Connect(function()
     end
 end)
 
+-- 获取当前虚空位置（包含高度偏移）
+local function getCurrentVoidPosition()
+    return CFrame.new(voidBasePosition.X, voidBasePosition.Y + currentVoidHeight, voidBasePosition.Z)
+end
+
+-- 更新高度显示
+local function updateHeightDisplay()
+    heightLabel.Text = "虚空高度调节 (当前: " .. currentVoidHeight .. ")"
+end
+
+-- 高度调节功能
+heightIncreaseButton.MouseButton1Click:Connect(function()
+    currentVoidHeight = currentVoidHeight + 10
+    updateHeightDisplay()
+    print("虚空高度增加10单位，当前高度: " .. currentVoidHeight)
+end)
+
+heightDecreaseButton.MouseButton1Click:Connect(function()
+    currentVoidHeight = currentVoidHeight - 10
+    updateHeightDisplay()
+    print("虚空高度减少10单位，当前高度: " .. currentVoidHeight)
+end)
+
 -- 虚空传送功能（先保存当前位置）
 teleportButton.MouseButton1Click:Connect(function()
     local success, errorMessage = pcall(function()
@@ -313,8 +337,12 @@ teleportButton.MouseButton1Click:Connect(function()
         if character and character:FindFirstChild("HumanoidRootPart") then
             -- 保存传送前的位置
             preVoidPosition = character.HumanoidRootPart.CFrame
-            -- 传送到虚空
-            character.HumanoidRootPart.CFrame = voidPosition
+            print("保存传送前位置: " .. tostring(preVoidPosition))
+            
+            -- 传送到虚空（包含当前高度）
+            local voidPos = getCurrentVoidPosition()
+            character.HumanoidRootPart.CFrame = voidPos
+            print("传送到虚空位置: " .. tostring(voidPos))
         else
             error("角色或HumanoidRootPart不存在")
         end
@@ -325,17 +353,6 @@ teleportButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- 高度调节功能
-heightIncreaseButton.MouseButton1Click:Connect(function()
-    voidPosition = voidPosition + Vector3.new(0, 10, 0) -- 增加高度
-    print("虚空高度增加10单位，当前高度: " .. voidPosition.Y)
-end)
-
-heightDecreaseButton.MouseButton1Click:Connect(function()
-    voidPosition = voidPosition + Vector3.new(0, -10, 0) -- 减少高度
-    print("虚空高度减少10单位，当前高度: " .. voidPosition.Y)
-end)
-
 -- 死亡时自动传送回之前位置的功能
 local function onCharacterAdded(character)
     -- 等待角色完全加载
@@ -344,12 +361,20 @@ local function onCharacterAdded(character)
     local humanoid = character:WaitForChild("Humanoid")
     humanoid.Died:Connect(function()
         if preVoidPosition then
-            wait(2) -- 等待复活
-            local newCharacter = game.Players.LocalPlayer.Character
-            if newCharacter and newCharacter:FindFirstChild("HumanoidRootPart") then
-                newCharacter.HumanoidRootPart.CFrame = preVoidPosition
-                print("死亡后自动传送回之前位置")
+            wait(3) -- 等待复活完成
+            local success, errorMessage = pcall(function()
+                local newCharacter = game.Players.LocalPlayer.Character
+                if newCharacter and newCharacter:FindFirstChild("HumanoidRootPart") then
+                    newCharacter.HumanoidRootPart.CFrame = preVoidPosition
+                    print("死亡后自动传送回之前位置: " .. tostring(preVoidPosition))
+                end
+            end)
+            
+            if not success then
+                warn("死亡传送失败: " .. tostring(errorMessage))
             end
+        else
+            print("没有保存的传送前位置")
         end
     end)
 end
@@ -361,6 +386,9 @@ game.Players.LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
 if game.Players.LocalPlayer.Character then
     onCharacterAdded(game.Players.LocalPlayer.Character)
 end
+
+-- 初始化高度显示
+updateHeightDisplay()
 
 -- 将GUI添加到玩家界面
 screenGui.Parent = playerGui

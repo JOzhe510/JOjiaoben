@@ -1331,120 +1331,93 @@ return {
    end,
 })
 
--- 保存当前位置功能：
-local function saveCurrentPosition()
-    local character = LocalPlayer.Character
-    if character then
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        if rootPart then
-            respawnService.savedPosition = rootPart.Position
-            Rayfield:Notify({
-                Title = "位置已保存",
-                Content = "当前位置已保存用于复活",
-                Duration = 3,
-            })
-        end
-    end
-end
+local PlayerData = {
+    savedPosition = nil,
+    enableTeleport = false
+}
 
 local Button = MainTab:CreateButton({
    Name = "保存当前位置",
-   Callback = saveCurrentPosition  -- 直接引用函数
-   end
+   Callback = function()
+        local character = LocalPlayer.Character
+        if character then
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                PlayerData.savedPosition = rootPart.Position
+                Rayfield:Notify({
+                    Title = "位置已保存",
+                    Content = "当前位置已保存",
+                    Duration = 3,
+                })
+            else
+                Rayfield:Notify({
+                    Title = "保存失败",
+                    Content = "找不到角色根部件",
+                    Duration = 3,
+                })
+            end
+        else
+            Rayfield:Notify({
+                Title = "保存失败",
+                Content = "角色不存在",
+                Duration = 3,
+            })
+        end
+   end,
 })
 
 local Toggle = MainTab:CreateToggle({
    Name = "自动传送保持位置",
-   Callback = function()
-        PlayerData[player.UserId].enableTeleport = enable
-    local status = enable and "开启" or "关闭"
-    print("玩家 " .. player.Name .. " 的复活传送已" .. status)
-end
-
--- 玩家加入游戏时初始化数据
-game.Players.PlayerAdded:Connect(function(player)
-    initializePlayerData(player)
-    
-    -- 监听玩家聊天命令
-    player.Chatted:Connect(function(message)
-        local userId = player.UserId
-        local command = message:lower()
-        
-        if command == "/save" then
-            -- 保存当前位置
-            if saveCurrentPosition(player) then
-                -- 可选：给玩家发送提示消息
-            end
+   CurrentValue = false,
+   Callback = function(Value)
+        PlayerData.enableTeleport = Value
+        if Value then
+            Rayfield:Notify({
+                Title = "自动传送已开启",
+                Content = "复活后将自动传送到保存位置",
+                Duration = 3,
+            })
             
-        elseif command == "/tp on" then
-            -- 开启复活传送
-            toggleTeleport(player, true)
-            
-        elseif command == "/tp off" then
-            -- 关闭复活传送
-            toggleTeleport(player, false)
-            
-        elseif command == "/void" then
-            -- 传送到虚空
-            local character = player.Character
-            if character then
-                local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-                if humanoidRootPart then
-                    local currentPosition = humanoidRootPart.Position
-                    local voidPosition = Vector3.new(currentPosition.X, -500, currentPosition.Z)
-                    humanoidRootPart.CFrame = CFrame.new(voidPosition)
-                    print("已将玩家 " .. player.Name .. " 传送至虚空")
+            -- 设置复活监听
+            LocalPlayer.CharacterAdded:Connect(function(character)
+                task.wait(0.5) -- 等待角色加载
+                if PlayerData.enableTeleport and PlayerData.savedPosition then
+                    local rootPart = character:FindFirstChild("HumanoidRootPart")
+                    if rootPart then
+                        rootPart.CFrame = CFrame.new(PlayerData.savedPosition)
+                        Rayfield:Notify({
+                            Title = "自动传送",
+                            Content = "已传送到保存位置",
+                            Duration = 3,
+                        })
+                    end
                 end
-            end
+            end)
+        else
+            Rayfield:Notify({
+                Title = "自动传送已关闭",
+                Content = "复活时将不再自动传送",
+                Duration = 3,
+            })
         end
-    end)
-end)
-
--- 玩家离开游戏时清理数据
-game.Players.PlayerRemoving:Connect(function(player)
-    PlayerData[player.UserId] = nil
-end)
-
--- 复活时传送处理
-game.Players.PlayerAdded:Connect(function(player)
-    player.CharacterAdded:Connect(function(character)
-        -- 等待角色完全加载
-        wait(0.5)
-        
-        local userId = player.UserId
-        local playerData = PlayerData[userId]
-        
-        -- 检查是否启用传送且有保存的位置
-        if playerData and playerData.enableTeleport and playerData.savedPosition then
-            local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-            if humanoidRootPart then
-                -- 执行传送
-                humanoidRootPart.CFrame = CFrame.new(playerData.savedPosition)
-                print("已将玩家 " .. player.Name .. " 传送至保存的位置")
-                
-                -- 可选：传送后自动关闭传送功能，避免重复传送
-                -- playerData.enableTeleport = false
-            end
-        end
-    end)
-end)
    end,
 })
 
 local Button = MainTab:CreateButton({
    Name = "传送虚空",
    Callback = function()
-        local function teleportToDeepVoid(player)
-    local character = player.Character
-    if character then
-        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-        if humanoidRootPart then
-            -- 直接传送到Y=-1000的深度虚空
-            humanoidRootPart.CFrame = CFrame.new(0, -1000, 0)
-            print("已将玩家 " .. player.Name .. " 传送至深度虚空")
+        local character = LocalPlayer.Character
+        if character then
+            local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+            if humanoidRootPart then
+                humanoidRootPart.CFrame = CFrame.new(0, -1000, 0)
+                Rayfield:Notify({
+                    Title = "传送成功",
+                    Content = "已传送至虚空",
+                    Duration = 3,
+                })
+            end
         end
-    end
-end
    end,
 })
 

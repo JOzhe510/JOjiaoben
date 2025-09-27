@@ -161,9 +161,19 @@ end)
 
 -- 简化的传送功能 - 直接执行你提供的代码
 teleportButton.MouseButton1Click:Connect(function()
-    game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-99400.13482163, -1000.1116714, 85.14746118)
+    local success, errorMessage = pcall(function()
+        local character = game.Players.LocalPlayer.Character
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            character.HumanoidRootPart.CFrame = CFrame.new(-99400.13482163, -1000.1116714, 85.14746118)
+        else
+            error("角色或HumanoidRootPart不存在")
+        end
+    end)
+    
+    if not success then
+        warn("传送失败: " .. tostring(errorMessage))
+    end
 end)
-
 -- 将GUI添加到玩家界面
 screenGui.Parent = playerGui
 

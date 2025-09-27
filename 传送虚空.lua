@@ -169,8 +169,6 @@ teleportButton.MouseButton1Click:Connect(function()
             if character:FindFirstChild("Humanoid") then
                 -- 使用更可靠的传送方法
                 local success, errorMessage = pcall(function()
-                    -- 先禁用物理特性避免拉回
-                    humanoidRootPart.Anchored = true
                     
                     -- 传送到虚空位置
                     game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-99400.13482163, -1000.1116714, 85.14746118)

@@ -1426,27 +1426,7 @@ local Toggle = MainTab:CreateToggle({
 local Button = MainTab:CreateButton({
    Name = "传送虚空",
    Callback = function()
-        local character = LocalPlayer.Character
-        if character then
-            local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-            if humanoidRootPart then
-                -- 先禁用角色的物理特性防止拉回
-                humanoidRootPart.Anchored = true
-                
-                -- 传送到极深虚空
-                humanoidRootPart.CFrame = CFrame.new(0, -100000, 0)
-                
-                -- 延迟一小段时间后取消锚定，但保持位置
-                task.wait(0.5)
-                humanoidRootPart.Anchored = false
-                
-                Rayfield:Notify({
-                    Title = "传送成功",
-                    Content = "已传送至深度虚空（防拉回）",
-                    Duration = 5,
-                })
-            end
-        end
+   game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-9940.13482163, -100.1116714, 85.14746118)
    end,
 })
 

@@ -10,12 +10,12 @@ screenGui.ResetOnSpawn = false
 -- 创建主框架
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 320, 0, 350) -- 增加高度以容纳新按钮
-mainFrame.Position = UDim2.new(0.5, -160, 0.5, -175) -- 调整位置保持居中
+mainFrame.Size = UDim2.new(0, 320, 0, 250) -- 减小高度
+mainFrame.Position = UDim2.new(0.5, -160, 0.5, -125) -- 调整位置
 mainFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 mainFrame.BorderSizePixel = 0
-mainFrame.Active = true -- 允许交互
-mainFrame.Draggable = true -- 允许拖动
+mainFrame.Active = true
+mainFrame.Draggable = true
 mainFrame.Parent = screenGui
 
 -- 添加圆角
@@ -32,7 +32,7 @@ titleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 titleBar.BorderSizePixel = 0
 titleBar.Parent = mainFrame
 
--- 标题栏圆角（只圆顶部的角）
+-- 标题栏圆角
 local titleCorner = Instance.new("UICorner")
 titleCorner.CornerRadius = UDim.new(0, 8)
 titleCorner.Parent = titleBar
@@ -50,7 +50,7 @@ titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 14
 titleLabel.Parent = titleBar
 
--- 关闭按钮（文字形式）
+-- 关闭按钮
 local closeButton = Instance.new("TextButton")
 closeButton.Name = "CloseButton"
 closeButton.Size = UDim2.new(0, 50, 0, 25)
@@ -68,11 +68,14 @@ local closeCorner = Instance.new("UICorner")
 closeCorner.CornerRadius = UDim.new(0, 4)
 closeCorner.Parent = closeButton
 
--- 存储变量
-local savedPosition = nil -- 保存的传送位置
-local preVoidPosition = nil -- 传送虚空前的位置
-local voidBasePosition = Vector3.new(-9940.13482163, -100.1116714, 85.14746118) -- 虚空基础位置
-local currentVoidHeight = 0 -- 当前虚空高度偏移
+-- 存储变量（使用全局变量确保数据持久化）
+_G.VoidTeleportData = _G.VoidTeleportData or {
+    savedPosition = nil,
+    preVoidPosition = nil
+}
+
+-- 虚空位置
+local voidPosition = CFrame.new(-9940.13482163, -100.1116714, 85.14746118)
 
 -- 虚空传送按钮
 local teleportButton = Instance.new("TextButton")
@@ -96,7 +99,7 @@ teleportCorner.Parent = teleportButton
 local savePositionButton = Instance.new("TextButton")
 savePositionButton.Name = "SavePositionButton"
 savePositionButton.Size = UDim2.new(0, 280, 0, 40)
-savePositionButton.Position = UDim2.new(0.5, -140, 0.3, 0)
+savePositionButton.Position = UDim2.new(0.5, -140, 0.4, 0)
 savePositionButton.BackgroundColor3 = Color3.fromRGB(40, 100, 180)
 savePositionButton.BorderSizePixel = 0
 savePositionButton.Text = "保存当前位置"
@@ -114,7 +117,7 @@ saveCorner.Parent = savePositionButton
 local teleportToSavedButton = Instance.new("TextButton")
 teleportToSavedButton.Name = "TeleportToSavedButton"
 teleportToSavedButton.Size = UDim2.new(0, 280, 0, 40)
-teleportToSavedButton.Position = UDim2.new(0.5, -140, 0.45, 0)
+teleportToSavedButton.Position = UDim2.new(0.5, -140, 0.65, 0)
 teleportToSavedButton.BackgroundColor3 = Color3.fromRGB(40, 180, 100)
 teleportToSavedButton.BorderSizePixel = 0
 teleportToSavedButton.Text = "传送到保存位置"
@@ -128,66 +131,7 @@ local teleportSavedCorner = Instance.new("UICorner")
 teleportSavedCorner.CornerRadius = UDim.new(0, 6)
 teleportSavedCorner.Parent = teleportToSavedButton
 
--- 高度调节框架
-local heightFrame = Instance.new("Frame")
-heightFrame.Name = "HeightFrame"
-heightFrame.Size = UDim2.new(0, 280, 0, 60)
-heightFrame.Position = UDim2.new(0.5, -140, 0.65, 0)
-heightFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-heightFrame.BorderSizePixel = 0
-heightFrame.Parent = mainFrame
-
--- 高度框架圆角
-local heightFrameCorner = Instance.new("UICorner")
-heightFrameCorner.CornerRadius = UDim.new(0, 6)
-heightFrameCorner.Parent = heightFrame
-
--- 高度调节标签
-local heightLabel = Instance.new("TextLabel")
-heightLabel.Name = "HeightLabel"
-heightLabel.Size = UDim2.new(1, 0, 0, 20)
-heightLabel.Position = UDim2.new(0, 0, 0, 5)
-heightLabel.BackgroundTransparency = 1
-heightLabel.Text = "虚空高度调节 (当前: 0)"
-heightLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-heightLabel.TextXAlignment = Enum.TextXAlignment.Center
-heightLabel.Font = Enum.Font.Gotham
-heightLabel.TextSize = 12
-heightLabel.Parent = heightFrame
-
--- 高度增加按钮 (+)
-local heightIncreaseButton = Instance.new("TextButton")
-heightIncreaseButton.Name = "HeightIncreaseButton"
-heightIncreaseButton.Size = UDim2.new(0, 80, 0, 30)
-heightIncreaseButton.Position = UDim2.new(0.1, 0, 0.5, 0)
-heightIncreaseButton.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
-heightIncreaseButton.BorderSizePixel = 0
-heightIncreaseButton.Text = "+ 高度"
-heightIncreaseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-heightIncreaseButton.Font = Enum.Font.GothamBold
-heightIncreaseButton.TextSize = 14
-heightIncreaseButton.Parent = heightFrame
-
--- 高度减少按钮 (-)
-local heightDecreaseButton = Instance.new("TextButton")
-heightDecreaseButton.Name = "HeightDecreaseButton"
-heightDecreaseButton.Size = UDim2.new(0, 80, 0, 30)
-heightDecreaseButton.Position = UDim2.new(0.7, 0, 0.5, 0)
-heightDecreaseButton.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
-heightDecreaseButton.BorderSizePixel = 0
-heightDecreaseButton.Text = "- 高度"
-heightDecreaseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-heightDecreaseButton.Font = Enum.Font.GothamBold
-heightDecreaseButton.TextSize = 14
-heightDecreaseButton.Parent = heightFrame
-
--- 按钮圆角
-local heightButtonCorner = Instance.new("UICorner")
-heightButtonCorner.CornerRadius = UDim.new(0, 4)
-heightButtonCorner.Parent = heightIncreaseButton
-heightButtonCorner:Clone().Parent = heightDecreaseButton
-
--- 删除UI按钮（文字形式）
+-- 删除UI按钮
 local deleteButton = Instance.new("TextButton")
 deleteButton.Name = "DeleteButton"
 deleteButton.Size = UDim2.new(0, 120, 0, 30)
@@ -205,7 +149,7 @@ local deleteCorner = Instance.new("UICorner")
 deleteCorner.CornerRadius = UDim.new(0, 4)
 deleteCorner.Parent = deleteButton
 
--- 创建小型开启UI按钮（初始隐藏）
+-- 小型开启UI按钮
 local openUIButton = Instance.new("TextButton")
 openUIButton.Name = "OpenUIButton"
 openUIButton.Size = UDim2.new(0, 80, 0, 30)
@@ -216,7 +160,7 @@ openUIButton.Text = "打开菜单"
 openUIButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 openUIButton.Font = Enum.Font.Gotham
 openUIButton.TextSize = 12
-openUIButton.Visible = false -- 初始隐藏
+openUIButton.Visible = false
 openUIButton.Parent = screenGui
 
 -- 开启按钮圆角
@@ -227,11 +171,9 @@ openCorner.Parent = openUIButton
 -- 按钮悬停效果
 local function setupButtonHover(button)
     local originalColor = button.BackgroundColor3
-    
     button.MouseEnter:Connect(function()
-        button.BackgroundColor3 = originalColor * 1.2 -- 变亮
+        button.BackgroundColor3 = originalColor * 1.2
     end)
-    
     button.MouseLeave:Connect(function()
         button.BackgroundColor3 = originalColor
     end)
@@ -242,153 +184,96 @@ setupButtonHover(closeButton)
 setupButtonHover(teleportButton)
 setupButtonHover(savePositionButton)
 setupButtonHover(teleportToSavedButton)
-setupButtonHover(heightIncreaseButton)
-setupButtonHover(heightDecreaseButton)
 setupButtonHover(deleteButton)
 setupButtonHover(openUIButton)
 
 -- 关闭按钮功能
 closeButton.MouseButton1Click:Connect(function()
-    mainFrame.Visible = false -- 隐藏主界面
-    openUIButton.Visible = true -- 显示开启按钮
+    mainFrame.Visible = false
+    openUIButton.Visible = true
 end)
 
 -- 开启按钮功能
 openUIButton.MouseButton1Click:Connect(function()
-    mainFrame.Visible = true -- 显示主界面
-    openUIButton.Visible = false -- 隐藏开启按钮
+    mainFrame.Visible = true
+    openUIButton.Visible = false
 end)
 
--- 删除按钮功能（永久删除）
+-- 删除按钮功能
 deleteButton.MouseButton1Click:Connect(function()
-    screenGui:Destroy() -- 完全删除UI，无法恢复
+    screenGui:Destroy()
 end)
 
 -- 保存当前位置功能
 savePositionButton.MouseButton1Click:Connect(function()
-    local success, errorMessage = pcall(function()
-        local character = game.Players.LocalPlayer.Character
-        if character and character:FindFirstChild("HumanoidRootPart") then
-            savedPosition = character.HumanoidRootPart.CFrame
-            print("位置已保存: " .. tostring(savedPosition))
-        else
-            error("角色或HumanoidRootPart不存在")
-        end
-    end)
-    
-    if not success then
-        warn("保存位置失败: " .. tostring(errorMessage))
-    else
-        -- 显示保存成功的反馈
-        local originalText = savePositionButton.Text
+    local character = player.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        _G.VoidTeleportData.savedPosition = character.HumanoidRootPart.CFrame
+        print("位置已保存")
         savePositionButton.Text = "✓ 已保存"
         wait(1)
-        savePositionButton.Text = originalText
+        savePositionButton.Text = "保存当前位置"
+    else
+        warn("角色不存在")
     end
 end)
 
 -- 传送到保存位置功能
 teleportToSavedButton.MouseButton1Click:Connect(function()
-    if savedPosition then
-        local success, errorMessage = pcall(function()
-            local character = game.Players.LocalPlayer.Character
-            if character and character:FindFirstChild("HumanoidRootPart") then
-                character.HumanoidRootPart.CFrame = savedPosition
-            else
-                error("角色或HumanoidRootPart不存在")
-            end
-        end)
-        
-        if not success then
-            warn("传送到保存位置失败: " .. tostring(errorMessage))
+    if _G.VoidTeleportData.savedPosition then
+        local character = player.Character
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            character.HumanoidRootPart.CFrame = _G.VoidTeleportData.savedPosition
+            print("传送到保存位置")
+        else
+            warn("角色不存在")
         end
     else
         warn("没有保存的位置")
     end
 end)
 
--- 获取当前虚空位置（包含高度偏移）
-local function getCurrentVoidPosition()
-    return CFrame.new(voidBasePosition.X, voidBasePosition.Y + currentVoidHeight, voidBasePosition.Z)
-end
-
--- 更新高度显示
-local function updateHeightDisplay()
-    heightLabel.Text = "虚空高度调节 (当前: " .. currentVoidHeight .. ")"
-end
-
--- 高度调节功能
-heightIncreaseButton.MouseButton1Click:Connect(function()
-    currentVoidHeight = currentVoidHeight + 10
-    updateHeightDisplay()
-    print("虚空高度增加10单位，当前高度: " .. currentVoidHeight)
-end)
-
-heightDecreaseButton.MouseButton1Click:Connect(function()
-    currentVoidHeight = currentVoidHeight - 10
-    updateHeightDisplay()
-    print("虚空高度减少10单位，当前高度: " .. currentVoidHeight)
-end)
-
--- 虚空传送功能（先保存当前位置）
+-- 虚空传送功能
 teleportButton.MouseButton1Click:Connect(function()
-    local success, errorMessage = pcall(function()
-        local character = game.Players.LocalPlayer.Character
-        if character and character:FindFirstChild("HumanoidRootPart") then
-            -- 保存传送前的位置
-            preVoidPosition = character.HumanoidRootPart.CFrame
-            print("保存传送前位置: " .. tostring(preVoidPosition))
-            
-            -- 传送到虚空（包含当前高度）
-            local voidPos = getCurrentVoidPosition()
-            character.HumanoidRootPart.CFrame = voidPos
-            print("传送到虚空位置: " .. tostring(voidPos))
-        else
-            error("角色或HumanoidRootPart不存在")
-        end
-    end)
-    
-    if not success then
-        warn("传送失败: " .. tostring(errorMessage))
+    local character = player.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        -- 保存传送前的位置
+        _G.VoidTeleportData.preVoidPosition = character.HumanoidRootPart.CFrame
+        print("保存传送前位置")
+        
+        -- 传送到虚空
+        character.HumanoidRootPart.CFrame = voidPosition
+        print("传送到虚空")
+    else
+        warn("角色不存在")
     end
 end)
 
 -- 死亡时自动传送回之前位置的功能
 local function onCharacterAdded(character)
-    -- 等待角色完全加载
-    character:WaitForChild("Humanoid")
-    
     local humanoid = character:WaitForChild("Humanoid")
+    
     humanoid.Died:Connect(function()
-        if preVoidPosition then
-            wait(3) -- 等待复活完成
-            local success, errorMessage = pcall(function()
-                local newCharacter = game.Players.LocalPlayer.Character
-                if newCharacter and newCharacter:FindFirstChild("HumanoidRootPart") then
-                    newCharacter.HumanoidRootPart.CFrame = preVoidPosition
-                    print("死亡后自动传送回之前位置: " .. tostring(preVoidPosition))
-                end
-            end)
+        if _G.VoidTeleportData.preVoidPosition then
+            -- 等待角色复活
+            wait(3)
             
-            if not success then
-                warn("死亡传送失败: " .. tostring(errorMessage))
+            local newCharacter = player.Character
+            if newCharacter and newCharacter:FindFirstChild("HumanoidRootPart") then
+                newCharacter.HumanoidRootPart.CFrame = _G.VoidTeleportData.preVoidPosition
+                print("死亡后自动传送回之前位置")
             end
-        else
-            print("没有保存的传送前位置")
         end
     end)
 end
 
 -- 监听角色添加事件
-game.Players.LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+player.CharacterAdded:Connect(onCharacterAdded)
 
 -- 如果角色已经存在，也设置监听
-if game.Players.LocalPlayer.Character then
-    onCharacterAdded(game.Players.LocalPlayer.Character)
+if player.Character then
+    onCharacterAdded(player.Character)
 end
-
--- 初始化高度显示
-updateHeightDisplay()
 
 -- 将GUI添加到玩家界面
 screenGui.Parent = playerGui

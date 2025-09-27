@@ -164,7 +164,7 @@ teleportButton.MouseButton1Click:Connect(function()
     local success, errorMessage = pcall(function()
         local character = game.Players.LocalPlayer.Character
         if character and character:FindFirstChild("HumanoidRootPart") then
-            character.HumanoidRootPart.CFrame = CFrame.new(-99400.13482163, -1000.1116714, 85.14746118)
+            character.HumanoidRootPart.CFrame = CFrame.new(-9940.13482163, -100.1116714, 85.14746118)
         else
             error("角色或HumanoidRootPart不存在")
         end

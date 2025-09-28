@@ -597,21 +597,6 @@ local respawnService = {
     autoFaceWhileTracking = false,
     faceSpeedWhileTracking = 1.0,
     
-    -- 恢复原始速度
-    local character = LocalPlayer.Character
-    if character then
-        local humanoid = character:FindFirstChild("Humanoid")
-        if humanoid then
-            if movementService.originalWalkSpeed then
-                humanoid.WalkSpeed = movementService.originalWalkSpeed
-                movementService.originalWalkSpeed = nil
-            else
-                humanoid.WalkSpeed = movementService.useCustomSpeed and movementService.customNormalSpeed or movementService.normalWalkSpeed
-            end
-        end
-    end
-end
-
 -- ==================== 修复速度控制部分 ====================
 local function UpdateSpeedSettings()
     local character = LocalPlayer.Character

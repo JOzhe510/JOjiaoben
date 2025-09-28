@@ -519,7 +519,7 @@ local function AutoFaceTarget()
     end
 end
 
--- 自瞄主循环
+-- 在自瞄主循环中修改这部分代码
 RunService.RenderStepped:Connect(function()
     Circle.Position = ScreenCenter
     Circle.Radius = AimSettings.FOV
@@ -535,44 +535,45 @@ RunService.RenderStepped:Connect(function()
     
     if not AimSettings.Enabled then return end
     
-    -- 改进的自瞄逻辑：减少粘黏度，增加距离检查
+    -- 修复：改进的自瞄逻辑 - 增加粘性但允许切换
     if AimSettings.LockedTarget and AimSettings.LockSingleTarget then
+        -- 单锁模式：只有目标无效时才清除
         if not IsTargetValid(AimSettings.LockedTarget) then
             AimSettings.LockedTarget = nil
         end
-    end
-    
-    -- 非单锁模式：改进的目标切换逻辑
-    if not AimSettings.LockSingleTarget then
-        -- 只有当当前目标无效或超出距离时才切换
-        if AimSettings.LockedTarget and IsTargetValid(AimSettings.LockedTarget) then
-            -- 检查目标是否仍然在FOV内
-            local cameraDirection = Camera.CFrame.LookVector
-            local targetDirection = (AimSettings.LockedTarget.Position - Camera.CFrame.Position).Unit
-            local dotProduct = cameraDirection:Dot(targetDirection)
-            local angle = math.acos(math.clamp(dotProduct, -1, 1))
-            local fovRad = math.rad(AimSettings.FOV / 2)
-            
-            if angle > fovRad then
-                -- 目标离开FOV，寻找新目标
-                if AimSettings.NearestAim then
-                    AimSettings.LockedTarget = FindNearestTarget()
-                else
-                    AimSettings.LockedTarget = FindTargetInView()
-                end
-            end
-        else
+    else
+        -- 普通模式：增加粘性但允许更好的目标切换
+        local currentTargetValid = AimSettings.LockedTarget and IsTargetValid(AimSettings.LockedTarget)
+        
+        if not currentTargetValid then
             -- 当前目标无效，寻找新目标
             if AimSettings.NearestAim then
                 AimSettings.LockedTarget = FindNearestTarget()
             else
                 AimSettings.LockedTarget = FindTargetInView()
             end
-        end
-    else
-        -- 单锁模式：目标无效时清除
-        if not AimSettings.LockedTarget or not IsTargetValid(AimSettings.LockedTarget) then
-            AimSettings.LockedTarget = nil
+        else
+            -- 当前目标有效，检查是否需要切换（降低切换频率增加粘性）
+            local cameraDirection = Camera.CFrame.LookVector
+            local targetDirection = (AimSettings.LockedTarget.Position - Camera.CFrame.Position).Unit
+            local dotProduct = cameraDirection:Dot(targetDirection)
+            local angle = math.acos(math.clamp(dotProduct, -1, 1))
+            local fovRad = math.rad(AimSettings.FOV / 2)
+            
+            -- 只有当目标完全离开FOV或距离过远时才切换，增加粘性
+            if angle > fovRad * 1.5 then -- 增加1.5倍容差
+                if AimSettings.NearestAim then
+                    local newTarget = FindNearestTarget()
+                    if newTarget then
+                        AimSettings.LockedTarget = newTarget
+                    end
+                else
+                    local newTarget = FindTargetInView()
+                    if newTarget then
+                        AimSettings.LockedTarget = newTarget
+                    end
+                end
+            end
         end
     end
     
@@ -1835,21 +1836,54 @@ local Input = MainTab:CreateInput({
    end,
 })
 
--- TP速度输入
+-- 修改速度控制部分
+local function UpdateSpeed()
+    local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    if respawnService.speedMode == "normal" then
+        humanoid.WalkSpeed = respawnService.useCustomSpeed and respawnService.customWalkSpeed or respawnService.walkSpeed
+    else -- tp模式
+        humanoid.WalkSpeed = respawnService.useCustomSpeed and respawnService.customTpSpeed or respawnService.tpWalkSpeed
+    end
+end
+
+-- 添加TP行走指令功能
 local Input = MainTab:CreateInput({
-   Name = "TP行走速度",
-   PlaceholderText = "输入TP速度 (默认: 100)",
+   Name = "TP行走速度指令",
+   PlaceholderText = "输入 tpwalk 数字 设置TP速度",
    RemoveTextAfterFocusLost = false,
    Callback = function(Text)
-        local value = tonumber(Text)
-        if value and value > 0 then
-            respawnService.customTpSpeed = value
-            if respawnService.useCustomSpeed and respawnService.speedMode == "tp" then
+        local command, value = Text:match("^(%S+)%s+(%d+)$")
+        if command and value then
+            if command:lower() == "tpwalk" then
+                local speed = tonumber(value)
+                if speed and speed > 0 then
+                    respawnService.customTpSpeed = speed
+                    respawnService.useCustomSpeed = true
+                    respawnService.speedMode = "tp"
+                    UpdateSpeed()
+                    
+                    Rayfield:Notify({
+                        Title = "TP行走速度设置成功",
+                        Content = "TP速度: " .. speed,
+                        Duration = 3,
+                    })
+                end
+            end
+        else
+            -- 直接输入数字也支持
+            local speed = tonumber(Text)
+            if speed and speed > 0 then
+                respawnService.customTpSpeed = speed
+                respawnService.useCustomSpeed = true
+                respawnService.speedMode = "tp"
                 UpdateSpeed()
+                
                 Rayfield:Notify({
-                    Title = "TP速度已更新",
-                    Content = "新速度: " .. value,
-                    Duration = 2,
+                    Title = "TP行走速度设置成功",
+                    Content = "TP速度: " .. speed,
+                    Duration = 3,
                 })
             end
         end

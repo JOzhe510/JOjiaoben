@@ -519,7 +519,7 @@ local function AutoFaceTarget()
     end
 end
 
--- 在自瞄主循环中修改这部分代码
+-- ==================== 修复自瞄锁定逻辑 ====================
 RunService.RenderStepped:Connect(function()
     Circle.Position = ScreenCenter
     Circle.Radius = AimSettings.FOV
@@ -535,45 +535,18 @@ RunService.RenderStepped:Connect(function()
     
     if not AimSettings.Enabled then return end
     
-    -- 修复：改进的自瞄逻辑 - 增加粘性但允许切换
-    if AimSettings.LockedTarget and AimSettings.LockSingleTarget then
+    -- 修复自瞄逻辑：单锁模式只锁一人，普通模式可以切换目标
+    if AimSettings.LockSingleTarget then
         -- 单锁模式：只有目标无效时才清除
-        if not IsTargetValid(AimSettings.LockedTarget) then
+        if AimSettings.LockedTarget and not IsTargetValid(AimSettings.LockedTarget) then
             AimSettings.LockedTarget = nil
         end
     else
-        -- 普通模式：增加粘性但允许更好的目标切换
-        local currentTargetValid = AimSettings.LockedTarget and IsTargetValid(AimSettings.LockedTarget)
-        
-        if not currentTargetValid then
-            -- 当前目标无效，寻找新目标
-            if AimSettings.NearestAim then
-                AimSettings.LockedTarget = FindNearestTarget()
-            else
-                AimSettings.LockedTarget = FindTargetInView()
-            end
+        -- 普通模式：根据设置寻找目标
+        if AimSettings.NearestAim then
+            AimSettings.LockedTarget = FindNearestTarget()
         else
-            -- 当前目标有效，检查是否需要切换（降低切换频率增加粘性）
-            local cameraDirection = Camera.CFrame.LookVector
-            local targetDirection = (AimSettings.LockedTarget.Position - Camera.CFrame.Position).Unit
-            local dotProduct = cameraDirection:Dot(targetDirection)
-            local angle = math.acos(math.clamp(dotProduct, -1, 1))
-            local fovRad = math.rad(AimSettings.FOV / 2)
-            
-            -- 只有当目标完全离开FOV或距离过远时才切换，增加粘性
-            if angle > fovRad * 1.5 then -- 增加1.5倍容差
-                if AimSettings.NearestAim then
-                    local newTarget = FindNearestTarget()
-                    if newTarget then
-                        AimSettings.LockedTarget = newTarget
-                    end
-                else
-                    local newTarget = FindTargetInView()
-                    if newTarget then
-                        AimSettings.LockedTarget = newTarget
-                    end
-                end
-            end
+            AimSettings.LockedTarget = FindTargetInView()
         end
     end
     
@@ -623,6 +596,143 @@ local respawnService = {
     lastUpdateTime = tick(),
     autoFaceWhileTracking = false,
     faceSpeedWhileTracking = 1.0,
+    
+    -- 恢复原始速度
+    local character = LocalPlayer.Character
+    if character then
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            if movementService.originalWalkSpeed then
+                humanoid.WalkSpeed = movementService.originalWalkSpeed
+                movementService.originalWalkSpeed = nil
+            else
+                humanoid.WalkSpeed = movementService.useCustomSpeed and movementService.customNormalSpeed or movementService.normalWalkSpeed
+            end
+        end
+    end
+end
+
+-- ==================== 修复速度控制部分 ====================
+local function UpdateSpeedSettings()
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    if movementService.tpWalking then
+        -- TP行走模式下使用TP速度
+        humanoid.WalkSpeed = movementService.useCustomSpeed and movementService.customTpSpeed or movementService.tpWalkSpeed
+    else
+        -- 普通模式下使用普通速度
+        humanoid.WalkSpeed = movementService.useCustomSpeed and movementService.customNormalSpeed or movementService.normalWalkSpeed
+    end
+end
+
+-- 角色添加时自动应用速度设置
+LocalPlayer.CharacterAdded:Connect(function(character)
+    task.wait(0.5)
+    UpdateSpeedSettings()
+end)
+
+-- ==================== 修复TP行走功能 ====================
+local movementService = {
+    tpWalking = false,
+    tpWalkSpeed = 100,
+    normalWalkSpeed = 16,
+    useCustomSpeed = false,
+    customTpSpeed = 100,
+    customNormalSpeed = 16,
+    tpWalkConnection = nil
+}
+
+-- 真正的TP行走功能（直接平移角色）
+local function StartTPWalk()
+    if movementService.tpWalkConnection then
+        movementService.tpWalkConnection:Disconnect()
+        movementService.tpWalkConnection = nil
+    end
+    
+    movementService.tpWalking = true
+    
+    movementService.tpWalkConnection = RunService.Heartbeat:Connect(function()
+        if not movementService.tpWalking then
+            movementService.tpWalkConnection:Disconnect()
+            movementService.tpWalkConnection = nil
+            return
+        end
+        
+        local character = LocalPlayer.Character
+        if not character then return end
+        
+        local humanoid = character:FindFirstChild("Humanoid")
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        
+        if not humanoid or not rootPart then return end
+        
+        -- 保存原始速度设置
+        if not movementService.originalWalkSpeed then
+            movementService.originalWalkSpeed = humanoid.WalkSpeed
+        end
+        
+        -- 设置TP行走速度
+        local speed = movementService.useCustomSpeed and movementService.customTpSpeed or movementService.tpWalkSpeed
+        humanoid.WalkSpeed = speed
+        
+        -- 获取输入方向并直接移动角色
+        local moveDirection = humanoid.MoveDirection
+        if moveDirection.Magnitude > 0 then
+            local velocity = moveDirection * speed
+            rootPart.Velocity = Vector3.new(velocity.X, rootPart.Velocity.Y, velocity.Z)
+        end
+    end)
+end
+
+local function StopTPWalk()
+    movementService.tpWalking = false
+    
+    if movementService.tpWalkConnection then
+        movementService.tpWalkConnection:Disconnect()
+        movementService.tpWalkConnection = nil
+    end
+    
+    -- 恢复原始速度
+    local character = LocalPlayer.Character
+    if character then
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            if movementService.originalWalkSpeed then
+                humanoid.WalkSpeed = movementService.originalWalkSpeed
+                movementService.originalWalkSpeed = nil
+            else
+                humanoid.WalkSpeed = movementService.useCustomSpeed and movementService.customNormalSpeed or movementService.normalWalkSpeed
+            end
+        end
+    end
+end
+
+-- ==================== 修复速度控制部分 ====================
+local function UpdateSpeedSettings()
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    if movementService.tpWalking then
+        -- TP行走模式下使用TP速度
+        humanoid.WalkSpeed = movementService.useCustomSpeed and movementService.customTpSpeed or movementService.tpWalkSpeed
+    else
+        -- 普通模式下使用普通速度
+        humanoid.WalkSpeed = movementService.useCustomSpeed and movementService.customNormalSpeed or movementService.normalWalkSpeed
+    end
+end
+
+-- 角色添加时自动应用速度设置
+LocalPlayer.CharacterAdded:Connect(function(character)
+    task.wait(0.5)
+    UpdateSpeedSettings()
+end)
 
     -- 速度设置（从AimSettings移动过来）
     useCustomSpeed = false,

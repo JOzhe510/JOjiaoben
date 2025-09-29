@@ -579,25 +579,17 @@ local respawnService = {
     rotationRadius = 5,
     rotationHeight = 0,
     currentRotationAngle = 0,
-
-    -- 通用设置
-    savedPositions = {},
-    followConnection = nil,
-    teleportConnection = nil,
-    autoFindNearest = false,
-    speedMode = "normal",
-    walkSpeed = 16,
-    tpWalkSpeed = 100,
-    predictionEnabled = true,
-    smoothingFactor = 0.2,
-    maxPredictionTime = 0.3,
-    velocityMultiplier = 2,
-    lastTargetPositions = {},
-    lastUpdateTime = tick(),
-    autoFaceWhileTracking = false,
-    faceSpeedWhileTracking = 1.0,
     
--- ==================== 修复速度控制部分 ====================
+    local movementService = {
+    tpWalking = false,
+    tpWalkSpeed = 100,
+    normalWalkSpeed = 16,
+    useCustomSpeed = false,
+    customTpSpeed = 100,
+    customNormalSpeed = 16,
+    tpWalkConnection = nil
+}
+
 local function UpdateSpeedSettings()
     local character = LocalPlayer.Character
     if not character then return end
@@ -606,10 +598,8 @@ local function UpdateSpeedSettings()
     if not humanoid then return end
     
     if movementService.tpWalking then
-        -- TP行走模式下使用TP速度
         humanoid.WalkSpeed = movementService.useCustomSpeed and movementService.customTpSpeed or movementService.tpWalkSpeed
     else
-        -- 普通模式下使用普通速度
         humanoid.WalkSpeed = movementService.useCustomSpeed and movementService.customNormalSpeed or movementService.normalWalkSpeed
     end
 end
@@ -621,17 +611,6 @@ LocalPlayer.CharacterAdded:Connect(function(character)
 end)
 
 -- ==================== 修复TP行走功能 ====================
-local movementService = {
-    tpWalking = false,
-    tpWalkSpeed = 100,
-    normalWalkSpeed = 16,
-    useCustomSpeed = false,
-    customTpSpeed = 100,
-    customNormalSpeed = 16,
-    tpWalkConnection = nil
-}
-
--- 真正的TP行走功能（直接平移角色）
 local function StartTPWalk()
     if movementService.tpWalkConnection then
         movementService.tpWalkConnection:Disconnect()
@@ -655,16 +634,13 @@ local function StartTPWalk()
         
         if not humanoid or not rootPart then return end
         
-        -- 保存原始速度设置
         if not movementService.originalWalkSpeed then
             movementService.originalWalkSpeed = humanoid.WalkSpeed
         end
         
-        -- 设置TP行走速度
         local speed = movementService.useCustomSpeed and movementService.customTpSpeed or movementService.tpWalkSpeed
         humanoid.WalkSpeed = speed
         
-        -- 获取输入方向并直接移动角色
         local moveDirection = humanoid.MoveDirection
         if moveDirection.Magnitude > 0 then
             local velocity = moveDirection * speed
@@ -681,7 +657,6 @@ local function StopTPWalk()
         movementService.tpWalkConnection = nil
     end
     
-    -- 恢复原始速度
     local character = LocalPlayer.Character
     if character then
         local humanoid = character:FindFirstChild("Humanoid")
@@ -695,6 +670,24 @@ local function StopTPWalk()
         end
     end
 end
+
+    -- 通用设置
+    savedPositions = {},
+    followConnection = nil,
+    teleportConnection = nil,
+    autoFindNearest = false,
+    speedMode = "normal",
+    walkSpeed = 16,
+    tpWalkSpeed = 100,
+    predictionEnabled = true,
+    smoothingFactor = 0.2,
+    maxPredictionTime = 0.3,
+    velocityMultiplier = 2,
+    lastTargetPositions = {},
+    lastUpdateTime = tick(),
+    autoFaceWhileTracking = false,
+    faceSpeedWhileTracking = 1.0,
+}
 
 -- ==================== 修复速度控制部分 ====================
 local function UpdateSpeedSettings()

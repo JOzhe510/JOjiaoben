@@ -629,6 +629,67 @@ end)
     customTpSpeed = 100,
 }
 
+-- ==================== 修复TP行走功能 ====================
+local function StartTPWalk()
+    if movementService.tpWalkConnection then
+        movementService.tpWalkConnection:Disconnect()
+        movementService.tpWalkConnection = nil
+    end
+    
+    movementService.tpWalking = true
+    
+    movementService.tpWalkConnection = RunService.Heartbeat:Connect(function()
+        if not movementService.tpWalking then
+            movementService.tpWalkConnection:Disconnect()
+            movementService.tpWalkConnection = nil
+            return
+        end
+        
+        local character = LocalPlayer.Character
+        if not character then return end
+        
+        local humanoid = character:FindFirstChild("Humanoid")
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        
+        if not humanoid or not rootPart then return end
+        
+        if not movementService.originalWalkSpeed then
+            movementService.originalWalkSpeed = humanoid.WalkSpeed
+        end
+        
+        local speed = movementService.useCustomSpeed and movementService.customTpSpeed or movementService.tpWalkSpeed
+        humanoid.WalkSpeed = speed
+        
+        local moveDirection = humanoid.MoveDirection
+        if moveDirection.Magnitude > 0 then
+            local velocity = moveDirection * speed
+            rootPart.Velocity = Vector3.new(velocity.X, rootPart.Velocity.Y, velocity.Z)
+        end
+    end)
+end
+
+local function StopTPWalk()
+    movementService.tpWalking = false
+    
+    if movementService.tpWalkConnection then
+        movementService.tpWalkConnection:Disconnect()
+        movementService.tpWalkConnection = nil
+    end
+    
+    local character = LocalPlayer.Character
+    if character then
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            if movementService.originalWalkSpeed then
+                humanoid.WalkSpeed = movementService.originalWalkSpeed
+                movementService.originalWalkSpeed = nil
+            else
+                humanoid.WalkSpeed = movementService.useCustomSpeed and movementService.customNormalSpeed or movementService.normalWalkSpeed
+            end
+        end
+    end
+end
+
 -- 修复：添加缺失的函数
 local function IsPlayerValid(playerName)
     if not playerName or playerName == "" then

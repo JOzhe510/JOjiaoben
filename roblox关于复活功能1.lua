@@ -51,6 +51,7 @@ local AimSettings = {
     FaceMode = "Selected",
     ShowTargetRay = true,
     RayColor = Color3.fromRGB(255, 0, 255),
+    }
 
 local ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 

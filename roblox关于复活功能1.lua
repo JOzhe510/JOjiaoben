@@ -590,14 +590,9 @@ local respawnService = {
     autoFaceWhileTracking = false,
     faceSpeedWhileTracking = 1.0,
     
-    movementService = {
-    tpWalking = false,
-    tpWalkSpeed = 100,
-    normalWalkSpeed = 16,
     useCustomSpeed = false,
+    customWalkSpeed = 16,
     customTpSpeed = 100,
-    customNormalSpeed = 16,
-    tpWalkConnection = nil,
     }
 
 -- ==================== 修复速度控制部分 ====================

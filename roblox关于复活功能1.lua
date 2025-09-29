@@ -3,9 +3,9 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
    Name = "🔥 终极功能系统",
    LoadingTitle = "自瞄+复活功能系统",
-   LoadingSubtitle = "by 1_F0",
+   LoadingSubtitle = "作者 ufo外星人",
    ConfigurationSaving = {
-      Enabled = false,
+      Enabled = true,
       FolderName = nil,
       FileName = "终极功能"
    },
@@ -590,10 +590,15 @@ local respawnService = {
     autoFaceWhileTracking = false,
     faceSpeedWhileTracking = 1.0,
     
-    -- 速度设置
+local movementService = {
+    tpWalking = false,
+    tpWalkConnection = nil,
+    originalWalkSpeed = nil,
+    normalWalkSpeed = 16,
+    tpWalkSpeed = 100,
     useCustomSpeed = false,
-    customWalkSpeed = 16,
-    customTpSpeed = 100,
+    customNormalSpeed = 16,
+    customTpSpeed = 100
 }
 
 -- ==================== 修复速度控制部分 ====================
@@ -618,12 +623,6 @@ LocalPlayer.CharacterAdded:Connect(function(character)
     task.wait(0.5)
     UpdateSpeedSettings()
 end)
-
-    -- 速度设置（从AimSettings移动过来）
-    useCustomSpeed = false,
-    customWalkSpeed = 16,
-    customTpSpeed = 100,
-}
 
 -- ==================== 修复TP行走功能 ====================
 local function StartTPWalk()

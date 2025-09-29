@@ -977,18 +977,6 @@ LocalPlayer.CharacterAdded:Connect(function(character)
     UpdateSpeed()
 end)
 
--- 速度控制函数
-local function UpdateSpeed()
-    local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
-    if not humanoid then return end
-    
-    if respawnService.speedMode == "normal" then
-        humanoid.WalkSpeed = respawnService.useCustomSpeed and respawnService.customWalkSpeed or respawnService.walkSpeed
-    else -- tp模式
-        humanoid.WalkSpeed = respawnService.useCustomSpeed and respawnService.customTpSpeed or respawnService.tpWalkSpeed
-    end
-end
-
 -- 角色添加时自动应用速度设置
 LocalPlayer.CharacterAdded:Connect(function(character)
     task.wait(0.5) -- 等待角色完全加载

@@ -580,7 +580,6 @@ local respawnService = {
     customTpSpeed = 100,
     customNormalSpeed = 16,
     tpWalkConnection = nil
-}
 
     -- 通用设置
     savedPositions = {},

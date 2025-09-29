@@ -572,15 +572,6 @@ local respawnService = {
     rotationHeight = 0,
     currentRotationAngle = 0,
     
-    local movementService = {
-    tpWalking = false,
-    tpWalkSpeed = 100,
-    normalWalkSpeed = 16,
-    useCustomSpeed = false,
-    customTpSpeed = 100,
-    customNormalSpeed = 16,
-    tpWalkConnection = nil
-
     -- 通用设置
     savedPositions = {},
     followConnection = nil,
@@ -597,7 +588,16 @@ local respawnService = {
     lastUpdateTime = tick(),
     autoFaceWhileTracking = false,
     faceSpeedWhileTracking = 1.0,
-}
+    
+    local movementService = {
+    tpWalking = false,
+    tpWalkSpeed = 100,
+    normalWalkSpeed = 16,
+    useCustomSpeed = false,
+    customTpSpeed = 100,
+    customNormalSpeed = 16,
+    tpWalkConnection = nil
+    }
 
 -- ==================== 修复速度控制部分 ====================
 local function UpdateSpeedSettings()

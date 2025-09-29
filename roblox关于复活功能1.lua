@@ -590,10 +590,11 @@ local respawnService = {
     autoFaceWhileTracking = false,
     faceSpeedWhileTracking = 1.0,
     
+    -- 速度设置
     useCustomSpeed = false,
     customWalkSpeed = 16,
     customTpSpeed = 100,
-    }
+}
 
 -- ==================== 修复速度控制部分 ====================
 local function UpdateSpeedSettings()

@@ -589,6 +589,7 @@ local respawnService = {
     lastUpdateTime = tick(),
     autoFaceWhileTracking = false,
     faceSpeedWhileTracking = 1.0,
+    }
     
 local movementService = {
     tpWalking = false,
@@ -598,7 +599,7 @@ local movementService = {
     tpWalkSpeed = 100,
     useCustomSpeed = false,
     customNormalSpeed = 16,
-    customTpSpeed = 100
+    customTpSpeed = 100,
 }
 
 -- ==================== 修复速度控制部分 ====================

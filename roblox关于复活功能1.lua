@@ -51,14 +51,6 @@ local AimSettings = {
     FaceMode = "Selected",
     ShowTargetRay = true,
     RayColor = Color3.fromRGB(255, 0, 255),
-    -- 新增速度控制变量
-    walkSpeed = 16,           -- 普通行走速度
-    tpWalkSpeed = 100,        -- TP行走速度
-    speedMode = "normal",     -- 速度模式: normal/tp
-    useCustomSpeed = false,   -- 是否使用自定义速度
-    customWalkSpeed = 16,     -- 自定义普通速度
-    customTpSpeed = 100,      -- 自定义TP速度
-}
 
 local ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 
@@ -589,87 +581,6 @@ local respawnService = {
     customNormalSpeed = 16,
     tpWalkConnection = nil
 }
-
-local function UpdateSpeedSettings()
-    local character = LocalPlayer.Character
-    if not character then return end
-    
-    local humanoid = character:FindFirstChild("Humanoid")
-    if not humanoid then return end
-    
-    if movementService.tpWalking then
-        humanoid.WalkSpeed = movementService.useCustomSpeed and movementService.customTpSpeed or movementService.tpWalkSpeed
-    else
-        humanoid.WalkSpeed = movementService.useCustomSpeed and movementService.customNormalSpeed or movementService.normalWalkSpeed
-    end
-end
-
--- 角色添加时自动应用速度设置
-LocalPlayer.CharacterAdded:Connect(function(character)
-    task.wait(0.5)
-    UpdateSpeedSettings()
-end)
-
--- ==================== 修复TP行走功能 ====================
-local function StartTPWalk()
-    if movementService.tpWalkConnection then
-        movementService.tpWalkConnection:Disconnect()
-        movementService.tpWalkConnection = nil
-    end
-    
-    movementService.tpWalking = true
-    
-    movementService.tpWalkConnection = RunService.Heartbeat:Connect(function()
-        if not movementService.tpWalking then
-            movementService.tpWalkConnection:Disconnect()
-            movementService.tpWalkConnection = nil
-            return
-        end
-        
-        local character = LocalPlayer.Character
-        if not character then return end
-        
-        local humanoid = character:FindFirstChild("Humanoid")
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        
-        if not humanoid or not rootPart then return end
-        
-        if not movementService.originalWalkSpeed then
-            movementService.originalWalkSpeed = humanoid.WalkSpeed
-        end
-        
-        local speed = movementService.useCustomSpeed and movementService.customTpSpeed or movementService.tpWalkSpeed
-        humanoid.WalkSpeed = speed
-        
-        local moveDirection = humanoid.MoveDirection
-        if moveDirection.Magnitude > 0 then
-            local velocity = moveDirection * speed
-            rootPart.Velocity = Vector3.new(velocity.X, rootPart.Velocity.Y, velocity.Z)
-        end
-    end)
-end
-
-local function StopTPWalk()
-    movementService.tpWalking = false
-    
-    if movementService.tpWalkConnection then
-        movementService.tpWalkConnection:Disconnect()
-        movementService.tpWalkConnection = nil
-    end
-    
-    local character = LocalPlayer.Character
-    if character then
-        local humanoid = character:FindFirstChild("Humanoid")
-        if humanoid then
-            if movementService.originalWalkSpeed then
-                humanoid.WalkSpeed = movementService.originalWalkSpeed
-                movementService.originalWalkSpeed = nil
-            else
-                humanoid.WalkSpeed = movementService.useCustomSpeed and movementService.customNormalSpeed or movementService.normalWalkSpeed
-            end
-        end
-    end
-end
 
     -- 通用设置
     savedPositions = {},

@@ -554,6 +554,18 @@ end)
 UpdateESP()
 
 -- ==================== 复活功能部分 ====================
+
+local movementService = {
+    tpWalking = false,
+    tpWalkConnection = nil,
+    originalWalkSpeed = nil,
+    normalWalkSpeed = 16,
+    tpWalkSpeed = 100,
+    useCustomSpeed = false,
+    customNormalSpeed = 16,
+    customTpSpeed = 100
+}
+
 local respawnService = {
     autoRespawn = false,
     followPlayer = nil,
@@ -588,19 +600,8 @@ local respawnService = {
     lastTargetPositions = {},
     lastUpdateTime = tick(),
     autoFaceWhileTracking = false,
-    faceSpeedWhileTracking = 1.0,
+    faceSpeedWhileTracking = 1.0
     }
-    
-local movementService = {
-    tpWalking = false,
-    tpWalkConnection = nil,
-    originalWalkSpeed = nil,
-    normalWalkSpeed = 16,
-    tpWalkSpeed = 100,
-    useCustomSpeed = false,
-    customNormalSpeed = 16,
-    customTpSpeed = 100,
-}
 
 -- ==================== 修复速度控制部分 ====================
 local function UpdateSpeedSettings()

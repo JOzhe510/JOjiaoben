@@ -53,6 +53,10 @@ local AimSettings = {
     RayColor = Color3.fromRGB(255, 0, 255),
     HeightOffset = 0,
     }
+    
+    -- 在 AimSettings 附近添加
+local isManuallyAiming = false
+local SingleTargetToggle, AimModeToggle = nil, nil
 
 local ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 
@@ -542,8 +546,6 @@ RunService.RenderStepped:Connect(function()
         return 
     end
     
-    -- ==================== 修复的自瞄目标获取逻辑 ====================
-    
     -- 检查当前锁定目标是否仍然有效
     if AimSettings.LockedTarget and not IsTargetValid(AimSettings.LockedTarget) then
         AimSettings.LockedTarget = nil
@@ -591,15 +593,17 @@ RunService.RenderStepped:Connect(function()
         end
     end
     
-    -- ==================== 修复的瞄准逻辑 ====================
-    
+    -- 执行瞄准
     if AimSettings.LockedTarget and IsTargetValid(AimSettings.LockedTarget) then
-        local predictedPosition = nil
+        local predictedPosition = CalculatePredictedPosition(AimSettings.LockedTarget)
         
         if AimSettings.HeightOffset ~= 0 then
             predictedPosition = predictedPosition + Vector3.new(0, AimSettings.HeightOffset, 0)
         end
-end)
+        
+        AimAtPosition(predictedPosition)
+    end
+end)  -- 结束 RenderStepped 连接
 
 -- 初始更新
 UpdateESP()

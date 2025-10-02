@@ -513,12 +513,75 @@ local function AutoFaceTarget()
     end
 end
 
--- ==================== 修复自瞄锁定逻辑 ====================
--- 添加滑动检测变量
-local lastMousePos = UIS:GetMouseLocation()
-local isManuallyAiming = false
-local manualAimCooldown = 0
+-- ==================== 智能自瞄设置 ====================
+local SmartAimSettings = {
+    Enabled = false,
+    BodyParts = {"Head", "UpperTorso", "LowerTorso", "LeftUpperArm", "RightUpperArm", "LeftLowerArm", "RightLowerArm", "LeftUpperLeg", "RightUpperLeg"},
+    CurrentPartIndex = 1,
+    SwitchInterval = 0.3, -- 切换部位的时间间隔（秒）
+    LastSwitchTime = 0,
+    RandomizeOrder = true, -- 是否随机顺序
+    RealisticMode = true, -- 是否启用真实模式（模拟人类瞄准）
+    MinAimTime = 0.1, -- 最小瞄准时间
+    MaxAimTime = 0.5, -- 最大瞄准时间
+}
 
+-- 智能自瞄部位管理
+local function GetNextBodyPart()
+    if SmartAimSettings.RandomizeOrder then
+        SmartAimSettings.CurrentPartIndex = math.random(1, #SmartAimSettings.BodyParts)
+    else
+        SmartAimSettings.CurrentPartIndex = SmartAimSettings.CurrentPartIndex % #SmartAimSettings.BodyParts + 1
+    end
+    return SmartAimSettings.BodyParts[SmartAimSettings.CurrentPartIndex]
+end
+
+-- 智能获取目标位置
+local function GetSmartAimPosition(targetHead)
+    if not SmartAimSettings.Enabled or not targetHead then
+        return CalculatePredictedPosition(targetHead)
+    end
+    
+    local character = targetHead.Parent
+    if not character then
+        return CalculatePredictedPosition(targetHead)
+    end
+    
+    local currentTime = tick()
+    if currentTime - SmartAimSettings.LastSwitchTime >= SmartAimSettings.SwitchInterval then
+        GetNextBodyPart()
+        SmartAimSettings.LastSwitchTime = currentTime
+        
+        -- 在真实模式下随机调整切换间隔
+        if SmartAimSettings.RealisticMode then
+            SmartAimSettings.SwitchInterval = math.random(20, 50) / 100 -- 0.2-0.5秒
+        end
+    end
+    
+    local targetPartName = SmartAimSettings.BodyParts[SmartAimSettings.CurrentPartIndex]
+    local targetPart = character:FindFirstChild(targetPartName)
+    
+    if targetPart then
+        local basePosition = CalculatePredictedPosition(targetPart)
+        
+        -- 在真实模式下添加微小随机偏移，模拟人类手抖
+        if SmartAimSettings.RealisticMode then
+            local randomOffset = Vector3.new(
+                math.random(-5, 5) / 100, -- -0.05 到 0.05
+                math.random(-5, 5) / 100,
+                math.random(-5, 5) / 100
+            )
+            return basePosition + randomOffset
+        end
+        
+        return basePosition
+    end
+    
+    -- 如果找不到指定部位，回退到头部
+    return CalculatePredictedPosition(targetHead)
+end
+
+-- 修改后的瞄准逻辑部分
 RunService.RenderStepped:Connect(function()
     Circle.Position = ScreenCenter
     Circle.Radius = AimSettings.FOV
@@ -582,7 +645,14 @@ RunService.RenderStepped:Connect(function()
     
     -- 瞄准逻辑
     if AimSettings.LockedTarget then
-        local predictedPosition = CalculatePredictedPosition(AimSettings.LockedTarget)
+        local predictedPosition = nil
+        
+        -- 使用智能自瞄或普通自瞄
+        if SmartAimSettings.Enabled then
+            predictedPosition = GetSmartAimPosition(AimSettings.LockedTarget)
+        else
+            predictedPosition = CalculatePredictedPosition(AimSettings.LockedTarget)
+        end
         
         -- 添加高度偏移
         if AimSettings.HeightOffset ~= 0 then
@@ -1118,6 +1188,32 @@ local Toggle = MainTab:CreateToggle({
 })
 
 local Toggle = MainTab:CreateToggle({
+   Name = "单锁模式",
+   CurrentValue = false,
+   Callback = function(Value)
+        AimSettings.LockSingleTarget = Value
+        if not Value then
+            AimSettings.LockedTarget = nil
+        end
+   end,
+})
+
+local Toggle = MainTab:CreateToggle({
+   Name = "智能自瞄演戏模式",
+   CurrentValue = false,
+   Callback = function(Value)
+        SmartAimSettings.Enabled = Value
+        if Value then
+            Rayfield:Notify({
+                Title = "智能自瞄已开启",
+                Content = "将在多个身体部位间切换瞄准",
+                Duration = 3,
+            })
+        end
+   end,
+})
+
+local Toggle = MainTab:CreateToggle({
    Name = "瞄准模式: 相机",
    CurrentValue = true,
    Callback = function(Value)
@@ -1161,17 +1257,6 @@ local Toggle = MainTab:CreateToggle({
 })
 
 local Toggle = MainTab:CreateToggle({
-   Name = "单锁模式",
-   CurrentValue = false,
-   Callback = function(Value)
-        AimSettings.LockSingleTarget = Value
-        if not Value then
-            AimSettings.LockedTarget = nil
-        end
-   end,
-})
-
-local Toggle = MainTab:CreateToggle({
    Name = "FOV圆圈",
    CurrentValue = true,
    Callback = function(Value)
@@ -1206,6 +1291,33 @@ local Dropdown = MainTab:CreateDropdown({
    CurrentOption = "选定目标",
    Callback = function(Option)
         AimSettings.FaceMode = Option == "选定目标" and "Selected" or "Nearest"
+   end,
+})
+
+-- 智能自瞄设置
+local Dropdown = MainTab:CreateDropdown({
+   Name = "自瞄模式",
+   Options = {"头部锁定",全身演戏", "随机部位", "顺序切换"},
+   CurrentOption = "头部锁定",
+   Callback = function(Option)
+        if Option == "头部锁定" then
+            SmartAimSettings.Enabled = false
+        else
+            SmartAimSettings.Enabled = true
+            SmartAimSettings.RandomizeOrder = (Option == "随机部位")
+        end
+   end,
+})
+
+local Input = MainTab:CreateInput({
+   Name = "部位切换速度 (0.1-2.0)",
+   PlaceholderText = "输入切换速度 (默认: 0.3)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value >= 0.1 and value <= 2.0 then
+            SmartAimSettings.SwitchInterval = value
+        end
    end,
 })
 

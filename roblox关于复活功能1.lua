@@ -51,6 +51,7 @@ local AimSettings = {
     FaceMode = "Selected",
     ShowTargetRay = true,
     RayColor = Color3.fromRGB(255, 0, 255),
+    HeightOffset = 0,
     }
 
 local ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
@@ -529,9 +530,9 @@ RunService.RenderStepped:Connect(function()
     if not AimSettings.Enabled then return end
     
     -- 修复自瞄逻辑：单锁模式只锁一人，普通模式可以切换目标
-    if AimSettings.LockSingleTarget then
+    if AimSettings.LockSingleTarget and AimSettings.LockedTarget then
         -- 单锁模式：只有目标无效时才清除
-        if AimSettings.LockedTarget and not IsTargetValid(AimSettings.LockedTarget) then
+        if not IsTargetValid(AimSettings.LockedTarget) then
             AimSettings.LockedTarget = nil
         end
     else
@@ -546,6 +547,12 @@ RunService.RenderStepped:Connect(function()
     -- 瞄准逻辑
     if AimSettings.LockedTarget then
         local predictedPosition = CalculatePredictedPosition(AimSettings.LockedTarget)
+        
+        -- 添加高度偏移
+        if AimSettings.HeightOffset ~= 0 then
+            predictedPosition = predictedPosition + Vector3.new(0, AimSettings.HeightOffset, 0)
+        end
+        
         AimAtPosition(predictedPosition)
     end
 end)
@@ -1216,6 +1223,30 @@ local Input = MainTab:CreateInput({
             Rayfield:Notify({
                 Title = "自瞄距离重置",
                 Content = "自瞄距离限制已取消 (无限距离)",
+                Duration = 3,
+            })
+        end
+   end,
+})
+
+local Input = MainTab:CreateInput({
+   Name = "自瞄高度偏移 (-10 到 10)",
+   PlaceholderText = "输入高度偏移 (默认: 0)",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        local value = tonumber(Text)
+        if value and value >= -10 and value <= 10 then
+            AimSettings.HeightOffset = value
+            Rayfield:Notify({
+                Title = "自瞄高度设置成功",
+                Content = "高度偏移: " .. value,
+                Duration = 3,
+            })
+        else
+            AimSettings.HeightOffset = 0
+            Rayfield:Notify({
+                Title = "自瞄高度重置",
+                Content = "高度偏移已重置为 0",
                 Duration = 3,
             })
         end

@@ -1539,12 +1539,6 @@ Tab21:Button(
         loadstring(game:HttpGet("https://pastefy.app/Z7DawZJB/raw"))()
         end)
         
-        bin:Button("复制替身脚本，在enterfullusernamehere那里输入别人的名字，按防御3次是召唤和叫回去", function()
-    setclipboard("getgenv().TargetUsername = "EnterFullUsernameHere" --Capitalization Important!!
-
-loadstring(game:HttpGet("https://raw.githubusercontent.com/Dragonfly5101/Minosr/refs/heads/main/Stand"))()")
-end)
-        
         credits:Button(
         "Kiba Tech v2",
         function()

@@ -648,6 +648,12 @@ credits:Button(
         end)
         
         credits:Button(
+        "自动汉化翻译(翻译内容太多会很卡",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/greatjakson-lgtm/-2/main/戊自动汉化", true))()
+        end)
+        
+        credits:Button(
         "碰到就飞",
         function()
         loadstring(game:HttpGet(('https://raw.githubusercontent.com/0Ben1/fe/main/obf_5wpM7bBcOPspmX7lQ3m75SrYNWqxZ858ai3tJdEAId6jSI05IOUB224FQ0VSAswH.lua.txt'),true))()
@@ -1289,7 +1295,20 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/ShenJiaoBen/Partial-S
         end)
         
         
+        local creds = window:Tab("墨水游戏", "992417778")
+    local credits = creds:section("内容", true)
+    
+    credits:Button(
+        "脚本(第二强，已汉化",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/hdjsjjdgrhj/script-hub/refs/heads/main/TexRBLlX"))()
+        end)
         
+        credits:Button(
+        "脚本2(已汉化",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/ke9460394-dot/ugik/refs/heads/main/%E6%B1%89%E5%8C%96%E5%A2%A8%E6%B0%B4Ringta.txt"))()
+        end)
 
         
         local creds = window:Tab("极速传奇", "992417778")
@@ -1697,20 +1716,9 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/ivannetta/ShitScripts
         end)
         
         credits:Button(
-        "nol最好最强的平替!!!(还是nol付费更强",
+        "nol最好最强的平替!!!(已汉化，但还是nol付费更强",
         function()
-        if getgenv then
-
-getgenv().BloxtrapRPC =
-"true"
-getgenv().DebugNotifications = "false"
-getgenv().TrackMePlease
-
-=
-"true"
-end
-
-loadstring(game:HttpGet("https://raw.githubusercontent.com/ivannetta/ShitScripts/main/forsaken.lua"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/ke9460394-dot/ugik/refs/heads/main/Fartsaken.txt"))()
 end)
         
         credits:Button(
@@ -1835,7 +1843,7 @@ Tab21:Button(
         loadstring(game:HttpGet("https://raw.githubusercontent.com/ke9460394-dot/ugik/refs/heads/main/ArgonHubX.lua"))()
         end)
         
-        local creds = window:Tab("成为乞丐", "6035145364")
+        local creds = window:Tab("成为乞丐", "992417778")
     local credits = creds:section("内容", true)
     
     credits:Button(
@@ -1844,7 +1852,7 @@ Tab21:Button(
         loadstring(game:HttpGet("https://raw.githubusercontent.com/ke9460394-dot/ugik/refs/heads/main/NEGA.lua"))()
         end)
         
-        local creds = window:Tab("活了七天", "6035145364")
+        local creds = window:Tab("活了七天", "992417778")
     local credits = creds:section("内容", true)
     
     credits:Button(
@@ -2186,6 +2194,12 @@ local creds = window:Tab("其他脚本", "992417778")
         "禁漫中心",
         function()
         getgenv().LS="禁漫中心" loadstring(game:HttpGet("https://raw.githubusercontent.com/dingding123hhh/ng/main/jmlllllllIIIIlllllII.lua"))()---公益 大约65个服务器 祝好---公益 暑假无聊 进群：930667114 找群主领取禁漫天堂 轻松快乐
+        end)
+        
+        credits:Button(
+        "kenny脚本",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/ke9460394-dot/ugik/refs/heads/main/Kenny1.5.txt"))()
         end)
         
         credits:Button(

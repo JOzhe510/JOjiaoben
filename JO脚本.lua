@@ -663,6 +663,7 @@ credits:Button(
         "防甩飞",
         function()
         loadstring(game:HttpGet('https://raw.githubusercontent.com/Linux6699/DaHubRevival/main/AntiFling.lua'))()
+        end)
 
         credits:Button(
         "通用子弹追踪",
@@ -758,7 +759,7 @@ credits:Button(
     _G.HeadSize = 300 _G.Disabled = true game:GetService('RunService').RenderStepped:connect(function() if _G.Disabled then for i,v in next, game:GetService('Players'):GetPlayers() do if v.Name ~= game:GetService('Players').LocalPlayer.Name then pcall(function() v.Character.HumanoidRootPart.Size = Vector3.new(_G.HeadSize,_G.HeadSize,_G.HeadSize) v.Character.HumanoidRootPart.Transparency = 0.7 v.Character.HumanoidRootPart.BrickColor = BrickColor.new("Really blue") v.Character.HumanoidRootPart.Material = "Neon" v.Character.HumanoidRootPart.CanCollide = false end) end end end end)
 end)
 
-local creds = window:Tab("视角大小更改", "6035145364")
+local creds = window:Tab("视角大小更改", "992417778")
     local credits = creds:section("内容", true)
     
     credits:Button(
@@ -996,7 +997,7 @@ onFOVChanged()
 print("FOV强制锁定已启用")
 end)
 
-local creds = window:Tab("射击类游戏脚本", "6035145364")
+local creds = window:Tab("射击类游戏脚本", "992417778")
     local credits = creds:section("内容", true)
     
     credits:Button(
@@ -1410,7 +1411,7 @@ creditsHUB:Button(
         loadstring(game:HttpGet("https://raw.githubusercontent.com/Omgshit/Scripts/main/MainLoader.lua"))()
         end)
         
-        local creds = window:Tab("三叉姬生成", "6035145364")
+        local creds = window:Tab("三叉姬生成", "992417778")
     local credits = creds:section("内容", true)
     
     credits:Button(

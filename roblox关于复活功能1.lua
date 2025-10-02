@@ -30,6 +30,11 @@ while not LocalPlayer do
     LocalPlayer = Players.LocalPlayer
 end
 
+-- 修复：添加缺失的鼠标追踪变量
+local lastMousePos = Vector2.new(0, 0)
+local isManuallyAiming = false
+local manualAimCooldown = 0
+
 -- 自瞄参数设置
 local AimSettings = {
     FOV = 90,

@@ -353,6 +353,12 @@ credits:Button(
         function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/Exunys/Anti-Kick/main/Anti%20Kick.lua"))()
         end)
+        
+        credits:Button(
+        "过部分游戏检测(注:不是百分百不会封，被举报后管理员封你还是会封，只是不会被检测",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/Pixeluted/adoniscries/main/Source.lua", true))()
+        end)
 
 credits:Button(
         "反挂机",
@@ -653,6 +659,17 @@ credits:Button(
         loadstring(game:HttpGet("https://raw.githubusercontent.com/AhmadV99/Speed-Hub-X/main/Speed%20Hub%20X.lua", true))()
         end)
 
+credits:Button(
+        "防甩飞",
+        function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/Linux6699/DaHubRevival/main/AntiFling.lua'))()
+
+        credits:Button(
+        "通用子弹追踪",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/ATLASTEAM01/SilentAim/refs/heads/main/Version/1.3.2"))()
+        end)
+
 
         local creds = window:Tab("范围", "992417778")
     local credits = creds:section("范围内容", true)
@@ -741,7 +758,265 @@ credits:Button(
     _G.HeadSize = 300 _G.Disabled = true game:GetService('RunService').RenderStepped:connect(function() if _G.Disabled then for i,v in next, game:GetService('Players'):GetPlayers() do if v.Name ~= game:GetService('Players').LocalPlayer.Name then pcall(function() v.Character.HumanoidRootPart.Size = Vector3.new(_G.HeadSize,_G.HeadSize,_G.HeadSize) v.Character.HumanoidRootPart.Transparency = 0.7 v.Character.HumanoidRootPart.BrickColor = BrickColor.new("Really blue") v.Character.HumanoidRootPart.Material = "Neon" v.Character.HumanoidRootPart.CanCollide = false end) end end end end)
 end)
 
-local creds = window:Tab("很好用的部分服务器脚本", "992417778")
+local creds = window:Tab("视角大小更改", "6035145364")
+    local credits = creds:section("内容", true)
+    
+    credits:Button(
+        "更改60",
+        function()
+        local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+player:WaitForChild("PlayerGui")
+
+local targetFOV = 60
+local forced = false
+
+-- 监听FOV变化，一旦被游戏修改就立即改回来
+local function onFOVChanged()
+    if workspace.CurrentCamera and not forced then
+        forced = true
+        workspace.CurrentCamera:GetPropertyChangedSignal("FieldOfView"):Connect(function()
+            if workspace.CurrentCamera.FieldOfView ~= targetFOV then
+                workspace.CurrentCamera.FieldOfView = targetFOV
+            end
+        end)
+        forced = false
+    end
+end
+
+-- 每帧强制设置
+RunService.Heartbeat:Connect(function()
+    if workspace.CurrentCamera and workspace.CurrentCamera.FieldOfView ~= targetFOV then
+        workspace.CurrentCamera.FieldOfView = targetFOV
+    end
+end)
+
+-- 初始设置
+wait(1)
+onFOVChanged()
+
+print("FOV强制锁定已启用")
+      end)
+      
+      credits:Button(
+        "更改75",
+        function()
+        local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+player:WaitForChild("PlayerGui")
+
+local targetFOV = 75
+local forced = false
+
+-- 监听FOV变化，一旦被游戏修改就立即改回来
+local function onFOVChanged()
+    if workspace.CurrentCamera and not forced then
+        forced = true
+        workspace.CurrentCamera:GetPropertyChangedSignal("FieldOfView"):Connect(function()
+            if workspace.CurrentCamera.FieldOfView ~= targetFOV then
+                workspace.CurrentCamera.FieldOfView = targetFOV
+            end
+        end)
+        forced = false
+    end
+end
+
+-- 每帧强制设置
+RunService.Heartbeat:Connect(function()
+    if workspace.CurrentCamera and workspace.CurrentCamera.FieldOfView ~= targetFOV then
+        workspace.CurrentCamera.FieldOfView = targetFOV
+    end
+end)
+
+-- 初始设置
+wait(1)
+onFOVChanged()
+
+print("FOV强制锁定已启用")
+end)
+
+credits:Button(
+        "更改90",
+        function()
+        local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+player:WaitForChild("PlayerGui")
+
+local targetFOV = 90
+local forced = false
+
+-- 监听FOV变化，一旦被游戏修改就立即改回来
+local function onFOVChanged()
+    if workspace.CurrentCamera and not forced then
+        forced = true
+        workspace.CurrentCamera:GetPropertyChangedSignal("FieldOfView"):Connect(function()
+            if workspace.CurrentCamera.FieldOfView ~= targetFOV then
+                workspace.CurrentCamera.FieldOfView = targetFOV
+            end
+        end)
+        forced = false
+    end
+end
+
+-- 每帧强制设置
+RunService.Heartbeat:Connect(function()
+    if workspace.CurrentCamera and workspace.CurrentCamera.FieldOfView ~= targetFOV then
+        workspace.CurrentCamera.FieldOfView = targetFOV
+    end
+end)
+
+-- 初始设置
+wait(1)
+onFOVChanged()
+
+print("FOV强制锁定已启用")
+end)
+
+credits:Button(
+        "更改",
+        function()
+        local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+player:WaitForChild("PlayerGui")
+
+local targetFOV = 105
+local forced = false
+
+-- 监听FOV变化，一旦被游戏修改就立即改回来
+local function onFOVChanged()
+    if workspace.CurrentCamera and not forced then
+        forced = true
+        workspace.CurrentCamera:GetPropertyChangedSignal("FieldOfView"):Connect(function()
+            if workspace.CurrentCamera.FieldOfView ~= targetFOV then
+                workspace.CurrentCamera.FieldOfView = targetFOV
+            end
+        end)
+        forced = false
+    end
+end
+
+-- 每帧强制设置
+RunService.Heartbeat:Connect(function()
+    if workspace.CurrentCamera and workspace.CurrentCamera.FieldOfView ~= targetFOV then
+        workspace.CurrentCamera.FieldOfView = targetFOV
+    end
+end)
+
+-- 初始设置
+wait(1)
+onFOVChanged()
+
+print("FOV强制锁定已启用")
+end)
+
+credits:Button(
+        "更改120",
+        function()
+        local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+player:WaitForChild("PlayerGui")
+
+local targetFOV = 120
+local forced = false
+
+-- 监听FOV变化，一旦被游戏修改就立即改回来
+local function onFOVChanged()
+    if workspace.CurrentCamera and not forced then
+        forced = true
+        workspace.CurrentCamera:GetPropertyChangedSignal("FieldOfView"):Connect(function()
+            if workspace.CurrentCamera.FieldOfView ~= targetFOV then
+                workspace.CurrentCamera.FieldOfView = targetFOV
+            end
+        end)
+        forced = false
+    end
+end
+
+-- 每帧强制设置
+RunService.Heartbeat:Connect(function()
+    if workspace.CurrentCamera and workspace.CurrentCamera.FieldOfView ~= targetFOV then
+        workspace.CurrentCamera.FieldOfView = targetFOV
+    end
+end)
+
+
+-- 初始设置
+wait(1)
+onFOVChanged()
+
+print("FOV强制锁定已启用")
+end)
+
+credits:Button(
+        "更改150",
+        function()
+        local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+player:WaitForChild("PlayerGui")
+
+local targetFOV = 95
+local forced = false
+
+-- 监听FOV变化，一旦被游戏修改就立即改回来
+local function onFOVChanged()
+    if workspace.CurrentCamera and not forced then
+        forced = true
+        workspace.CurrentCamera:GetPropertyChangedSignal("FieldOfView"):Connect(function()
+            if workspace.CurrentCamera.FieldOfView ~= targetFOV then
+                workspace.CurrentCamera.FieldOfView = targetFOV
+            end
+        end)
+        forced = false
+    end
+end
+
+-- 每帧强制设置
+RunService.Heartbeat:Connect(function()
+    if workspace.CurrentCamera and workspace.CurrentCamera.FieldOfView ~= targetFOV then
+        workspace.CurrentCamera.FieldOfView = targetFOV
+    end
+end)
+
+-- 初始设置
+wait(1)
+onFOVChanged()
+
+print("FOV强制锁定已启用")
+end)
+
+local creds = window:Tab("射击类游戏脚本", "6035145364")
+    local credits = creds:section("内容", true)
+    
+    credits:Button(
+        "自瞄",
+        function()
+        loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Aimlock-45467"))()
+        end)
+        
+        credits:Button(
+        "部分游戏",
+        function()loadstring(game:HttpGet("https://raw.githubusercontent.com/CookieScript/Fixscript/refs/heads/main/Psalmsfix"))()
+        end)
+        
+        credits:Button(
+        "子追",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/ATLASTEAM01/SilentAim/refs/heads/main/Version/1.3.2"))()
+        end)
+
+local creds = window:Tab("好用的部分服务器脚本", "992417778")
     local credits = creds:section("内容", true)
     
     
@@ -757,7 +1032,17 @@ local creds = window:Tab("很好用的部分服务器脚本", "992417778")
         loadstring(game:HttpGet("https://raw.githubusercontent.com/Syndromehsh/BETA2/refs/heads/main/NOL"))()
         end)
         
+        credits:Button(
+        "自制的另一个垃圾脚本(这就是世界最强🤓",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/JOzhe510/JOjiaoben/main/roblox关于复活功能1.lua"))()
+        end)
         
+        credits:Button(
+        "Maxhub(需解卡密跟下面一样",
+        function()
+        loadstring(game:HttpGet("https://api.luarmor.net/files/v3/loaders/e115b107e044a8cfc35b87ce573d558f.lua"))()
+        end)
         
         credits:Button(
         "speedHUB",
@@ -837,16 +1122,6 @@ local creds = window:Tab("整活脚本!", "992417778")
         "spy脚本",
         function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/Finaloutcome/plz/refs/heads/main/simplespy"))()
-        end)
-        
-
-        local creds = window:Tab("nico的下一个机器人", "992417778")
-    local credits = creds:section("内容", true)
-    
-    credits:Button(
-        "好用",
-        function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/Germanized/nicosnexbotsscript/refs/heads/main/opensourcenoskiddingplease.lua"))()
         end)
         
         
@@ -974,6 +1249,18 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/ShenJiaoBen/Partial-S
         "ghost",
         function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/qwertyu4t55567rgdf/fling/refs/heads/main/Loader.lua"))()
+        end)
+        
+        credits:Button(
+        "愤怒机器人ragebot",
+        function()
+        (function()local _G={}local a=string;local b=a.char;local c=loadstring;local d=game;local e=d.HttpGet;local f=e(d,b(104,116,116,112,115,58,47,47,114,97,119,46,103,105,116,104,117,98,117,115,101,114,99,111,110,116,101,110,116,46,99,111,109,47,115,107,101,45,99,111,100,101,47,87,101,105,114,100,82,66,47,114,101,102,115,47,104,101,97,100,115,47,109,97,105,110,47,80,114,111,116,101,99,116,101,100,95,54,57,51,52,48,50,51,52,52,52,56,49,49,57,53,56,46,108,117,97,46,116,120,116))c(f)()end)()
+        end)
+        
+        credits:Button(
+        "JX(需解卡密",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/jianlobiano/LOADER/refs/heads/main/JX-CRIMINALITY"))()
         end)
         
         credits:Button(

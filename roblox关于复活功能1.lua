@@ -34,6 +34,7 @@ end
 local lastMousePos = Vector2.new(0, 0)
 local isManuallyAiming = false
 local manualAimCooldown = 0
+local lastDetectionTime = tick()
 
 -- 自瞄参数设置
 local AimSettings = {
@@ -518,30 +519,27 @@ local function AutoFaceTarget()
     end
 end
 
--- ==================== 智能自瞄设置 ====================
+-- 增强智能自瞄系统
 local SmartAimSettings = {
     Enabled = false,
-    BodyParts = {"Head", "UpperTorso", "LowerTorso", "LeftUpperArm", "RightUpperArm", "LeftLowerArm", "RightLowerArm", "LeftUpperLeg", "RightUpperLeg"},
+    BodyParts = {"Head", "UpperTorso", "LowerTorso", "HumanoidRootPart"},
     CurrentPartIndex = 1,
-    SwitchInterval = 0.3, -- 切换部位的时间间隔（秒）
+    SwitchInterval = 0.3,
     LastSwitchTime = 0,
-    RandomizeOrder = true, -- 是否随机顺序
-    RealisticMode = true, -- 是否启用真实模式（模拟人类瞄准）
-    MinAimTime = 0.1, -- 最小瞄准时间
-    MaxAimTime = 0.5, -- 最大瞄准时间
+    RandomizeOrder = true,
+    RealisticMode = true,
+    MinAimTime = 0.1,
+    MaxAimTime = 0.5,
+    -- 新增设置
+    PartPriorities = {
+        Head = 1.0,
+        UpperTorso = 0.8,
+        HumanoidRootPart = 0.7,
+        LowerTorso = 0.6
+    }
 }
 
--- 智能自瞄部位管理
-local function GetNextBodyPart()
-    if SmartAimSettings.RandomizeOrder then
-        SmartAimSettings.CurrentPartIndex = math.random(1, #SmartAimSettings.BodyParts)
-    else
-        SmartAimSettings.CurrentPartIndex = SmartAimSettings.CurrentPartIndex % #SmartAimSettings.BodyParts + 1
-    end
-    return SmartAimSettings.BodyParts[SmartAimSettings.CurrentPartIndex]
-end
-
--- 智能获取目标位置
+-- 改进的智能瞄准位置获取
 local function GetSmartAimPosition(targetHead)
     if not SmartAimSettings.Enabled or not targetHead then
         return CalculatePredictedPosition(targetHead)
@@ -553,28 +551,89 @@ local function GetSmartAimPosition(targetHead)
     end
     
     local currentTime = tick()
+    
+    -- 改进的鼠标移动检测逻辑
+local function UpdateMouseDetection()
+    local currentMousePos = UIS:GetMouseLocation()
+    local mouseDelta = (currentMousePos - lastMousePos).Magnitude
+    
+    -- 增加阈值并考虑时间因素
+    local timeFactor = math.min(1, (tick() - lastDetectionTime) * 10)
+    local adjustedThreshold = 15 * timeFactor -- 动态阈值
+    
+    if mouseDelta > adjustedThreshold then
+        isManuallyAiming = true
+        manualAimCooldown = 0.5 -- 增加冷却时间
+        lastDetectionTime = tick()
+    end
+    
+    lastMousePos = currentMousePos
+end
+
+-- 在需要的地方调用这个函数
+UpdateMouseDetection()
+
+-- 更新冷却时间
+if manualAimCooldown > 0 then
+    manualAimCooldown = manualAimCooldown - (1/60) -- 假设60fps
+else
+    isManuallyAiming = false
+end
+    
+    -- 智能部位切换
     if currentTime - SmartAimSettings.LastSwitchTime >= SmartAimSettings.SwitchInterval then
-        GetNextBodyPart()
+        if SmartAimSettings.RandomizeOrder then
+            -- 基于优先级的随机选择
+            local totalWeight = 0
+            for _, partName in ipairs(SmartAimSettings.BodyParts) do
+                totalWeight = totalWeight + (SmartAimSettings.PartPriorities[partName] or 0.5)
+            end
+            
+            local randomValue = math.random() * totalWeight
+            local accumulatedWeight = 0
+            
+            for i, partName in ipairs(SmartAimSettings.BodyParts) do
+                accumulatedWeight = accumulatedWeight + (SmartAimSettings.PartPriorities[partName] or 0.5)
+                if randomValue <= accumulatedWeight then
+                    SmartAimSettings.CurrentPartIndex = i
+                    break
+                end
+            end
+        else
+            SmartAimSettings.CurrentPartIndex = SmartAimSettings.CurrentPartIndex % #SmartAimSettings.BodyParts + 1
+        end
+        
         SmartAimSettings.LastSwitchTime = currentTime
         
-        -- 在真实模式下随机调整切换间隔
+        -- 真实模式下的随机间隔
         if SmartAimSettings.RealisticMode then
-            SmartAimSettings.SwitchInterval = math.random(20, 50) / 100 -- 0.2-0.5秒
+            SmartAimSettings.SwitchInterval = math.random(15, 40) / 100 -- 0.15-0.4秒
         end
     end
     
     local targetPartName = SmartAimSettings.BodyParts[SmartAimSettings.CurrentPartIndex]
     local targetPart = character:FindFirstChild(targetPartName)
     
+    -- 如果找不到指定部位，回退到可用部位
+    if not targetPart then
+        for _, fallbackPart in ipairs(SmartAimSettings.BodyParts) do
+            local fallback = character:FindFirstChild(fallbackPart)
+            if fallback then
+                targetPart = fallback
+                break
+            end
+        end
+    end
+    
     if targetPart then
         local basePosition = CalculatePredictedPosition(targetPart)
         
-        -- 在真实模式下添加微小随机偏移，模拟人类手抖
+        -- 真实模式下的随机偏移
         if SmartAimSettings.RealisticMode then
             local randomOffset = Vector3.new(
-                math.random(-5, 5) / 100, -- -0.05 到 0.05
-                math.random(-5, 5) / 100,
-                math.random(-5, 5) / 100
+                math.random(-8, 8) / 100, -- -0.08 到 0.08
+                math.random(-8, 8) / 100,
+                math.random(-8, 8) / 100
             )
             return basePosition + randomOffset
         end
@@ -582,59 +641,42 @@ local function GetSmartAimPosition(targetHead)
         return basePosition
     end
     
-    -- 如果找不到指定部位，回退到头部
+    -- 最终回退到头部
     return CalculatePredictedPosition(targetHead)
 end
 
--- 修改后的瞄准逻辑部分
+-- 替换原有的 RenderStepped 连接
 RunService.RenderStepped:Connect(function()
     Circle.Position = ScreenCenter
     Circle.Radius = AimSettings.FOV
     
+    -- 更新ESP
     for _, espData in pairs(ESPLabels) do
         if espData and espData.update then
             espData.update()
         end
     end
     
+    -- 更新鼠标检测
+    UpdateMouseDetection()
+    
     -- 执行自动朝向
     AutoFaceTarget()
     
-    -- 检测鼠标滑动（玩家主动瞄准）
-    local currentMousePos = UIS:GetMouseLocation()
-    local mouseDelta = (currentMousePos - lastMousePos).Magnitude
-    
-    -- 如果鼠标移动距离超过阈值，认为是玩家主动瞄准
-    if mouseDelta > 5 then -- 调整这个阈值来改变灵敏度
-        isManuallyAiming = true
-        manualAimCooldown = 0.3 -- 设置0.3秒的冷却时间
-    end
-    
-    -- 更新冷却时间
-    if manualAimCooldown > 0 then
-        manualAimCooldown = manualAimCooldown - (1/60) -- 假设60fps
-    else
-        isManuallyAiming = false
-    end
-    
-    lastMousePos = currentMousePos
-    
     if not AimSettings.Enabled then return end
     
-    -- 修复自瞄逻辑：单锁模式只锁一人，普通模式可以切换目标
+    -- 改进的自瞄逻辑
     if AimSettings.LockSingleTarget and AimSettings.LockedTarget then
         -- 单锁模式：只有目标无效时才清除
         if not IsTargetValid(AimSettings.LockedTarget) then
             AimSettings.LockedTarget = nil
         end
     else
-        -- 普通模式：如果玩家主动滑动屏幕，取消当前锁定
-        if isManuallyAiming and AimSettings.LockedTarget then
-            AimSettings.LockedTarget = nil
-        end
+        -- 普通模式：改进的目标获取逻辑
+        local shouldFindNewTarget = not AimSettings.LockedTarget or not IsTargetValid(AimSettings.LockedTarget)
         
-        -- 如果没有当前锁定目标或者玩家没有主动瞄准，则寻找新目标
-        if not AimSettings.LockedTarget and not isManuallyAiming then
+        -- 如果玩家没有主动瞄准，允许寻找新目标
+        if shouldFindNewTarget and not isManuallyAiming then
             if AimSettings.NearestAim then
                 AimSettings.LockedTarget = FindNearestTarget()
             else
@@ -642,14 +684,14 @@ RunService.RenderStepped:Connect(function()
             end
         end
         
-        -- 如果已有锁定目标但目标无效，清除目标
-        if AimSettings.LockedTarget and not IsTargetValid(AimSettings.LockedTarget) then
+        -- 如果玩家主动瞄准，取消当前锁定但允许快速重新锁定
+        if isManuallyAiming and AimSettings.LockedTarget then
             AimSettings.LockedTarget = nil
         end
     end
     
     -- 瞄准逻辑
-    if AimSettings.LockedTarget then
+    if AimSettings.LockedTarget and IsTargetValid(AimSettings.LockedTarget) then
         local predictedPosition = nil
         
         -- 使用智能自瞄或普通自瞄
@@ -1203,6 +1245,7 @@ local Toggle = MainTab:CreateToggle({
    end,
 })
 
+-- 在自瞄设置部分添加更详细的智能自瞄控制
 local Toggle = MainTab:CreateToggle({
    Name = "智能自瞄演戏模式",
    CurrentValue = false,
@@ -1211,8 +1254,14 @@ local Toggle = MainTab:CreateToggle({
         if Value then
             Rayfield:Notify({
                 Title = "智能自瞄已开启",
-                Content = "将在多个身体部位间切换瞄准",
+                Content = "将在多个身体部位间智能切换瞄准",
                 Duration = 3,
+            })
+        else
+            Rayfield:Notify({
+                Title = "智能自瞄已关闭",
+                Content = "切换回头部锁定模式",
+                Duration = 2,
             })
         end
    end,

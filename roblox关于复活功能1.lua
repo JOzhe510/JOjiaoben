@@ -460,7 +460,7 @@ local function IsTargetValid(target)
     return true
 end
 
--- 修复的自动朝向目标函数 - 只控制水平旋转
+-- 修复的自动朝向目标函数
 local function AutoFaceTarget()
     if not AimSettings.AutoFaceTarget or not LocalPlayer.Character then
         TargetRay.Visible = false
@@ -477,6 +477,9 @@ local function AutoFaceTarget()
         targetHead = AimSettings.LockedTarget
     elseif AimSettings.FaceMode == "Nearest" then
         targetHead = FindNearestTarget()
+    else
+        -- 如果没有特定模式，使用当前锁定目标
+        targetHead = AimSettings.LockedTarget
     end
     
     if not targetHead or not IsTargetValid(targetHead) then
@@ -497,9 +500,14 @@ local function AutoFaceTarget()
     -- 只使用X和Z分量来保持水平旋转，忽略Y分量
     local horizontalDirection = Vector3.new(direction.X, 0, direction.Z).Unit
     
-    -- 保持原有的垂直位置
-    local newCFrame = CFrame.new(localRoot.Position, localRoot.Position + horizontalDirection)
-    localRoot.CFrame = newCFrame
+    if horizontalDirection.Magnitude > 0 then
+        -- 使用平滑过渡
+        local currentLook = currentCFrame.LookVector
+        local horizontalCurrentLook = Vector3.new(currentLook.X, 0, currentLook.Z).Unit
+        
+        local newLook = (horizontalCurrentLook * (1 - AimSettings.FaceSpeed) + horizontalDirection * AimSettings.FaceSpeed).Unit
+        localRoot.CFrame = CFrame.new(localRoot.Position, localRoot.Position + newLook)
+    end
     
     -- 显示目标射线
     if AimSettings.ShowTargetRay then
@@ -552,32 +560,26 @@ local function GetSmartAimPosition(targetHead)
     
     local currentTime = tick()
     
-    -- 改进的鼠标移动检测逻辑
+    -- 修复的鼠标移动检测逻辑
 local function UpdateMouseDetection()
     local currentMousePos = UIS:GetMouseLocation()
     local mouseDelta = (currentMousePos - lastMousePos).Magnitude
     
-    -- 增加阈值并考虑时间因素
-    local timeFactor = math.min(1, (tick() - lastDetectionTime) * 10)
-    local adjustedThreshold = 15 * timeFactor -- 动态阈值
-    
-    if mouseDelta > adjustedThreshold then
+    -- 使用固定阈值，避免过于敏感
+    if mouseDelta > 5 then -- 降低阈值到5
         isManuallyAiming = true
-        manualAimCooldown = 0.5 -- 增加冷却时间
+        manualAimCooldown = 0.3 -- 减少冷却时间
         lastDetectionTime = tick()
     end
     
+    -- 更新冷却时间
+    if manualAimCooldown > 0 then
+        manualAimCooldown = manualAimCooldown - (1/60)
+    else
+        isManuallyAiming = false
+    end
+    
     lastMousePos = currentMousePos
-end
-
--- 在需要的地方调用这个函数
-UpdateMouseDetection()
-
--- 更新冷却时间
-if manualAimCooldown > 0 then
-    manualAimCooldown = manualAimCooldown - (1/60) -- 假设60fps
-else
-    isManuallyAiming = false
 end
     
     -- 智能部位切换
@@ -645,7 +647,7 @@ end
     return CalculatePredictedPosition(targetHead)
 end
 
--- 替换原有的 RenderStepped 连接
+-- 修复自瞄目标获取逻辑
 RunService.RenderStepped:Connect(function()
     Circle.Position = ScreenCenter
     Circle.Radius = AimSettings.FOV
@@ -663,34 +665,62 @@ RunService.RenderStepped:Connect(function()
     -- 执行自动朝向
     AutoFaceTarget()
     
-    if not AimSettings.Enabled then return end
+    if not AimSettings.Enabled then 
+        AimSettings.LockedTarget = nil
+        return 
+    end
     
-    -- 改进的自瞄逻辑
-    if AimSettings.LockSingleTarget and AimSettings.LockedTarget then
-        -- 单锁模式：只有目标无效时才清除
-        if not IsTargetValid(AimSettings.LockedTarget) then
-            AimSettings.LockedTarget = nil
-        end
-    else
-        -- 普通模式：改进的目标获取逻辑
-        local shouldFindNewTarget = not AimSettings.LockedTarget or not IsTargetValid(AimSettings.LockedTarget)
-        
-        -- 如果玩家没有主动瞄准，允许寻找新目标
-        if shouldFindNewTarget and not isManuallyAiming then
+    -- ==================== 修复的自瞄目标获取逻辑 ====================
+    
+    -- 检查当前锁定目标是否仍然有效
+    if AimSettings.LockedTarget and not IsTargetValid(AimSettings.LockedTarget) then
+        AimSettings.LockedTarget = nil
+    end
+    
+    -- 单锁模式逻辑
+    if AimSettings.LockSingleTarget then
+        -- 如果没有锁定目标，尝试寻找新目标
+        if not AimSettings.LockedTarget then
             if AimSettings.NearestAim then
                 AimSettings.LockedTarget = FindNearestTarget()
             else
                 AimSettings.LockedTarget = FindTargetInView()
             end
+            
+            -- 如果找到目标，通知用户
+            if AimSettings.LockedTarget then
+                local player = Players:GetPlayerFromCharacter(AimSettings.LockedTarget.Parent)
+                if player then
+                    Rayfield:Notify({
+                        Title = "目标锁定",
+                        Content = "已锁定: " .. player.Name,
+                        Duration = 2,
+                    })
+                end
+            end
         end
-        
-        -- 如果玩家主动瞄准，取消当前锁定但允许快速重新锁定
-        if isManuallyAiming and AimSettings.LockedTarget then
+    else
+        -- 普通模式逻辑
+        -- 只有在没有手动瞄准时才寻找新目标
+        if not isManuallyAiming then
+            local shouldFindNewTarget = not AimSettings.LockedTarget
+            
+            -- 如果当前没有目标，或者目标无效，寻找新目标
+            if shouldFindNewTarget then
+                if AimSettings.NearestAim then
+                    AimSettings.LockedTarget = FindNearestTarget()
+                else
+                    AimSettings.LockedTarget = FindTargetInView()
+                end
+            end
+        else
+            -- 如果玩家正在手动瞄准，清除锁定目标
             AimSettings.LockedTarget = nil
         end
     end
     
-    -- 瞄准逻辑
+    -- ==================== 修复的瞄准逻辑 ====================
+    
     if AimSettings.LockedTarget and IsTargetValid(AimSettings.LockedTarget) then
         local predictedPosition = nil
         
@@ -706,7 +736,18 @@ RunService.RenderStepped:Connect(function()
             predictedPosition = predictedPosition + Vector3.new(0, AimSettings.HeightOffset, 0)
         end
         
+        -- 执行瞄准
         AimAtPosition(predictedPosition)
+        
+        -- 显示锁定状态
+        if tick() % 1 < 0.1 then -- 每秒闪烁10次
+            Circle.Color = Color3.fromRGB(0, 255, 0) -- 绿色表示锁定
+        else
+            Circle.Color = Color3.fromRGB(255, 0, 0) -- 红色表示未锁定
+        end
+    else
+        -- 没有锁定目标时显示红色圆圈
+        Circle.Color = Color3.fromRGB(255, 0, 0)
     end
 end)
 

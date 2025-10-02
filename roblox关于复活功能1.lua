@@ -514,6 +514,11 @@ local function AutoFaceTarget()
 end
 
 -- ==================== 修复自瞄锁定逻辑 ====================
+-- 添加滑动检测变量
+local lastMousePos = UIS:GetMouseLocation()
+local isManuallyAiming = false
+local manualAimCooldown = 0
+
 RunService.RenderStepped:Connect(function()
     Circle.Position = ScreenCenter
     Circle.Radius = AimSettings.FOV
@@ -527,6 +532,25 @@ RunService.RenderStepped:Connect(function()
     -- 执行自动朝向
     AutoFaceTarget()
     
+    -- 检测鼠标滑动（玩家主动瞄准）
+    local currentMousePos = UIS:GetMouseLocation()
+    local mouseDelta = (currentMousePos - lastMousePos).Magnitude
+    
+    -- 如果鼠标移动距离超过阈值，认为是玩家主动瞄准
+    if mouseDelta > 5 then -- 调整这个阈值来改变灵敏度
+        isManuallyAiming = true
+        manualAimCooldown = 0.3 -- 设置0.3秒的冷却时间
+    end
+    
+    -- 更新冷却时间
+    if manualAimCooldown > 0 then
+        manualAimCooldown = manualAimCooldown - (1/60) -- 假设60fps
+    else
+        isManuallyAiming = false
+    end
+    
+    lastMousePos = currentMousePos
+    
     if not AimSettings.Enabled then return end
     
     -- 修复自瞄逻辑：单锁模式只锁一人，普通模式可以切换目标
@@ -536,11 +560,23 @@ RunService.RenderStepped:Connect(function()
             AimSettings.LockedTarget = nil
         end
     else
-        -- 普通模式：根据设置寻找目标
-        if AimSettings.NearestAim then
-            AimSettings.LockedTarget = FindNearestTarget()
-        else
-            AimSettings.LockedTarget = FindTargetInView()
+        -- 普通模式：如果玩家主动滑动屏幕，取消当前锁定
+        if isManuallyAiming and AimSettings.LockedTarget then
+            AimSettings.LockedTarget = nil
+        end
+        
+        -- 如果没有当前锁定目标或者玩家没有主动瞄准，则寻找新目标
+        if not AimSettings.LockedTarget and not isManuallyAiming then
+            if AimSettings.NearestAim then
+                AimSettings.LockedTarget = FindNearestTarget()
+            else
+                AimSettings.LockedTarget = FindTargetInView()
+            end
+        end
+        
+        -- 如果已有锁定目标但目标无效，清除目标
+        if AimSettings.LockedTarget and not IsTargetValid(AimSettings.LockedTarget) then
+            AimSettings.LockedTarget = nil
         end
     end
     

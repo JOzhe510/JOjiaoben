@@ -1294,10 +1294,9 @@ local Dropdown = MainTab:CreateDropdown({
    end,
 })
 
--- 智能自瞄设置
 local Dropdown = MainTab:CreateDropdown({
    Name = "自瞄模式",
-   Options = {"头部锁定",全身演戏", "随机部位", "顺序切换"},
+   Options = {"头部锁定", "全身演戏", "随机部位", "顺序切换"},  -- 修复了字符串格式
    CurrentOption = "头部锁定",
    Callback = function(Option)
         if Option == "头部锁定" then

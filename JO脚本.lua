@@ -1409,6 +1409,20 @@ creditsHUB:Button(
         function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/Omgshit/Scripts/main/MainLoader.lua"))()
         end)
+        
+        local creds = window:Tab("三叉姬生成", "6035145364")
+    local credits = creds:section("内容", true)
+    
+    credits:Button(
+        "脚本1(英文",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/SWIMHUBISWIMMING/swimhub/refs/heads/main/free_trident.lua"))()
+        end)
+        
+        credits:Button(
+        "脚本2(部分已汉化",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/JOzhe510/JOjiaoben/main/三叉戟生存.lua"))()
 
 local creds = window:Tab("小屋角色扮演", "992417778")
     local credits = creds:section("内容", true)
@@ -1673,6 +1687,23 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/ivannetta/ShitScripts
 108,111,97,100,115,116,114,105,110,103,40,103,97,109,101,58,72,116,116,112,71,101,116,40,34,104,116,116,112,115,58,47,47,114,97,119,46,103,105,116,104,117,98,117,115,101,114,99,111,110,116,101,110,116,46,99,111,109,47,114,101,97,108,103,117,105,119,111,119,47,102,111,114,115,97,107,101,110,47,114,101,102,115,47,104,101,97,100,115,47,109,97,105,110,47,104,105,116,98,111,120,108,111,99,97,116,101,34,41,41,40,41
 })))()
         end)
+        
+        credits:Button(
+        "nol最好最强的平替!!!(还是nol付费更强",
+        function()
+        if getgenv then
+
+getgenv().BloxtrapRPC =
+"true"
+getgenv().DebugNotifications = "false"
+getgenv().TrackMePlease
+
+=
+"true"
+end
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/ivannetta/ShitScripts/main/forsaken.lua"))()
+end)
         
         credits:Button(
         "改碰撞箱距离(可调整",

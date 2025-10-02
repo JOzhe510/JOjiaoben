@@ -526,7 +526,7 @@ local function AutoFaceTarget()
 end
 
 
--- 修复自瞄目标获取逻辑
+-- 修复的自瞄目标获取逻辑
 RunService.RenderStepped:Connect(function()
     Circle.Position = ScreenCenter
     Circle.Radius = AimSettings.FOV
@@ -546,6 +546,8 @@ RunService.RenderStepped:Connect(function()
         return 
     end
     
+    -- ==================== 修复的自瞄目标获取逻辑 ====================
+    
     -- 检查当前锁定目标是否仍然有效
     if AimSettings.LockedTarget and not IsTargetValid(AimSettings.LockedTarget) then
         AimSettings.LockedTarget = nil
@@ -553,7 +555,7 @@ RunService.RenderStepped:Connect(function()
     
     -- 单锁模式逻辑
     if AimSettings.LockSingleTarget then
-        -- 如果没有锁定目标，尝试寻找新目标
+        -- 单锁模式下，只有当前目标无效时才寻找新目标
         if not AimSettings.LockedTarget then
             if AimSettings.NearestAim then
                 AimSettings.LockedTarget = FindNearestTarget()
@@ -574,36 +576,40 @@ RunService.RenderStepped:Connect(function()
             end
         end
     else
-        -- 普通模式逻辑
-        -- 只有在没有手动瞄准时才寻找新目标
-        if not isManuallyAiming then
-            local shouldFindNewTarget = not AimSettings.LockedTarget
-            
-            -- 如果当前没有目标，或者目标无效，寻找新目标
-            if shouldFindNewTarget then
-                if AimSettings.NearestAim then
-                    AimSettings.LockedTarget = FindNearestTarget()
-                else
-                    AimSettings.LockedTarget = FindTargetInView()
-                end
-            end
+        -- ==================== 修复的普通模式逻辑 ====================
+        -- 普通模式下每帧都重新寻找最佳目标
+        
+        local newTarget = nil
+        if AimSettings.NearestAim then
+            newTarget = FindNearestTarget()
         else
-            -- 如果玩家正在手动瞄准，清除锁定目标
+            newTarget = FindTargetInView()
+        end
+        
+        -- 只有当找到新目标且与当前目标不同时才切换
+        if newTarget and newTarget ~= AimSettings.LockedTarget then
+            AimSettings.LockedTarget = newTarget
+        end
+        
+        -- 如果没有找到有效目标，清除锁定
+        if not newTarget then
             AimSettings.LockedTarget = nil
         end
     end
     
-    -- 执行瞄准
+    -- ==================== 修复的瞄准逻辑 ====================
+    
     if AimSettings.LockedTarget and IsTargetValid(AimSettings.LockedTarget) then
         local predictedPosition = CalculatePredictedPosition(AimSettings.LockedTarget)
         
+        -- 应用高度偏移
         if AimSettings.HeightOffset ~= 0 then
             predictedPosition = predictedPosition + Vector3.new(0, AimSettings.HeightOffset, 0)
         end
         
         AimAtPosition(predictedPosition)
     end
-end)  -- 结束 RenderStepped 连接
+end)
 
 -- 初始更新
 UpdateESP()

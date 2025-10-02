@@ -1423,6 +1423,7 @@ creditsHUB:Button(
         "脚本2(部分已汉化",
         function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/JOzhe510/JOjiaoben/main/三叉戟生存.lua"))()
+        end)
 
 local creds = window:Tab("小屋角色扮演", "992417778")
     local credits = creds:section("内容", true)

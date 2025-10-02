@@ -1691,6 +1691,12 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/ivannetta/ShitScripts
         end)
         
         credits:Button(
+        "自由冲刺(noli和小孩cookie的",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/XQZ-official/XQZscripts/refs/heads/main/VroomVroom.txt"))()
+        end)
+        
+        credits:Button(
         "nol最好最强的平替!!!(还是nol付费更强",
         function()
         if getgenv then
@@ -1809,7 +1815,7 @@ Tab21:Button(
     local credits = creds:section("传奇战场", true)
     
     credits:Button(
-        "非常强的脚本!(里面有原地重生来刷新技能来实现无限技能",
+        "非常强的脚本!已删库(里面有原地重生来刷新技能来实现无限技能",
         function()
         loadstring(game:HttpGet('https://raw.githubusercontent.com/DarkDoorsKing/Clinet/main/LegendsBattlegrounds'))()
         end)
@@ -1818,15 +1824,39 @@ Tab21:Button(
     local credits = creds:section("刀刃球", true)
     
     credits:Button(
-        "刀刃球",
+        "刀刃球(已汉化",
         function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/Serwxl/BladeBall_AutoParry/refs/heads/main/Autoparry"))()
+       loadstring(game:HttpGet("https://raw.githubusercontent.com/ke9460394-dot/ugik/refs/heads/main/Kalitor.lua"))()
         end)
         
         credits:Button(
-        "超强无敌脚本",
+        "超强无敌脚本(已汉化",
         function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/mzkv/LUNAR/refs/heads/main/BladeBall", true))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/ke9460394-dot/ugik/refs/heads/main/ArgonHubX.lua"))()
+        end)
+        
+        local creds = window:Tab("成为乞丐", "6035145364")
+    local credits = creds:section("内容", true)
+    
+    credits:Button(
+        "脚本(已汉化",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/ke9460394-dot/ugik/refs/heads/main/NEGA.lua"))()
+        end)
+        
+        local creds = window:Tab("活了七天", "6035145364")
+    local credits = creds:section("内容", true)
+    
+    credits:Button(
+        "脚本1(已汉化",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/ke9460394-dot/ugik/refs/heads/main/bf.txt"))()
+        end)
+        
+        credits:Button(
+        "脚本2(已汉化",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/ke9460394-dot/ugik/refs/heads/main/%E4%B8%83%E6%97%A5%E7%94%9F%E6%88%90kkk.txt"))()
         end)
     
        local creds = window:Tab("奶酪逃生", "992417778")
@@ -1947,9 +1977,9 @@ RunService.Heartbeat:Connect(updateCharacterPosition)
         end)
         
         credits:Button(
-        "外网超强脚本!!!",
+        "外网超强脚本!!!(已汉化",
         function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/DiosDi/VexonHub/refs/heads/main/VexonHub"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/ke9460394-dot/ugik/refs/heads/main/VexonHub%E6%B1%89%E5%8C%96.txt"))()
         end)
         
         credits:Button(

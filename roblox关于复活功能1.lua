@@ -546,16 +546,20 @@ RunService.RenderStepped:Connect(function()
         return 
     end
     
-    -- ==================== 修复的自瞄目标获取逻辑 ====================
-    
-    -- 检查当前锁定目标是否仍然有效
-    if AimSettings.LockedTarget and not IsTargetValid(AimSettings.LockedTarget) then
-        AimSettings.LockedTarget = nil
+    -- 检查当前锁定目标是否仍然有效（放宽条件）
+    if AimSettings.LockedTarget then
+        local isValid = IsTargetValid(AimSettings.LockedTarget)
+        
+        -- 单锁模式下，即使目标暂时无效也保持一小段时间
+        if not isValid and AimSettings.LockSingleTarget then
+            -- 可以添加短暂保持逻辑，比如0.5秒内不切换目标
+        else
+            AimSettings.LockedTarget = isValid and AimSettings.LockedTarget or nil
+        end
     end
     
     -- 单锁模式逻辑
     if AimSettings.LockSingleTarget then
-        -- 单锁模式下，只有当前目标无效时才寻找新目标
         if not AimSettings.LockedTarget then
             if AimSettings.NearestAim then
                 AimSettings.LockedTarget = FindNearestTarget()
@@ -563,7 +567,6 @@ RunService.RenderStepped:Connect(function()
                 AimSettings.LockedTarget = FindTargetInView()
             end
             
-            -- 如果找到目标，通知用户
             if AimSettings.LockedTarget then
                 local player = Players:GetPlayerFromCharacter(AimSettings.LockedTarget.Parent)
                 if player then
@@ -576,9 +579,7 @@ RunService.RenderStepped:Connect(function()
             end
         end
     else
-        -- ==================== 修复的普通模式逻辑 ====================
-        -- 普通模式下每帧都重新寻找最佳目标
-        
+        -- 普通模式：动态寻找最佳目标
         local newTarget = nil
         if AimSettings.NearestAim then
             newTarget = FindNearestTarget()
@@ -586,19 +587,29 @@ RunService.RenderStepped:Connect(function()
             newTarget = FindTargetInView()
         end
         
-        -- 只有当找到新目标且与当前目标不同时才切换
+        -- 平滑切换目标，避免频繁跳动
         if newTarget and newTarget ~= AimSettings.LockedTarget then
-            AimSettings.LockedTarget = newTarget
+            -- 只有当新目标明显更好时才切换
+            if not AimSettings.LockedTarget then
+                AimSettings.LockedTarget = newTarget
+            else
+                -- 计算两个目标的优先级
+                local currentDistance = (AimSettings.LockedTarget.Position - Camera.CFrame.Position).Magnitude
+                local newDistance = (newTarget.Position - Camera.CFrame.Position).Magnitude
+                
+                -- 新目标更近或者在视野中心更近时切换
+                if newDistance < currentDistance * 0.8 then
+                    AimSettings.LockedTarget = newTarget
+                end
+            end
         end
         
-        -- 如果没有找到有效目标，清除锁定
         if not newTarget then
             AimSettings.LockedTarget = nil
         end
     end
     
-    -- ==================== 修复的瞄准逻辑 ====================
-    
+    -- 瞄准逻辑
     if AimSettings.LockedTarget and IsTargetValid(AimSettings.LockedTarget) then
         local predictedPosition = CalculatePredictedPosition(AimSettings.LockedTarget)
         

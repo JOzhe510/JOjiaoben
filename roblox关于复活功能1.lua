@@ -30,12 +30,6 @@ while not LocalPlayer do
     LocalPlayer = Players.LocalPlayer
 end
 
--- 修复：添加缺失的鼠标追踪变量
-local lastMousePos = Vector2.new(0, 0)
-local isManuallyAiming = false
-local manualAimCooldown = 0
-local lastDetectionTime = tick()
-
 -- 自瞄参数设置
 local AimSettings = {
     FOV = 90,
@@ -527,125 +521,6 @@ local function AutoFaceTarget()
     end
 end
 
--- 增强智能自瞄系统
-local SmartAimSettings = {
-    Enabled = false,
-    BodyParts = {"Head", "UpperTorso", "LowerTorso", "HumanoidRootPart"},
-    CurrentPartIndex = 1,
-    SwitchInterval = 0.3,
-    LastSwitchTime = 0,
-    RandomizeOrder = true,
-    RealisticMode = true,
-    MinAimTime = 0.1,
-    MaxAimTime = 0.5,
-    -- 新增设置
-    PartPriorities = {
-        Head = 1.0,
-        UpperTorso = 0.8,
-        HumanoidRootPart = 0.7,
-        LowerTorso = 0.6
-    }
-}
-
--- 改进的智能瞄准位置获取
-local function GetSmartAimPosition(targetHead)
-    if not SmartAimSettings.Enabled or not targetHead then
-        return CalculatePredictedPosition(targetHead)
-    end
-    
-    local character = targetHead.Parent
-    if not character then
-        return CalculatePredictedPosition(targetHead)
-    end
-    
-    local currentTime = tick()
-    
-    -- 修复的鼠标移动检测逻辑
-local function UpdateMouseDetection()
-    local currentMousePos = UIS:GetMouseLocation()
-    local mouseDelta = (currentMousePos - lastMousePos).Magnitude
-    
-    -- 使用固定阈值，避免过于敏感
-    if mouseDelta > 5 then -- 降低阈值到5
-        isManuallyAiming = true
-        manualAimCooldown = 0.3 -- 减少冷却时间
-        lastDetectionTime = tick()
-    end
-    
-    -- 更新冷却时间
-    if manualAimCooldown > 0 then
-        manualAimCooldown = manualAimCooldown - (1/60)
-    else
-        isManuallyAiming = false
-    end
-    
-    lastMousePos = currentMousePos
-end
-    
-    -- 智能部位切换
-    if currentTime - SmartAimSettings.LastSwitchTime >= SmartAimSettings.SwitchInterval then
-        if SmartAimSettings.RandomizeOrder then
-            -- 基于优先级的随机选择
-            local totalWeight = 0
-            for _, partName in ipairs(SmartAimSettings.BodyParts) do
-                totalWeight = totalWeight + (SmartAimSettings.PartPriorities[partName] or 0.5)
-            end
-            
-            local randomValue = math.random() * totalWeight
-            local accumulatedWeight = 0
-            
-            for i, partName in ipairs(SmartAimSettings.BodyParts) do
-                accumulatedWeight = accumulatedWeight + (SmartAimSettings.PartPriorities[partName] or 0.5)
-                if randomValue <= accumulatedWeight then
-                    SmartAimSettings.CurrentPartIndex = i
-                    break
-                end
-            end
-        else
-            SmartAimSettings.CurrentPartIndex = SmartAimSettings.CurrentPartIndex % #SmartAimSettings.BodyParts + 1
-        end
-        
-        SmartAimSettings.LastSwitchTime = currentTime
-        
-        -- 真实模式下的随机间隔
-        if SmartAimSettings.RealisticMode then
-            SmartAimSettings.SwitchInterval = math.random(15, 40) / 100 -- 0.15-0.4秒
-        end
-    end
-    
-    local targetPartName = SmartAimSettings.BodyParts[SmartAimSettings.CurrentPartIndex]
-    local targetPart = character:FindFirstChild(targetPartName)
-    
-    -- 如果找不到指定部位，回退到可用部位
-    if not targetPart then
-        for _, fallbackPart in ipairs(SmartAimSettings.BodyParts) do
-            local fallback = character:FindFirstChild(fallbackPart)
-            if fallback then
-                targetPart = fallback
-                break
-            end
-        end
-    end
-    
-    if targetPart then
-        local basePosition = CalculatePredictedPosition(targetPart)
-        
-        -- 真实模式下的随机偏移
-        if SmartAimSettings.RealisticMode then
-            local randomOffset = Vector3.new(
-                math.random(-8, 8) / 100, -- -0.08 到 0.08
-                math.random(-8, 8) / 100,
-                math.random(-8, 8) / 100
-            )
-            return basePosition + randomOffset
-        end
-        
-        return basePosition
-    end
-    
-    -- 最终回退到头部
-    return CalculatePredictedPosition(targetHead)
-end
 
 -- 修复自瞄目标获取逻辑
 RunService.RenderStepped:Connect(function()
@@ -658,9 +533,6 @@ RunService.RenderStepped:Connect(function()
             espData.update()
         end
     end
-    
-    -- 更新鼠标检测
-    UpdateMouseDetection()
     
     -- 执行自动朝向
     AutoFaceTarget()
@@ -724,31 +596,9 @@ RunService.RenderStepped:Connect(function()
     if AimSettings.LockedTarget and IsTargetValid(AimSettings.LockedTarget) then
         local predictedPosition = nil
         
-        -- 使用智能自瞄或普通自瞄
-        if SmartAimSettings.Enabled then
-            predictedPosition = GetSmartAimPosition(AimSettings.LockedTarget)
-        else
-            predictedPosition = CalculatePredictedPosition(AimSettings.LockedTarget)
-        end
-        
-        -- 添加高度偏移
         if AimSettings.HeightOffset ~= 0 then
             predictedPosition = predictedPosition + Vector3.new(0, AimSettings.HeightOffset, 0)
         end
-        
-        -- 执行瞄准
-        AimAtPosition(predictedPosition)
-        
-        -- 显示锁定状态
-        if tick() % 1 < 0.1 then -- 每秒闪烁10次
-            Circle.Color = Color3.fromRGB(0, 255, 0) -- 绿色表示锁定
-        else
-            Circle.Color = Color3.fromRGB(255, 0, 0) -- 红色表示未锁定
-        end
-    else
-        -- 没有锁定目标时显示红色圆圈
-        Circle.Color = Color3.fromRGB(255, 0, 0)
-    end
 end)
 
 -- 初始更新
@@ -1286,28 +1136,6 @@ local Toggle = MainTab:CreateToggle({
    end,
 })
 
--- 在自瞄设置部分添加更详细的智能自瞄控制
-local Toggle = MainTab:CreateToggle({
-   Name = "智能自瞄演戏模式",
-   CurrentValue = false,
-   Callback = function(Value)
-        SmartAimSettings.Enabled = Value
-        if Value then
-            Rayfield:Notify({
-                Title = "智能自瞄已开启",
-                Content = "将在多个身体部位间智能切换瞄准",
-                Duration = 3,
-            })
-        else
-            Rayfield:Notify({
-                Title = "智能自瞄已关闭",
-                Content = "切换回头部锁定模式",
-                Duration = 2,
-            })
-        end
-   end,
-})
-
 local Toggle = MainTab:CreateToggle({
    Name = "瞄准模式: 相机",
    CurrentValue = true,
@@ -1386,20 +1214,6 @@ local Dropdown = MainTab:CreateDropdown({
    CurrentOption = "选定目标",
    Callback = function(Option)
         AimSettings.FaceMode = Option == "选定目标" and "Selected" or "Nearest"
-   end,
-})
-
-local Dropdown = MainTab:CreateDropdown({
-   Name = "自瞄模式",
-   Options = {"头部锁定", "全身演戏", "随机部位", "顺序切换"},  -- 修复了字符串格式
-   CurrentOption = "头部锁定",
-   Callback = function(Option)
-        if Option == "头部锁定" then
-            SmartAimSettings.Enabled = false
-        else
-            SmartAimSettings.Enabled = true
-            SmartAimSettings.RandomizeOrder = (Option == "随机部位")
-        end
    end,
 })
 

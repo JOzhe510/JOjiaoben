@@ -82,25 +82,58 @@ local ESPHighlights = {}
 local ESPLabels = {}
 local ESPConnections = {}
 
--- 队友检测功能
+-- ==================== 优化的队友检测功能 ====================
 local function IsEnemy(player)
     if not AimSettings.TeamCheck then
         return true
     end
     
+    -- 优先使用游戏内团队系统检测
     if LocalPlayer.Team and player.Team then
         return LocalPlayer.Team ~= player.Team
     end
     
+    -- 使用更严格的友军检测
     local success, isFriend = pcall(function()
-        return player:IsFriendsWith(LocalPlayer.UserId)
+        -- 检查是否是好友关系
+        local isFriendResult = player:IsFriendsWith(LocalPlayer.UserId)
+        
+        -- 额外检查：同队标识（适用于没有Team服务的游戏）
+        local localCharacter = LocalPlayer.Character
+        local targetCharacter = player.Character
+        
+        if localCharacter and targetCharacter then
+            -- 检查是否有相同的队伍标签或标识
+            local localTeamTag = localCharacter:FindFirstChild("Team") or localCharacter:FindFirstChild("team")
+            local targetTeamTag = targetCharacter:FindFirstChild("Team") or targetCharacter:FindFirstChild("team")
+            
+            if localTeamTag and targetTeamTag and localTeamTag.Value == targetTeamTag.Value then
+                return true -- 是同队
+            end
+            
+            -- 检查名称中的队伍标识（常见模式）
+            local localName = LocalPlayer.Name:lower()
+            local targetName = player.Name:lower()
+            
+            -- 常见队伍前缀检测
+            local teamPrefixes = {"red", "blue", "team", "ct", "t", "guard", "prisoner"}
+            for _, prefix in ipairs(teamPrefixes) do
+                if (localName:find(prefix) and not targetName:find(prefix)) or 
+                   (not localName:find(prefix) and targetName:find(prefix)) then
+                    return false -- 是敌人
+                end
+            end
+        end
+        
+        return isFriendResult
     end)
     
-    if success and isFriend then
-        return false
+    -- 如果检测失败，默认视为敌人（更安全）
+    if not success then
+        return true
     end
     
-    return true
+    return not isFriend
 end
 
 -- 清理ESP资源
@@ -321,7 +354,47 @@ local function AimAtPosition(position)
     end
 end
 
--- 修复距离检查的 FindTargetInView 函数
+-- ==================== 优化的目标检测 - 基于头部模型轮廓 ====================
+local function FindHeadModel(player)
+    local character = player.Character
+    if not character then return nil end
+    
+    -- 优先查找标准头部部件
+    local head = character:FindFirstChild("Head")
+    if head then
+        return head
+    end
+    
+    -- 查找头部模型或Mesh
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("Part") or part:IsA("MeshPart") then
+            -- 通过名称识别头部
+            local partName = part.Name:lower()
+            if partName:find("head") or partName:find("face") or partName:find("skull") then
+                return part
+            end
+            
+            -- 通过位置识别头部（通常在最上方）
+            local humanoid = character:FindFirstChild("Humanoid")
+            if humanoid then
+                local rootPart = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
+                if rootPart then
+                    local headPosition = part.Position
+                    local rootPosition = rootPart.Position
+                    
+                    -- 头部通常在上方
+                    if headPosition.Y > rootPosition.Y + 1.0 then
+                        return part
+                    end
+                end
+            end
+        end
+    end
+    
+    return nil
+end
+
+-- ==================== 替换原有的 FindTargetInView 函数 ====================
 local function FindTargetInView()
     local bestTarget = nil
     local closestAngle = math.rad(AimSettings.FOV / 2)
@@ -329,24 +402,24 @@ local function FindTargetInView()
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and IsEnemy(player) then
             local humanoid = player.Character:FindFirstChild("Humanoid")
-            local head = player.Character:FindFirstChild("Head")
+            local headModel = FindHeadModel(player) -- 使用新的头部检测
             
-            if humanoid and humanoid.Health > 0 and head then
-                -- 修复距离检查（使用米为单位）
-                local distance = (head.Position - Camera.CFrame.Position).Magnitude
+            if humanoid and humanoid.Health > 0 and headModel then
+                -- 距离检查
+                local distance = (headModel.Position - Camera.CFrame.Position).Magnitude
                 if distance > AimSettings.MaxDistance then
                     continue
                 end
                 
                 local cameraDirection = Camera.CFrame.LookVector
-                local targetDirection = (head.Position - Camera.CFrame.Position).Unit
+                local targetDirection = (headModel.Position - Camera.CFrame.Position).Unit
                 local dotProduct = cameraDirection:Dot(targetDirection)
                 local angle = math.acos(math.clamp(dotProduct, -1, 1))
                 
                 if angle <= closestAngle then
                     if AimSettings.WallCheck then
                         local rayOrigin = Camera.CFrame.Position
-                        local rayDirection = (head.Position - rayOrigin).Unit * distance
+                        local rayDirection = (headModel.Position - rayOrigin).Unit * distance
                         
                         local raycastParams = RaycastParams.new()
                         raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
@@ -363,7 +436,7 @@ local function FindTargetInView()
                     end
                     
                     closestAngle = angle
-                    bestTarget = head
+                    bestTarget = headModel
                 end
             end
         end
@@ -372,7 +445,7 @@ local function FindTargetInView()
     return bestTarget
 end
 
--- 修复距离检查的 FindNearestTarget 函数
+-- ==================== 替换原有的 FindNearestTarget 函数 ====================
 local function FindNearestTarget()
     local nearestTarget = nil
     local minDistance = math.huge
@@ -380,11 +453,10 @@ local function FindNearestTarget()
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and IsEnemy(player) then
             local humanoid = player.Character:FindFirstChild("Humanoid")
-            local head = player.Character:FindFirstChild("Head")
+            local headModel = FindHeadModel(player) -- 使用新的头部检测
             
-            if humanoid and humanoid.Health > 0 and head then
-                -- 修复距离检查（使用米为单位）
-                local distance = (head.Position - Camera.CFrame.Position).Magnitude
+            if humanoid and humanoid.Health > 0 and headModel then
+                local distance = (headModel.Position - Camera.CFrame.Position).Magnitude
                 if distance > AimSettings.MaxDistance then
                     continue
                 end
@@ -392,7 +464,7 @@ local function FindNearestTarget()
                 if distance < minDistance then
                     if AimSettings.WallCheck then
                         local rayOrigin = Camera.CFrame.Position
-                        local rayDirection = (head.Position - rayOrigin).Unit * distance
+                        local rayDirection = (headModel.Position - rayOrigin).Unit * distance
                         
                         local raycastParams = RaycastParams.new()
                         raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
@@ -409,7 +481,7 @@ local function FindNearestTarget()
                     end
                     
                     minDistance = distance
-                    nearestTarget = head
+                    nearestTarget = headModel
                 end
             end
         end
@@ -418,14 +490,14 @@ local function FindNearestTarget()
     return nearestTarget
 end
 
--- 名字锁定功能
+-- ==================== 替换原有的 LockTargetByName 函数 ====================
 local function LockTargetByName(playerName)
     for _, player in pairs(Players:GetPlayers()) do
         if (player.Name:lower():find(playerName:lower()) or player.DisplayName:lower():find(playerName:lower())) and IsEnemy(player) then
             if player.Character then
-                local head = player.Character:FindFirstChild("Head")
-                if head then
-                    AimSettings.LockedTarget = head
+                local headModel = FindHeadModel(player) -- 使用新的头部检测
+                if headModel then
+                    AimSettings.LockedTarget = headModel
                     AimSettings.LockSingleTarget = true
                     return true
                 end
@@ -436,7 +508,7 @@ local function LockTargetByName(playerName)
     return false
 end
 
--- 检查目标是否有效
+-- ==================== 替换原有的 IsTargetValid 函数 ====================
 local function IsTargetValid(target)
     if not target then return false end
     
@@ -444,14 +516,21 @@ local function IsTargetValid(target)
         return false
     end
     
-    local humanoid = target.Parent:FindFirstChild("Humanoid")
+    local character = target.Parent
+    local humanoid = character:FindFirstChild("Humanoid")
     if not humanoid or humanoid.Health <= 0 then
         return false
     end
     
-    -- 距离检查（确保目标在最大距离内）
+    -- 距离检查
     local distance = (target.Position - Camera.CFrame.Position).Magnitude
     if distance > AimSettings.MaxDistance then
+        return false
+    end
+    
+    -- 额外检查：确保目标玩家仍然是敌人
+    local player = Players:GetPlayerFromCharacter(character)
+    if player and not IsEnemy(player) then
         return false
     end
     

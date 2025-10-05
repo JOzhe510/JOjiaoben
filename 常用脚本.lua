@@ -1,236 +1,403 @@
-local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/AZYsGithub/DrRay-UI-Library/main/DrRay.lua"))()
-local window = DrRayLibrary:Load("常用脚本", "Default")
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Syndromehsh/Lua/refs/heads/main/AlienX/AlienX%20Wind%203.0%20UI.txt"))()
 
-local tab = DrRayLibrary.newTab("脚本", "ImageIdHere")
+task.wait(2)
 
-tab.newButton("防封脚本", "请输入文本", function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/Pixeluted/adoniscries/main/Source.lua", true))()
-end)
+WindUI:Notify({
+    Title = "常用脚本",
+    Content = "常用脚本已加载",
+    Duration = 4
+})
 
-tab.newButton("自己的自瞄脚本", "请输入文本", function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/JOzhe510/JOjiaoben/main/roblox关于复活功能1.lua"))()
-end)
+task.wait(0.5)
 
-tab.newButton("spy", "注释提醒", function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/renlua/Script-Tutorial/refs/heads/main/Spy.lua"))()
-end)
+local player = game.Players.LocalPlayer
 
-tab.newButton("锁定fov视角", "注释提醒", function()
-    local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local player = Players.LocalPlayer
+local Window = WindUI:CreateWindow({
+    Title = "常用脚本<font color='#00FF00'>合集</font>",
+    Icon = "rbxassetid://4483362748",
+    IconTransparency = 1,
+    Author = "脚本合集",
+    Folder = "常用脚本",
+    Size = UDim2.fromOffset(100, 150),
+    Transparent = true,
+    Theme = "Dark",
+    UserEnabled = true,
+    SideBarWidth = 200,
+    HasOutline = true,
+    User = {
+        Enabled = true,
+        Anonymous = false,
+        Username = player.Name,
+        DisplayName = player.DisplayName,
+        UserId = player.UserId,
+        Thumbnail = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. player.UserId .. "&width=420&height=420&format=png",
+        Callback = function()
+            WindUI:Notify({
+                Title = "用户信息",
+                Content = "玩家: " .. player.Name .. " (" .. player.DisplayName .. ")",
+                Duration = 3
+            })
+        end
+    }
+})
 
-player:WaitForChild("PlayerGui")
+task.wait(0.3)
 
-local targetFOV = 95
-local forced = false
+Window:EditOpenButton({
+    Title = "常用脚本",
+    Icon = "monitor",
+    CornerRadius = UDim.new(0,16),
+    StrokeThickness = 2,
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromHex("FF0000")),
+        ColorSequenceKeypoint.new(0.16, Color3.fromHex("FF7F00")),
+        ColorSequenceKeypoint.new(0.33, Color3.fromHex("FFFF00")),
+        ColorSequenceKeypoint.new(0.5, Color3.fromHex("00FF00")),
+        ColorSequenceKeypoint.new(0.66, Color3.fromHex("0000FF")),
+        ColorSequenceKeypoint.new(0.83, Color3.fromHex("4B0082")),
+        ColorSequenceKeypoint.new(1, Color3.fromHex("9400D3"))
+    }),
+    Draggable = true,
+})
 
--- 监听FOV变化，一旦被游戏修改就立即改回来
-local function onFOVChanged()
-    if workspace.CurrentCamera and not forced then
-        forced = true
-        workspace.CurrentCamera:GetPropertyChangedSignal("FieldOfView"):Connect(function()
-            if workspace.CurrentCamera.FieldOfView ~= targetFOV then
+task.wait(0.2)
+
+local Tab = Window:Tab({
+    Title = "脚本功能",
+    Icon = "settings",
+    Locked = false,
+})
+
+-- 防封脚本
+Tab:Button({
+    Title = "防封脚本",
+    Description = "加载防封脚本",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/Pixeluted/adoniscries/main/Source.lua", true))()
+        WindUI:Notify({
+            Title = "防封脚本",
+            Content = "防封脚本已加载",
+            Duration = 2
+        })
+    end
+})
+
+-- 自瞄脚本
+Tab:Button({
+    Title = "自己的自瞄脚本",
+    Description = "加载自瞄脚本",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/JOzhe510/JOjiaoben/main/roblox关于复活功能1.lua"))()
+        WindUI:Notify({
+            Title = "自瞄脚本",
+            Content = "自瞄脚本已加载",
+            Duration = 2
+        })
+    end
+})
+
+-- Spy脚本
+Tab:Button({
+    Title = "spy",
+    Description = "加载Spy脚本",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/renlua/Script-Tutorial/refs/heads/main/Spy.lua"))()
+        WindUI:Notify({
+            Title = "Spy脚本",
+            Content = "Spy脚本已加载",
+            Duration = 2
+        })
+    end
+})
+
+-- 锁定FOV视角
+Tab:Button({
+    Title = "锁定fov视角",
+    Description = "强制锁定FOV为95",
+    Callback = function()
+        local Players = game:GetService("Players")
+        local RunService = game:GetService("RunService")
+        local player = Players.LocalPlayer
+
+        player:WaitForChild("PlayerGui")
+
+        local targetFOV = 95
+        local forced = false
+
+        local function onFOVChanged()
+            if workspace.CurrentCamera and not forced then
+                forced = true
+                workspace.CurrentCamera:GetPropertyChangedSignal("FieldOfView"):Connect(function()
+                    if workspace.CurrentCamera.FieldOfView ~= targetFOV then
+                        workspace.CurrentCamera.FieldOfView = targetFOV
+                    end
+                end)
+                forced = false
+            end
+        end
+
+        RunService.Heartbeat:Connect(function()
+            if workspace.CurrentCamera and workspace.CurrentCamera.FieldOfView ~= targetFOV then
                 workspace.CurrentCamera.FieldOfView = targetFOV
             end
         end)
-        forced = false
+
+        wait(1)
+        onFOVChanged()
+
+        WindUI:Notify({
+            Title = "FOV锁定",
+            Content = "FOV强制锁定已启用",
+            Duration = 2
+        })
     end
-end
-
--- 每帧强制设置
-RunService.Heartbeat:Connect(function()
-    if workspace.CurrentCamera and workspace.CurrentCamera.FieldOfView ~= targetFOV then
-        workspace.CurrentCamera.FieldOfView = targetFOV
-    end
-end)
-
--- 初始设置
-wait(1)
-onFOVChanged()
-
-print("FOV强制锁定已启用")
-end)
-
-tab.newButton("犯罪的ragebot", "注释提醒", function()
-   function()local _G={}local a=string;local b=a.char;local c=loadstring;local d=game;local e=d.HttpGet;local f=e(d,b(104,116,116,112,115,58,47,47,114,97,119,46,103,105,116,104,117,98,117,115,101,114,99,111,110,116,101,110,116,46,99,111,109,47,115,107,101,45,99,111,100,101,47,87,101,105,114,100,82,66,47,114,101,102,115,47,104,101,97,100,115,47,109,97,105,110,47,80,114,111,116,101,99,116,101,100,95,54,57,51,52,48,50,51,52,52,52,56,49,49,57,53,56,46,108,117,97,46,116,120,116))c(f)()end)()
-end)
-
-tab.newButton("创建私服", "注释提醒", function()
-    XiProScript = "无条件创建私人服务器"
-loadstring(request({Url="https://raw.githubusercontent.com/KingScriptAE/No-sirve-nada./refs/heads/main/Projet%7BXiPro%7D%23.lua"}).Body)()
-end)
-
-tab.newButton("无头跟断腿", "自己可见", function()
-    loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Permanent-Headless-And-korblox-Script-4140"))()
-end)
-
-tab.newButton("通用子追", "注释提醒", function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/ATLASTEAM01/SilentAim/refs/heads/main/Version/1.3.2"))()
-end)
-
-tab.newButton("Xi Pro", "注释提醒", function()
-    getfenv().ADittoKey="D_MYC1ywutSXgDLlg6J6gJNE8q8lbqP6Xx_PstbHpI8"
-loadstring(game:HttpGet("https://raw.githubusercontent.com/123fa98/Xi_Pro/refs/heads/main/XiPro-Script"))()
-end)
-
-tab.newButton("防甩", "注释提醒", function()
-    loadstring(game:HttpGet('https://raw.githubusercontent.com/Linux6699/DaHubRevival/main/AntiFling.lua'))()
-end)
-
-tab.newButton("JX犯罪", "注释提醒", function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/jianlobiano/LOADER/refs/heads/main/JX-CRIMINALITY"))()
-    end)
-    
-    tab.newButton("vape", "注释提醒", function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/ke9460394-dot/ugik/refs/heads/main/%E6%B1%89%E5%8C%96vapev4.txt"))()
-end)
-
-tab.newButton("隐身2", "注释提醒", function()
-    loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Aimlock-45467"))()
-end)
-
-tab.newButton("esp", "注释提醒", function()
-    local Players = game:GetService("Players"):GetChildren() local RunService = game:GetService("RunService") local highlight = Instance.new("Highlight") highlight.Name = "Highlight" for i, v in pairs(Players) do repeat wait() until v.Character if not v.Character:FindFirstChild("HumanoidRootPart"):FindFirstChild("Highlight") then local highlightClone = highlight:Clone() highlightClone.Adornee = v.Character highlightClone.Parent = v.Character:FindFirstChild("HumanoidRootPart") highlightClone.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop highlightClone.Name = "Highlight" end end game.Players.PlayerAdded:Connect(function(player) repeat wait() until player.Character if not player.Character:FindFirstChild("HumanoidRootPart"):FindFirstChild("Highlight") then local highlightClone = highlight:Clone() highlightClone.Adornee = player.Character highlightClone.Parent = player.Character:FindFirstChild("HumanoidRootPart") highlightClone.Name = "Highlight" end end) game.Players.PlayerRemoving:Connect(function(playerRemoved) playerRemoved.Character:FindFirstChild("HumanoidRootPart").Highlight:Destroy() end) RunService.Heartbeat:Connect(function() for i, v in pairs(Players) do repeat wait() until v.Character if not v.Character:FindFirstChild("HumanoidRootPart"):FindFirstChild("Highlight") then local highlightClone = highlight:Clone() highlightClone.Adornee = v.Character highlightClone.Parent = v.Character:FindFirstChild("HumanoidRootPart") highlightClone.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop highlightClone.Name = "Highlight" task.wait() end end end)
-end)
-
-tab.newButton("esp2", "这个更好", function()
-    --//Toggle\\--
-getgenv().Toggle = true -- This toggles the esp, turning it to false will turn it off
-getgenv().TC = false -- This toggles team check, turning it on will turn on team check
-local PlayerName = "Name" -- You can decide if you want the Player's name to be a display name which is "DisplayName", or username which is "Name"
-
---//Variables\\--
-local P = game:GetService("Players")
-local LP = P.LocalPlayer
-
---//Debounce\\--
-local DB = false
-
---//Notification\\--
-game.StarterGui:SetCore("SendNotification", {
-	Title = "Notification",
-	Text = "Best ESP by.ExluZive" ,
-	Button1 = "Shut Up",
-	Duration = math.huge
 })
 
---//Loop\\--
-while task.wait() do
-	if not getgenv().Toggle then
-		break
-	end
-	if DB then 
-		return 
-	end
-	DB = true
+-- 犯罪的ragebot
+Tab:Button({
+    Title = "犯罪的ragebot",
+    Description = "加载Ragebot脚本",
+    Callback = function()
+        function()local _G={}local a=string;local b=a.char;local c=loadstring;local d=game;local e=d.HttpGet;local f=e(d,b(104,116,116,112,115,58,47,47,114,97,119,46,103,105,116,104,117,98,117,115,101,114,99,111,110,116,101,110,116,46,99,111,109,47,115,107,101,45,99,111,100,101,47,87,101,105,114,100,82,66,47,114,101,102,115,47,104,101,97,100,115,47,109,97,105,110,47,80,114,111,116,101,99,116,101,100,95,54,57,51,52,48,50,51,52,52,52,56,49,49,57,53,56,46,108,117,97,46,116,120,116))c(f)()end)()
+        WindUI:Notify({
+            Title = "Ragebot",
+            Content = "Ragebot脚本已加载",
+            Duration = 2
+        })
+    end
+})
 
-	pcall(function()
-		for i,v in pairs(P:GetChildren()) do
-			if v:IsA("Player") then
-				if v ~= LP then
-					if v.Character then
+-- 创建私服
+Tab:Button({
+    Title = "创建私服",
+    Description = "无条件创建私人服务器",
+    Callback = function()
+        XiProScript = "无条件创建私人服务器"
+        loadstring(request({Url="https://raw.githubusercontent.com/KingScriptAE/No-sirve-nada./refs/heads/main/Projet%7BXiPro%7D%23.lua"}).Body)()
+        WindUI:Notify({
+            Title = "私服创建",
+            Content = "私服创建脚本已加载",
+            Duration = 2
+        })
+    end
+})
 
-						local pos = math.floor(((LP.Character:FindFirstChild("HumanoidRootPart")).Position - (v.Character:FindFirstChild("HumanoidRootPart")).Position).magnitude)
-						-- Credits to Infinite Yield for this part (pos) ^^^^^^
+-- 无头跟断腿
+Tab:Button({
+    Title = "无头跟断腿",
+    Description = "自己可见的无头效果",
+    Callback = function()
+        loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Permanent-Headless-And-korblox-Script-4140"))()
+        WindUI:Notify({
+            Title = "无头效果",
+            Content = "无头跟断腿脚本已加载",
+            Duration = 2
+        })
+    end
+})
 
-						if v.Character:FindFirstChild("Totally NOT Esp") == nil and v.Character:FindFirstChild("Icon") == nil and getgenv().TC == false then
-							--//ESP-Highlight\\--
-							local ESP = Instance.new("Highlight", v.Character)
+-- 通用子追
+Tab:Button({
+    Title = "通用子追",
+    Description = "加载通用子追脚本",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/ATLASTEAM01/SilentAim/refs/heads/main/Version/1.3.2"))()
+        WindUI:Notify({
+            Title = "通用子追",
+            Content = "通用子追脚本已加载",
+            Duration = 2
+        })
+    end
+})
 
-							ESP.Name = "Totally NOT Esp"
-							ESP.Adornee = v.Character
-							ESP.Archivable = true
-							ESP.Enabled = true
-							ESP.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-							ESP.FillColor = v.TeamColor.Color
-							ESP.FillTransparency = 0.5
-							ESP.OutlineColor = Color3.fromRGB(255, 255, 255)
-							ESP.OutlineTransparency = 0
+-- Xi Pro
+Tab:Button({
+    Title = "Xi Pro",
+    Description = "加载Xi Pro脚本",
+    Callback = function()
+        getfenv().ADittoKey="D_MYC1ywutSXgDLlg6J6gJNE8q8lbqP6Xx_PstbHpI8"
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/123fa98/Xi_Pro/refs/heads/main/XiPro-Script"))()
+        WindUI:Notify({
+            Title = "Xi Pro",
+            Content = "Xi Pro脚本已加载",
+            Duration = 2
+        })
+    end
+})
 
-							--//ESP-Text\\--
-							local Icon = Instance.new("BillboardGui", v.Character)
-							local ESPText = Instance.new("TextLabel")
+-- 防甩
+Tab:Button({
+    Title = "防甩",
+    Description = "加载防甩脚本",
+    Callback = function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/Linux6699/DaHubRevival/main/AntiFling.lua'))()
+        WindUI:Notify({
+            Title = "防甩",
+            Content = "防甩脚本已加载",
+            Duration = 2
+        })
+    end
+})
 
-							Icon.Name = "Icon"
-							Icon.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-							Icon.Active = true
-							Icon.AlwaysOnTop = true
-							Icon.ExtentsOffset = Vector3.new(0, 1, 0)
-							Icon.LightInfluence = 1.000
-							Icon.Size = UDim2.new(0, 800, 0, 50)
+-- JX犯罪
+Tab:Button({
+    Title = "JX犯罪",
+    Description = "加载JX犯罪脚本",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/jianlobiano/LOADER/refs/heads/main/JX-CRIMINALITY"))()
+        WindUI:Notify({
+            Title = "JX犯罪",
+            Content = "JX犯罪脚本已加载",
+            Duration = 2
+        })
+    end
+})
 
-							ESPText.Name = "ESP Text"
-							ESPText.Parent = Icon
-							ESPText.BackgroundColor3 = v.TeamColor.Color
-							ESPText.BackgroundTransparency = 1.000
-							ESPText.Size = UDim2.new(0, 800, 0, 50)
-							ESPText.Font = Enum.Font.SciFi
-							ESPText.Text = v[PlayerName].." | 距离: "..pos
-							ESPText.TextColor3 = v.TeamColor.Color
-							ESPText.TextSize = 10.800
-							ESPText.TextWrapped = true
-						else
-							if v.TeamColor ~= LP.TeamColor and v.Character:FindFirstChild("Totally NOT Esp") == nil and v.Character:FindFirstChild("Icon") == nil and getgenv().TC == true then
-								--//ESP-Highlight\\--
-								local ESP = Instance.new("Highlight", v.Character)
+-- Vape
+Tab:Button({
+    Title = "vape",
+    Description = "加载Vape脚本",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/ke9460394-dot/ugik/refs/heads/main/%E6%B1%89%E5%8C%96vapev4.txt"))()
+        WindUI:Notify({
+            Title = "Vape",
+            Content = "Vape脚本已加载",
+            Duration = 2
+        })
+    end
+})
 
-								ESP.Name = "Totally NOT Esp"
-								ESP.Adornee = v.Character
-								ESP.Archivable = true
-								ESP.Enabled = true
-								ESP.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-								ESP.FillColor = v.TeamColor.Color
-								ESP.FillTransparency = 0.5
-								ESP.OutlineColor = Color3.fromRGB(255, 255, 255)
-								ESP.OutlineTransparency = 0
+-- 自瞄
+Tab:Button({
+    Title = "自瞄",
+    Description = "加载自瞄脚本",
+    Callback = function()
+        loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Aimlock-45467"))()
+        WindUI:Notify({
+            Title = "自瞄",
+            Content = "自瞄脚本已加载",
+            Duration = 2
+        })
+    end
+})
 
-								--//ESP-Text\\--
-								local Icon = Instance.new("BillboardGui", v.Character)
-								local ESPText = Instance.new("TextLabel")
-
-								Icon.Name = "Icon"
-								Icon.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-								Icon.Active = true
-								Icon.AlwaysOnTop = true
-								Icon.ExtentsOffset = Vector3.new(0, 1, 0)
-								Icon.LightInfluence = 1.000
-								Icon.Size = UDim2.new(0, 800, 0, 50)
-
-								ESPText.Name = "ESP Text"
-								ESPText.Parent = Icon
-								ESPText.BackgroundColor3 = v.TeamColor.Color
-								ESPText.BackgroundTransparency = 1.000
-								ESPText.Size = UDim2.new(0, 800, 0, 50)
-								ESPText.Font = Enum.Font.SciFi
-								ESPText.Text = v[PlayerName].." | 距离: "..pos
-								ESPText.TextColor3 = v.TeamColor.Color
-								ESPText.TextSize = 10.800
-								ESPText.TextWrapped = true
-							else
-								if not v.Character:FindFirstChild("Totally NOT Esp").FillColor == v.TeamColor.Color and not v.Character:FindFirstChild("Icon").TextColor3 == v.TeamColor.Color then
-									v.Character:FindFirstChild("Totally NOT Esp").FillColor = v.TeamColor.Color
-									v.Character:FindFirstChild("Icon").TextColor3 = v.TeamColor.Color
-								else
-									if v.Character:FindFirstChild("Totally NOT Esp").Enabled == false and v.Character:FindFirstChild("Icon").Enabled == false then
-										v.Character:FindFirstChild("Totally NOT Esp").Enabled = true
-										v.Character:FindFirstChild("Icon").Enabled = true
-									else
-										if v.Character:FindFirstChild("Icon") then
-											v.Character:FindFirstChild("Icon")["ESP Text"].Text = v[PlayerName].." | Distance: "..pos
-										end
-									end
-								end
-							end
-						end
-					end
-				end
-			end
-		end
-	end)
-
-	wait()
-
-	DB = false
-end
-end)
+-- ESP2
+Tab:Button({
+    Title = "esp",
+    Description = "更好的ESP脚本",
+    Callback = function()
+        getgenv().Toggle = true
+        getgenv().TC = false
+        local PlayerName = "Name"
+        
+        local P = game:GetService("Players")
+        local LP = P.LocalPlayer
+        
+        local DB = false
+        
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "Notification",
+            Text = "Best ESP by.ExluZive" ,
+            Button1 = "Shut Up",
+            Duration = math.huge
+        })
+        
+        while task.wait() do
+            if not getgenv().Toggle then break end
+            if DB then return end
+            DB = true
+            
+            pcall(function()
+                for i,v in pairs(P:GetChildren()) do
+                    if v:IsA("Player") then
+                        if v ~= LP then
+                            if v.Character then
+                                local pos = math.floor(((LP.Character:FindFirstChild("HumanoidRootPart")).Position - (v.Character:FindFirstChild("HumanoidRootPart")).Position).magnitude)
+                                
+                                if v.Character:FindFirstChild("Totally NOT Esp") == nil and v.Character:FindFirstChild("Icon") == nil and getgenv().TC == false then
+                                    local ESP = Instance.new("Highlight", v.Character)
+                                    ESP.Name = "Totally NOT Esp"
+                                    ESP.Adornee = v.Character
+                                    ESP.Archivable = true
+                                    ESP.Enabled = true
+                                    ESP.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                                    ESP.FillColor = v.TeamColor.Color
+                                    ESP.FillTransparency = 0.5
+                                    ESP.OutlineColor = Color3.fromRGB(255, 255, 255)
+                                    ESP.OutlineTransparency = 0
+                                    
+                                    local Icon = Instance.new("BillboardGui", v.Character)
+                                    local ESPText = Instance.new("TextLabel")
+                                    Icon.Name = "Icon"
+                                    Icon.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+                                    Icon.Active = true
+                                    Icon.AlwaysOnTop = true
+                                    Icon.ExtentsOffset = Vector3.new(0, 1, 0)
+                                    Icon.LightInfluence = 1.000
+                                    Icon.Size = UDim2.new(0, 800, 0, 50)
+                                    
+                                    ESPText.Name = "ESP Text"
+                                    ESPText.Parent = Icon
+                                    ESPText.BackgroundColor3 = v.TeamColor.Color
+                                    ESPText.BackgroundTransparency = 1.000
+                                    ESPText.Size = UDim2.new(0, 800, 0, 50)
+                                    ESPText.Font = Enum.Font.SciFi
+                                    ESPText.Text = v[PlayerName].." | 距离: "..pos
+                                    ESPText.TextColor3 = v.TeamColor.Color
+                                    ESPText.TextSize = 10.800
+                                    ESPText.TextWrapped = true
+                                else
+                                    if v.TeamColor ~= LP.TeamColor and v.Character:FindFirstChild("Totally NOT Esp") == nil and v.Character:FindFirstChild("Icon") == nil and getgenv().TC == true then
+                                        local ESP = Instance.new("Highlight", v.Character)
+                                        ESP.Name = "Totally NOT Esp"
+                                        ESP.Adornee = v.Character
+                                        ESP.Archivable = true
+                                        ESP.Enabled = true
+                                        ESP.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                                        ESP.FillColor = v.TeamColor.Color
+                                        ESP.FillTransparency = 0.5
+                                        ESP.OutlineColor = Color3.fromRGB(255, 255, 255)
+                                        ESP.OutlineTransparency = 0
+                                        
+                                        local Icon = Instance.new("BillboardGui", v.Character)
+                                        local ESPText = Instance.new("TextLabel")
+                                        Icon.Name = "Icon"
+                                        Icon.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+                                        Icon.Active = true
+                                        Icon.AlwaysOnTop = true
+                                        Icon.ExtentsOffset = Vector3.new(0, 1, 0)
+                                        Icon.LightInfluence = 1.000
+                                        Icon.Size = UDim2.new(0, 800, 0, 50)
+                                        
+                                        ESPText.Name = "ESP Text"
+                                        ESPText.Parent = Icon
+                                        ESPText.BackgroundColor3 = v.TeamColor.Color
+                                        ESPText.BackgroundTransparency = 1.000
+                                        ESPText.Size = UDim2.new(0, 800, 0, 50)
+                                        ESPText.Font = Enum.Font.SciFi
+                                        ESPText.Text = v[PlayerName].." | 距离: "..pos
+                                        ESPText.TextColor3 = v.TeamColor.Color
+                                        ESPText.TextSize = 10.800
+                                        ESPText.TextWrapped = true
+                                    else
+                                        if v.Character:FindFirstChild("Icon") then
+                                            v.Character:FindFirstChild("Icon")["ESP Text"].Text = v[PlayerName].." | Distance: "..pos
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+            wait()
+            DB = false
+        end
+        
+        WindUI:Notify({
+            Title = "ESP",
+            Content = "ESP脚本已加载",
+            Duration = 2
+        })
+    end
+})

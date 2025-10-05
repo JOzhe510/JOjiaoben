@@ -226,117 +226,18 @@ Tab:Button({
     end
 })
 
--- ESP2
 Tab:Button({
-    Title = "esp",
-    Description = "更好的ESP脚本",
+    Title = "锁定视角",
+    Description = "加载脚本",
     Callback = function()
-        getgenv().Toggle = true
-        getgenv().TC = false
-        local PlayerName = "Name"
-        
-        local P = game:GetService("Players")
-        local LP = P.LocalPlayer
-        
-        local DB = false
-        
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "Notification",
-            Text = "Best ESP by.ExluZive" ,
-            Button1 = "Shut Up",
-            Duration = math.huge
-        })
-        
-        while task.wait() do
-            if not getgenv().Toggle then break end
-            if DB then return end
-            DB = true
-            
-            pcall(function()
-                for i,v in pairs(P:GetChildren()) do
-                    if v:IsA("Player") then
-                        if v ~= LP then
-                            if v.Character then
-                                local pos = math.floor(((LP.Character:FindFirstChild("HumanoidRootPart")).Position - (v.Character:FindFirstChild("HumanoidRootPart")).Position).magnitude)
-                                
-                                if v.Character:FindFirstChild("Totally NOT Esp") == nil and v.Character:FindFirstChild("Icon") == nil and getgenv().TC == false then
-                                    local ESP = Instance.new("Highlight", v.Character)
-                                    ESP.Name = "Totally NOT Esp"
-                                    ESP.Adornee = v.Character
-                                    ESP.Archivable = true
-                                    ESP.Enabled = true
-                                    ESP.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                                    ESP.FillColor = v.TeamColor.Color
-                                    ESP.FillTransparency = 0.5
-                                    ESP.OutlineColor = Color3.fromRGB(255, 255, 255)
-                                    ESP.OutlineTransparency = 0
-                                    
-                                    local Icon = Instance.new("BillboardGui", v.Character)
-                                    local ESPText = Instance.new("TextLabel")
-                                    Icon.Name = "Icon"
-                                    Icon.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-                                    Icon.Active = true
-                                    Icon.AlwaysOnTop = true
-                                    Icon.ExtentsOffset = Vector3.new(0, 1, 0)
-                                    Icon.LightInfluence = 1.000
-                                    Icon.Size = UDim2.new(0, 800, 0, 50)
-                                    
-                                    ESPText.Name = "ESP Text"
-                                    ESPText.Parent = Icon
-                                    ESPText.BackgroundColor3 = v.TeamColor.Color
-                                    ESPText.BackgroundTransparency = 1.000
-                                    ESPText.Size = UDim2.new(0, 800, 0, 50)
-                                    ESPText.Font = Enum.Font.SciFi
-                                    ESPText.Text = v[PlayerName].." | 距离: "..pos
-                                    ESPText.TextColor3 = v.TeamColor.Color
-                                    ESPText.TextSize = 10.800
-                                    ESPText.TextWrapped = true
-                                else
-                                    if v.TeamColor ~= LP.TeamColor and v.Character:FindFirstChild("Totally NOT Esp") == nil and v.Character:FindFirstChild("Icon") == nil and getgenv().TC == true then
-                                        local ESP = Instance.new("Highlight", v.Character)
-                                        ESP.Name = "Totally NOT Esp"
-                                        ESP.Adornee = v.Character
-                                        ESP.Archivable = true
-                                        ESP.Enabled = true
-                                        ESP.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                                        ESP.FillColor = v.TeamColor.Color
-                                        ESP.FillTransparency = 0.5
-                                        ESP.OutlineColor = Color3.fromRGB(255, 255, 255)
-                                        ESP.OutlineTransparency = 0
-                                        
-                                        local Icon = Instance.new("BillboardGui", v.Character)
-                                        local ESPText = Instance.new("TextLabel")
-                                        Icon.Name = "Icon"
-                                        Icon.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-                                        Icon.Active = true
-                                        Icon.AlwaysOnTop = true
-                                        Icon.ExtentsOffset = Vector3.new(0, 1, 0)
-                                        Icon.LightInfluence = 1.000
-                                        Icon.Size = UDim2.new(0, 800, 0, 50)
-                                        
-                                        ESPText.Name = "ESP Text"
-                                        ESPText.Parent = Icon
-                                        ESPText.BackgroundColor3 = v.TeamColor.Color
-                                        ESPText.BackgroundTransparency = 1.000
-                                        ESPText.Size = UDim2.new(0, 800, 0, 50)
-                                        ESPText.Font = Enum.Font.SciFi
-                                        ESPText.Text = v[PlayerName].." | 距离: "..pos
-                                        ESPText.TextColor3 = v.TeamColor.Color
-                                        ESPText.TextSize = 10.800
-                                        ESPText.TextWrapped = true
-                                    else
-                                        if v.Character:FindFirstChild("Icon") then
-                                            v.Character:FindFirstChild("Icon")["ESP Text"].Text = v[PlayerName].." | Distance: "..pos
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end)
-            wait()
-            DB = false
-        end
+    loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Mobile-Shiftlock-V2-18053"))()
+    end
+})
+
+Tab:Button({
+    Title = "控制玩家",
+    Description = "加载脚本",
+    Callback = function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/JOzhe510/JOjiaoben/main/玩家控制 汉化.txt"))()
     end
 })

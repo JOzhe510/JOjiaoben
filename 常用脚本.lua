@@ -74,11 +74,6 @@ Tab:Button({
     Description = "加载防封脚本",
     Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/Pixeluted/adoniscries/main/Source.lua", true))()
-        WindUI:Notify({
-            Title = "防封脚本",
-            Content = "防封脚本已加载",
-            Duration = 2
-        })
     end
 })
 
@@ -88,11 +83,6 @@ Tab:Button({
     Description = "加载自瞄脚本",
     Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/JOzhe510/JOjiaoben/main/roblox关于复活功能1.lua"))()
-        WindUI:Notify({
-            Title = "自瞄脚本",
-            Content = "自瞄脚本已加载",
-            Duration = 2
-        })
     end
 })
 
@@ -102,11 +92,6 @@ Tab:Button({
     Description = "加载Spy脚本",
     Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/renlua/Script-Tutorial/refs/heads/main/Spy.lua"))()
-        WindUI:Notify({
-            Title = "Spy脚本",
-            Content = "Spy脚本已加载",
-            Duration = 2
-        })
     end
 })
 
@@ -144,12 +129,6 @@ Tab:Button({
 
         wait(1)
         onFOVChanged()
-
-        WindUI:Notify({
-            Title = "FOV锁定",
-            Content = "FOV强制锁定已启用",
-            Duration = 2
-        })
     end
 })
 
@@ -159,11 +138,6 @@ Tab:Button({
     Description = "加载Ragebot脚本",
     Callback = function()
         function()local _G={}local a=string;local b=a.char;local c=loadstring;local d=game;local e=d.HttpGet;local f=e(d,b(104,116,116,112,115,58,47,47,114,97,119,46,103,105,116,104,117,98,117,115,101,114,99,111,110,116,101,110,116,46,99,111,109,47,115,107,101,45,99,111,100,101,47,87,101,105,114,100,82,66,47,114,101,102,115,47,104,101,97,100,115,47,109,97,105,110,47,80,114,111,116,101,99,116,101,100,95,54,57,51,52,48,50,51,52,52,52,56,49,49,57,53,56,46,108,117,97,46,116,120,116))c(f)()end)()
-        WindUI:Notify({
-            Title = "Ragebot",
-            Content = "Ragebot脚本已加载",
-            Duration = 2
-        })
     end
 })
 
@@ -174,11 +148,6 @@ Tab:Button({
     Callback = function()
         XiProScript = "无条件创建私人服务器"
         loadstring(request({Url="https://raw.githubusercontent.com/KingScriptAE/No-sirve-nada./refs/heads/main/Projet%7BXiPro%7D%23.lua"}).Body)()
-        WindUI:Notify({
-            Title = "私服创建",
-            Content = "私服创建脚本已加载",
-            Duration = 2
-        })
     end
 })
 
@@ -188,11 +157,6 @@ Tab:Button({
     Description = "自己可见的无头效果",
     Callback = function()
         loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Permanent-Headless-And-korblox-Script-4140"))()
-        WindUI:Notify({
-            Title = "无头效果",
-            Content = "无头跟断腿脚本已加载",
-            Duration = 2
-        })
     end
 })
 
@@ -202,11 +166,6 @@ Tab:Button({
     Description = "加载通用子追脚本",
     Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/ATLASTEAM01/SilentAim/refs/heads/main/Version/1.3.2"))()
-        WindUI:Notify({
-            Title = "通用子追",
-            Content = "通用子追脚本已加载",
-            Duration = 2
-        })
     end
 })
 
@@ -217,11 +176,6 @@ Tab:Button({
     Callback = function()
         getfenv().ADittoKey="D_MYC1ywutSXgDLlg6J6gJNE8q8lbqP6Xx_PstbHpI8"
         loadstring(game:HttpGet("https://raw.githubusercontent.com/123fa98/Xi_Pro/refs/heads/main/XiPro-Script"))()
-        WindUI:Notify({
-            Title = "Xi Pro",
-            Content = "Xi Pro脚本已加载",
-            Duration = 2
-        })
     end
 })
 
@@ -231,11 +185,6 @@ Tab:Button({
     Description = "加载防甩脚本",
     Callback = function()
         loadstring(game:HttpGet('https://raw.githubusercontent.com/Linux6699/DaHubRevival/main/AntiFling.lua'))()
-        WindUI:Notify({
-            Title = "防甩",
-            Content = "防甩脚本已加载",
-            Duration = 2
-        })
     end
 })
 
@@ -245,11 +194,6 @@ Tab:Button({
     Description = "加载JX犯罪脚本",
     Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/jianlobiano/LOADER/refs/heads/main/JX-CRIMINALITY"))()
-        WindUI:Notify({
-            Title = "JX犯罪",
-            Content = "JX犯罪脚本已加载",
-            Duration = 2
-        })
     end
 })
 
@@ -259,12 +203,18 @@ Tab:Button({
     Description = "加载Vape脚本",
     Callback = function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/ke9460394-dot/ugik/refs/heads/main/%E6%B1%89%E5%8C%96vapev4.txt"))()
-        WindUI:Notify({
-            Title = "Vape",
-            Content = "Vape脚本已加载",
-            Duration = 2
-        })
     end
+})
+
+Tab:Button({
+    Title = "wtb脚本",
+    Description = "加载wtb",
+    Callback = function()
+    getgenv().ADittoKey = "WTB_FREEKEY"
+pcall(function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Potato5466794/GC-WTB/refs/heads/main/Loader/Loader.luau", true))()
+end)
+   end
 })
 
 -- 自瞄
@@ -273,11 +223,6 @@ Tab:Button({
     Description = "加载自瞄脚本",
     Callback = function()
         loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Aimlock-45467"))()
-        WindUI:Notify({
-            Title = "自瞄",
-            Content = "自瞄脚本已加载",
-            Duration = 2
-        })
     end
 })
 
@@ -393,11 +338,5 @@ Tab:Button({
             wait()
             DB = false
         end
-        
-        WindUI:Notify({
-            Title = "ESP",
-            Content = "ESP脚本已加载",
-            Duration = 2
-        })
     end
 })

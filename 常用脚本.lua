@@ -77,7 +77,6 @@ Tab:Button({
     end
 })
 
-自瞄
 Tab:Button({
     Title = "防封2",
     Description = "加载脚本",
@@ -187,7 +186,6 @@ end)
    end
 })
 
-自瞄
 Tab:Button({
     Title = "动画提取器",
     Description = "加载脚本",
@@ -261,7 +259,7 @@ player.CharacterAdded:Connect(function(newCharacter)
     humanoid.AnimationPlayed:Connect(function(animationTrack)
         updateAnimationDisplay(animationTrack.Animation.AnimationId)
     end)
-end)
+end)=
    end
 })
 

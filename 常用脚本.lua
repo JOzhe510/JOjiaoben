@@ -77,6 +77,194 @@ Tab:Button({
     end
 })
 
+自瞄
+Tab:Button({
+    Title = "防封2",
+    Description = "加载脚本",
+    Callback = function()
+    -----bypass Anti Cheat  by yuxingchen   NOL TEAM-Neo-Utopia
+
+print("绕过反作弊 1秒后加载。")
+
+wait(1)
+
+if not shared.AntiBanLoop then
+    shared.AntiBanLoop = {running = false, hooked = false}
+end
+local loopData = shared.AntiBanLoop
+
+local function AntiChatLogger()
+    local StarterGui = game:GetService("StarterGui")
+    local Players = game:GetService("Players")
+    local Player = Players.LocalPlayer
+    local PlayerScripts = Player:WaitForChild("PlayerScripts")
+
+    local ChatMain = PlayerScripts:FindFirstChild("ChatMain", true)
+    if ChatMain then
+        local PostMessage = require(ChatMain).MessagePosted
+        if PostMessage then
+            local OldHook
+            OldHook = hookfunction(PostMessage.fire, function(self, Message)
+                if not checkcaller() and self == PostMessage then
+                    return
+                end
+                return OldHook(self, Message)
+            end)
+        end
+    end
+    if setfflag then
+        setfflag("AbuseReportScreenshot", "False")
+        setfflag("AbuseReportScreenshotPercentage", "0")
+    end
+end
+
+local function hookOnce()
+    if not loopData.hookedFind then
+        local oldFind = workspace.FindFirstChild
+        if typeof(oldFind) == "function" and hookfunction then
+            hookfunction(oldFind, function(self, ...)
+                local args = {...}
+                if tostring(args[1]):lower():find("screenshot") then
+                    return nil
+                end
+                return oldFind(self, unpack(args))
+            end)
+            loopData.hookedFind = true
+        end
+    end
+
+    if not loopData.hookedRequest then
+        local oldRequest = (syn and syn.request) or request or http_request
+        if hookfunction and typeof(oldRequest) == "function" then
+            hookfunction(oldRequest, function(req)
+                if req and req.Url and tostring(req.Url):lower():find("abuse") then
+                    return {StatusCode = 200, Body = "Blocked"}
+                end
+                return oldRequest(req)
+            end)
+            loopData.hookedRequest = true
+        end
+    end
+end
+
+local function setFlagsOff()
+    local flags = {
+        "AbuseReportScreenshot",
+        "AbuseReportScreenshotPercentage",
+        "AbuseReportEnabled",
+        "ReportAbuseMenu",
+        "EnableAbuseReportScreenshot"
+    }
+    for _, flag in ipairs(flags) do
+        if typeof(setfflag) == "function" then
+            pcall(function()
+                setfflag(flag, "False")
+            end)
+        end
+    end
+    if typeof(setfflag) == "function" then
+        setfflag("AbuseReportScreenshotPercentage", "0")
+    end
+end
+
+local function setFlagsOn()
+    if typeof(setfflag) == "function" then
+        setfflag("AbuseReportScreenshot", "True")
+        setfflag("AbuseReportScreenshotPercentage", "100")
+    end
+end
+
+hookOnce()
+AntiChatLogger()
+setFlagsOff()
+loopData.running = true
+task.spawn(function()
+    while loopData.running do
+        setFlagsOff()
+        task.wait(0.05)
+    end
+end)
+   end
+})
+
+自瞄
+Tab:Button({
+    Title = "动画提取器",
+    Description = "加载脚本",
+    Callback = function()
+    local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Parent = player.PlayerGui
+
+local idLabel = Instance.new("TextLabel")
+idLabel.Size = UDim2.new(0, 300, 0, 60)
+idLabel.Position = UDim2.new(0.5, -150, 0, 20)
+idLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+idLabel.BackgroundTransparency = 0.5
+idLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+idLabel.TextSize = 18
+idLabel.Text = "当前动画ID: 无"
+idLabel.Parent = screenGui
+
+local copyButton = Instance.new("TextButton")
+copyButton.Size = UDim2.new(0, 120, 0, 40)
+copyButton.Position = UDim2.new(0.5, -60, 0, 90)
+copyButton.BackgroundColor3 = Color3.fromRGB(85, 170, 85)
+copyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+copyButton.TextSize = 16
+copyButton.Text = "复制当前ID"
+copyButton.Parent = screenGui
+
+local currentAnimationId = ""
+
+local function copyToClipboard(text)
+    local clipboard = setclipboard or set_clipboard or (Clipboard and Clipboard.set)
+    if clipboard and text ~= "" then
+        clipboard(text)
+        idLabel.Text = "已复制ID: " .. text
+        wait(2)
+        idLabel.Text = "当前动画ID: " .. text
+    end
+end
+
+local function updateAnimationDisplay(animationId)
+    local id = string.match(animationId, "%d+")
+    if id then
+        currentAnimationId = id
+        idLabel.Text = "当前动画ID: " .. id
+        copyToClipboard(id)
+    end
+end
+
+copyButton.MouseButton1Click:Connect(function()
+    copyToClipboard(currentAnimationId)
+end)
+
+humanoid.AnimationPlayed:Connect(function(animationTrack)
+    updateAnimationDisplay(animationTrack.Animation.AnimationId)
+end)
+
+for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+    updateAnimationDisplay(track.Animation.AnimationId)
+end
+
+player.CharacterAdded:Connect(function(newCharacter)
+    character = newCharacter
+    humanoid = character:WaitForChild("Humanoid")
+    currentAnimationId = ""
+    idLabel.Text = "当前动画ID: 无"
+    
+    humanoid.AnimationPlayed:Connect(function(animationTrack)
+        updateAnimationDisplay(animationTrack.Animation.AnimationId)
+    end)
+end)
+   end
+})
+
 -- 自瞄脚本
 Tab:Button({
     Title = "自己的自瞄脚本",
@@ -366,7 +554,7 @@ Tab:Button({
     Title = "锁定视角",
     Description = "加载脚本",
     Callback = function()
-    loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Mobile-Shiftlock-V2-18053"))()
+    loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Shiftlock-script-42373"))()
     end
 })
 

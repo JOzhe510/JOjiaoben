@@ -1220,6 +1220,12 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/ShenJiaoBen/Partial-S
         end)
         
         credits:Button(
+        "快速攻击(快速攻击有两个，两个不要一起开会被踢",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/ke9460394-dot/ugik/refs/heads/main/%E6%AD%BB%E9%93%81%E8%BD%A8v4.lua"))()
+        end)
+        
+        credits:Button(
         "超多功能",
         function()
         loadstring(game:HttpGet('https://raw.githubusercontent.com/aceurss/AcxScripter/refs/heads/main/CapriHub-DeadRails'))()
@@ -1898,9 +1904,21 @@ Tab21:Button(
         end)
         
         credits:Button(
-        "Kiba Tech v2",
+        "supa Tech v2",
         function()
-        loadstring(game:HttpGet(" https://raw.githubusercontent.com/YQANTGV3/YQANTGV3/refs/heads/main/bruh.txt"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/MerebennieOfficial/ExoticJn/refs/heads/main/Supa%20V3"))()
+        end)
+        
+        credits:Button(
+        "自动系脚本",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/MerebennieOfficial/ExoticJn/main/SidedashAssist"))()
+        end)
+        
+        credits:Button(
+        "改碰撞箱op脚本!",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/XQZ-official/XQZscripts/refs/heads/main/Zafkiel_Zayin.txt"))()
         end)
         
         credits:Button(

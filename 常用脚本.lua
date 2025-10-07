@@ -95,6 +95,28 @@ Tab:Button({
     end
 })
 
+Tab:Button({
+    Title = "甩飞",
+    Description = "加载脚本",
+    Callback = function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/JOzhe510/JOjiaoben/main/甩飞.lua"))()
+    end
+})
+
+Tab:Button({
+    Title = "飞行",
+    Description = "加载脚本",
+    Callback = function()
+    --// FE invincible fly script 
+
+loadstring(game:HttpGet("https://gist.githubusercontent.com/JungleScripts/775c6366d91d39fe2633c5805a1d0c23/raw/c8de949402393510a27bcf4482c957b6c3bed2c2/gistfile1.txt"))()
+
+--//FE movement (if your in mobile)
+
+loadstring(game:HttpGet("https://gist.githubusercontent.com/JungleScripts/8dc95c7ce10e86d353d606334a77de88/raw/08f3e2967701463da36f2fc28e9943e63799dd3f/gistfile1.txt"))()
+    end
+})
+
 -- 锁定FOV视角
 Tab:Button({
     Title = "锁定fov视角",
@@ -359,6 +381,14 @@ Tab:Button({
     Description = "加载自瞄脚本",
     Callback = function()
         loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Aimlock-45467"))()
+    end
+})
+
+Tab:Button({
+    Title = "自瞄",
+    Description = "加载自瞄脚本",
+    Callback = function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Mark22028/Camlock/refs/heads/main/Universal%20Camlock.txt"))()
     end
 })
 

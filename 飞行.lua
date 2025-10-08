@@ -90,29 +90,50 @@ speedLabel.Font = Enum.Font.Gotham
 speedLabel.TextSize = 14
 speedLabel.Parent = mainFrame
 
-local speedSliderBg = Instance.new("Frame")
-speedSliderBg.Name = "SpeedSliderBg"
-speedSliderBg.Size = UDim2.new(0, 280, 0, 20)
-speedSliderBg.Position = UDim2.new(0.5, -140, 0.55, 0)
-speedSliderBg.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-speedSliderBg.BorderSizePixel = 0
-speedSliderBg.Parent = mainFrame
+local speedInputFrame = Instance.new("Frame")
+speedInputFrame.Name = "SpeedInputFrame"
+speedInputFrame.Size = UDim2.new(0, 280, 0, 35)
+speedInputFrame.Position = UDim2.new(0.5, -140, 0.55, 0)
+speedInputFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+speedInputFrame.BorderSizePixel = 0
+speedInputFrame.Parent = mainFrame
 
-local speedBgCorner = Instance.new("UICorner")
-speedBgCorner.CornerRadius = UDim.new(0, 10)
-speedBgCorner.Parent = speedSliderBg
+local speedInputCorner = Instance.new("UICorner")
+speedInputCorner.CornerRadius = UDim.new(0, 8)
+speedInputCorner.Parent = speedInputFrame
 
-local speedSlider = Instance.new("Frame")
-speedSlider.Name = "SpeedSlider"
-speedSlider.Size = UDim2.new(0.5, 0, 1, 0)
-speedSlider.Position = UDim2.new(0, 0, 0, 0)
-speedSlider.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
-speedSlider.BorderSizePixel = 0
-speedSlider.Parent = speedSliderBg
+local speedTextBox = Instance.new("TextBox")
+speedTextBox.Name = "SpeedTextBox"
+speedTextBox.Size = UDim2.new(0.6, 0, 0.7, 0)
+speedTextBox.Position = UDim2.new(0.05, 0, 0.15, 0)
+speedTextBox.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+speedTextBox.BorderSizePixel = 0
+speedTextBox.Text = "50"
+speedTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedTextBox.Font = Enum.Font.Gotham
+speedTextBox.TextSize = 14
+speedTextBox.PlaceholderText = "输入速度 (1-200)"
+speedTextBox.Parent = speedInputFrame
 
-local speedCorner = Instance.new("UICorner")
-speedCorner.CornerRadius = UDim.new(0, 10)
-speedCorner.Parent = speedSlider
+local textBoxCorner = Instance.new("UICorner")
+textBoxCorner.CornerRadius = UDim.new(0, 6)
+textBoxCorner.Parent = speedTextBox
+
+local applySpeedButton = Instance.new("TextButton")
+applySpeedButton.Name = "ApplySpeedButton"
+applySpeedButton.Size = UDim2.new(0.3, 0, 0.7, 0)
+applySpeedButton.Position = UDim2.new(0.67, 0, 0.15, 0)
+applySpeedButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
+applySpeedButton.BorderSizePixel = 0
+applySpeedButton.Text = "应用飞行速度"
+applySpeedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+applySpeedButton.Font = Enum.Font.Gotham
+applySpeedButton.TextSize = 13
+applySpeedButton.Parent = speedInputFrame
+
+local applyCorner = Instance.new("UICorner")
+applyCorner.CornerRadius = UDim.new(0, 6)
+applyCorner.Parent = applySpeedButton
 
 local deleteButton = Instance.new("TextButton")
 deleteButton.Name = "DeleteButton"
@@ -224,6 +245,7 @@ setupButtonHover(closeButton)
 setupButtonHover(flyToggleButton)
 setupButtonHover(deleteButton)
 setupButtonHover(openUIButton)
+setupButtonHover(applySpeedButton)
 
 closeButton.MouseButton1Click:Connect(function()
     mainFrame.Visible = false
@@ -238,6 +260,27 @@ end)
 deleteButton.MouseButton1Click:Connect(function()
     StopCFly()
     screenGui:Destroy()
+end)
+
+applySpeedButton.MouseButton1Click:Connect(function()
+    local inputSpeed = tonumber(speedTextBox.Text)
+    if inputSpeed and inputSpeed >= 1 and inputSpeed <= 200 then
+        CFSpeed = inputSpeed
+        speedLabel.Text = "飞行速度: " .. CFSpeed
+        speedTextBox.Text = tostring(CFSpeed)
+    else
+        speedTextBox.Text = tostring(CFSpeed)
+    end
+end)
+
+speedTextBox.FocusLost:Connect(function(enterPressed)
+    local inputSpeed = tonumber(speedTextBox.Text)
+    if inputSpeed and inputSpeed >= 1 and inputSpeed <= 200 then
+        CFSpeed = inputSpeed
+        speedLabel.Text = "飞行速度: " .. CFSpeed
+    else
+        speedTextBox.Text = tostring(CFSpeed)
+    end
 end)
 
 local isFlying = false
@@ -255,31 +298,6 @@ flyToggleButton.MouseButton1Click:Connect(function()
     end
 end)
 
-local isSliding = false
-speedSliderBg.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        isSliding = true
-    end
-end)
-
-speedSliderBg.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        isSliding = false
-    end
-end)
-
-speedSliderBg.MouseMoved:Connect(function()
-    if isSliding then
-        local mouse = game.Players.LocalPlayer:GetMouse()
-        local x = math.clamp(mouse.X - speedSliderBg.AbsolutePosition.X, 0, speedSliderBg.AbsoluteSize.X)
-        local ratio = x / speedSliderBg.AbsoluteSize.X
-        
-        speedSlider.Size = UDim2.new(ratio, 0, 1, 0)
-        
-        CFSpeed = math.floor(1 + ratio * 199)
-        speedLabel.Text = "飞行速度: " .. CFSpeed
-    end
-end)
 screenGui.Parent = playerGui
 
 print("飞行控制面板已加载！")

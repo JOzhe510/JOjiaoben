@@ -7,6 +7,7 @@ local CFLoop = nil
 local platformPart = nil
 local platformLoop = nil
 local isPlatformActive = false
+local platformFixedPosition = nil -- 新增：记录平台的固定位置
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "VoidTeleportUI"
@@ -274,6 +275,9 @@ local function CreatePlatform()
     local position = humanoidRootPart.Position - Vector3.new(0, 4, 0)
     platformPart.CFrame = CFrame.new(position)
     platformPart.Parent = workspace
+    
+    -- 记录平台的固定位置
+    platformFixedPosition = position
 end
 
 local function StartPlatform()
@@ -292,7 +296,13 @@ local function StartPlatform()
             if character then
                 local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
                 if humanoidRootPart then
-                    local targetPosition = humanoidRootPart.Position - Vector3.new(0, 4, 0)
+                    -- 修改：平台在X和Z轴上跟随玩家，但Y轴保持固定（悬空不下降）
+                    local targetPosition = Vector3.new(
+                        humanoidRootPart.Position.X,
+                        platformFixedPosition.Y, -- 保持初始高度，不下降
+                        humanoidRootPart.Position.Z
+                    )
+                    
                     platformPart.CFrame = CFrame.new(targetPosition)
                     
                     platformPart.CanCollide = true
@@ -313,6 +323,9 @@ local function StopPlatform()
         platformPart:Destroy()
         platformPart = nil
     end
+    
+    -- 重置固定位置
+    platformFixedPosition = nil
 end
 
 local function setupButtonHover(button)

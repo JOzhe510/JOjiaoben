@@ -107,13 +107,16 @@ Tab:Button({
     Title = "飞行",
     Description = "加载脚本",
     Callback = function()
-    --// FE invincible fly script 
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/JOzhe510/JOjiaoben/main/飞行.lua"))()
+    end
+})
 
-loadstring(game:HttpGet("https://gist.githubusercontent.com/JungleScripts/775c6366d91d39fe2633c5805a1d0c23/raw/c8de949402393510a27bcf4482c957b6c3bed2c2/gistfile1.txt"))()
-
---//FE movement (if your in mobile)
-
-loadstring(game:HttpGet("https://gist.githubusercontent.com/JungleScripts/8dc95c7ce10e86d353d606334a77de88/raw/08f3e2967701463da36f2fc28e9943e63799dd3f/gistfile1.txt"))()
+Tab:Button({
+    Title = "动画id提取器",
+    Description = "加载脚本",
+    Callback = function()
+    -- keep use this actual link to gets for updates (i promise i won't delete this script no matter what)
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Mautiku/ehh/main/sussy's%20animation%20logger.txt",true))()
     end
 })
 

@@ -4,6 +4,9 @@ local RunService = game:GetService("RunService")
 
 local CFSpeed = 50
 local CFLoop = nil
+local platformPart = nil
+local platformLoop = nil
+local isPlatformActive = false
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "VoidTeleportUI"
@@ -11,8 +14,8 @@ screenGui.ResetOnSpawn = false
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 320, 0, 300)
-mainFrame.Position = UDim2.new(0.5, -160, 0.5, -150)
+mainFrame.Size = UDim2.new(0, 320, 0, 350)
+mainFrame.Position = UDim2.new(0.5, -160, 0.5, -175)
 mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
@@ -66,7 +69,7 @@ closeCorner.Parent = closeButton
 local flyToggleButton = Instance.new("TextButton")
 flyToggleButton.Name = "FlyToggleButton"
 flyToggleButton.Size = UDim2.new(0, 280, 0, 60)
-flyToggleButton.Position = UDim2.new(0.5, -140, 0.15, 0)
+flyToggleButton.Position = UDim2.new(0.5, -140, 0.1, 0)
 flyToggleButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
 flyToggleButton.BorderSizePixel = 0
 flyToggleButton.Text = "开启飞行"
@@ -78,6 +81,22 @@ flyToggleButton.Parent = mainFrame
 local flyCorner = Instance.new("UICorner")
 flyCorner.CornerRadius = UDim.new(0, 10)
 flyCorner.Parent = flyToggleButton
+
+local platformToggleButton = Instance.new("TextButton")
+platformToggleButton.Name = "PlatformToggleButton"
+platformToggleButton.Size = UDim2.new(0, 280, 0, 40)
+platformToggleButton.Position = UDim2.new(0.5, -140, 0.3, 0)
+platformToggleButton.BackgroundColor3 = Color3.fromRGB(120, 80, 200)
+platformToggleButton.BorderSizePixel = 0
+platformToggleButton.Text = "开启平台"
+platformToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+platformToggleButton.Font = Enum.Font.GothamBold
+platformToggleButton.TextSize = 16
+platformToggleButton.Parent = mainFrame
+
+local platformCorner = Instance.new("UICorner")
+platformCorner.CornerRadius = UDim.new(0, 8)
+platformCorner.Parent = platformToggleButton
 
 local speedLabel = Instance.new("TextLabel")
 speedLabel.Name = "SpeedLabel"
@@ -231,6 +250,68 @@ local function StopCFly()
     end
 end
 
+local function CreatePlatform()
+    local character = game.Players.LocalPlayer.Character
+    if not character then return end
+    
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return end
+    
+    if platformPart then
+        platformPart:Destroy()
+        platformPart = nil
+    end
+    
+    platformPart = Instance.new("Part")
+    platformPart.Name = "FlightPlatform"
+    platformPart.Size = Vector3.new(8, 1, 8)
+    platformPart.Anchored = true
+    platformPart.CanCollide = true
+    platformPart.Material = Enum.Material.Neon
+    platformPart.BrickColor = BrickColor.new("Bright violet")
+    platformPart.Transparency = 0.2
+    
+    local position = humanoidRootPart.Position - Vector3.new(0, 4, 0)
+    platformPart.CFrame = CFrame.new(position)
+    platformPart.Parent = workspace
+end
+
+local function StartPlatform()
+    if platformLoop then 
+        platformLoop:Disconnect()
+        platformLoop = nil
+    end
+    
+    CreatePlatform()
+    
+    platformLoop = RunService.Heartbeat:Connect(function()
+        if not platformPart then
+            CreatePlatform()
+        else
+            local character = game.Players.LocalPlayer.Character
+            if character then
+                local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                if humanoidRootPart then
+                    local position = humanoidRootPart.Position - Vector3.new(0, 4, 0)
+                    platformPart.CFrame = CFrame.new(position)
+                end
+            end
+        end
+    end)
+end
+
+local function StopPlatform()
+    if platformLoop then
+        platformLoop:Disconnect()
+        platformLoop = nil
+    end
+    
+    if platformPart then
+        platformPart:Destroy()
+        platformPart = nil
+    end
+end
+
 local function setupButtonHover(button)
     local originalColor = button.BackgroundColor3
     button.MouseEnter:Connect(function()
@@ -243,6 +324,7 @@ end
 
 setupButtonHover(closeButton)
 setupButtonHover(flyToggleButton)
+setupButtonHover(platformToggleButton)
 setupButtonHover(deleteButton)
 setupButtonHover(openUIButton)
 setupButtonHover(applySpeedButton)
@@ -259,6 +341,7 @@ end)
 
 deleteButton.MouseButton1Click:Connect(function()
     StopCFly()
+    StopPlatform()
     screenGui:Destroy()
 end)
 
@@ -298,6 +381,21 @@ flyToggleButton.MouseButton1Click:Connect(function()
     end
 end)
 
+platformToggleButton.MouseButton1Click:Connect(function()
+    if isPlatformActive then
+        StopPlatform()
+        platformToggleButton.Text = "开启平台"
+        platformToggleButton.BackgroundColor3 = Color3.fromRGB(120, 80, 200)
+        isPlatformActive = false
+    else
+        StartPlatform()
+        platformToggleButton.Text = "关闭平台"
+        platformToggleButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
+        isPlatformActive = true
+    end
+end)
+
 screenGui.Parent = playerGui
 
 print("飞行控制面板已加载！")
+print("平台功能已加载！")

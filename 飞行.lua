@@ -7,6 +7,7 @@ local CFLoop = nil
 local platformPart = nil
 local platformLoop = nil
 local isPlatformActive = false
+local platformHeightOffset = 4 -- 平台在玩家下方的固定高度差
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "VoidTeleportUI"
@@ -271,7 +272,7 @@ local function CreatePlatform()
     platformPart.BrickColor = BrickColor.new("Bright violet")
     platformPart.Transparency = 0.2
     
-    local position = humanoidRootPart.Position - Vector3.new(0, 4, 0)
+    local position = humanoidRootPart.Position - Vector3.new(0, platformHeightOffset, 0)
     platformPart.CFrame = CFrame.new(position)
     platformPart.Parent = workspace
 end
@@ -292,9 +293,18 @@ local function StartPlatform()
             if character then
                 local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
                 if humanoidRootPart then
-                    -- 平台完全跟随玩家移动，保持固定高度差
-                    local targetPosition = humanoidRootPart.Position - Vector3.new(0, 4, 0)
-                    platformPart.CFrame = CFrame.new(targetPosition)
+                    -- 只更新X和Z坐标，保持Y坐标不变（悬空）
+                    local currentPosition = platformPart.Position
+                    local targetX = humanoidRootPart.Position.X
+                    local targetZ = humanoidRootPart.Position.Z
+                    local targetY = currentPosition.Y -- 保持当前高度不变
+                    
+                    -- 如果玩家在平台下方太远，则重新调整平台高度
+                    if humanoidRootPart.Position.Y < targetY - 10 then
+                        targetY = humanoidRootPart.Position.Y + platformHeightOffset
+                    end
+                    
+                    platformPart.CFrame = CFrame.new(Vector3.new(targetX, targetY, targetZ))
                     
                     platformPart.CanCollide = true
                     platformPart.Anchored = true

@@ -8,6 +8,7 @@ local platformPart = nil
 local platformLoop = nil
 local isPlatformActive = false
 local platformHeightOffset = 4 -- 平台在玩家下方的固定高度差
+local platformLiftForce = 10 -- 平台向上的推力
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "VoidTeleportUI"
@@ -286,31 +287,39 @@ local function StartPlatform()
     CreatePlatform()
     
     platformLoop = RunService.Heartbeat:Connect(function()
-        if not platformPart then
-            CreatePlatform()
-        else
-            local character = game.Players.LocalPlayer.Character
-            if character then
-                local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-                if humanoidRootPart then
-                    -- 只更新X和Z坐标，保持Y坐标不变（悬空）
-                    local currentPosition = platformPart.Position
-                    local targetX = humanoidRootPart.Position.X
-                    local targetZ = humanoidRootPart.Position.Z
-                    local targetY = currentPosition.Y -- 保持当前高度不变
-                    
-                    -- 如果玩家在平台下方太远，则重新调整平台高度
-                    if humanoidRootPart.Position.Y < targetY - 10 then
-                        targetY = humanoidRootPart.Position.Y + platformHeightOffset
-                    end
-                    
-                    platformPart.CFrame = CFrame.new(Vector3.new(targetX, targetY, targetZ))
-                    
-                    platformPart.CanCollide = true
-                    platformPart.Anchored = true
-                end
-            end
+        local character = game.Players.LocalPlayer.Character
+        if not character then return end
+        
+        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+        if not humanoidRootPart then return end
+        
+        -- 持续在玩家脚底生成平台
+        if platformPart then
+            platformPart:Destroy()
         end
+        
+        platformPart = Instance.new("Part")
+        platformPart.Name = "FlightPlatform"
+        platformPart.Size = Vector3.new(8, 0.2, 8) 
+        platformPart.Anchored = true
+        platformPart.CanCollide = true
+        platformPart.Material = Enum.Material.Neon
+        platformPart.BrickColor = BrickColor.new("Bright violet")
+        platformPart.Transparency = 0.2
+        
+        -- 在玩家脚底位置创建平台
+        local position = humanoidRootPart.Position - Vector3.new(0, platformHeightOffset, 0)
+        platformPart.CFrame = CFrame.new(position)
+        platformPart.Parent = workspace
+        
+        -- 给玩家一个向上的推力
+        local bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.Velocity = Vector3.new(0, platformLiftForce, 0)
+        bodyVelocity.MaxForce = Vector3.new(0, 10000, 0)
+        bodyVelocity.Parent = humanoidRootPart
+        
+        -- 短暂延迟后移除推力，避免过度加速
+        game:GetService("Debris"):AddItem(bodyVelocity, 0.1)
     end)
 end
 

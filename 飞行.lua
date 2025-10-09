@@ -264,7 +264,7 @@ local function CreatePlatform()
     
     platformPart = Instance.new("Part")
     platformPart.Name = "FlightPlatform"
-    platformPart.Size = Vector3.new(8, 1, 8)
+    platformPart.Size = Vector3.new(8, 0.2, 8) 
     platformPart.Anchored = true
     platformPart.CanCollide = true
     platformPart.Material = Enum.Material.Neon
@@ -292,8 +292,11 @@ local function StartPlatform()
             if character then
                 local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
                 if humanoidRootPart then
-                    local position = humanoidRootPart.Position - Vector3.new(0, 4, 0)
-                    platformPart.CFrame = CFrame.new(position)
+                    local targetPosition = humanoidRootPart.Position - Vector3.new(0, 4, 0)
+                    platformPart.CFrame = CFrame.new(targetPosition)
+                    
+                    platformPart.CanCollide = true
+                    platformPart.Anchored = true
                 end
             end
         end

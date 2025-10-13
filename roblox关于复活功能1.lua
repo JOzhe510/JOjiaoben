@@ -1627,6 +1627,97 @@ local PlayerData = {
 }
 
 local Button = MainTab:CreateButton({
+   Name = "设置重生点",
+   Callback = function()
+   local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- 获取当前玩家的准确位置
+local function getPlayerPosition()
+    local character = player.Character
+    if character then
+        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+        if humanoidRootPart then
+            return humanoidRootPart.Position
+        end
+    end
+    return nil -- 如果找不到玩家位置，就返回nil
+end
+
+-- 设置重生点为当前玩家脚下
+local spawnLocation = getPlayerPosition()
+
+if not spawnLocation then
+    -- 如果获取不到当前位置，就让玩家手动设置或者使用游戏默认重生点
+    warn("无法获取玩家当前位置，使用游戏默认重生点")
+    return
+end
+
+-- 重生时传送到设定位置
+local function onCharacterAdded(character)
+    local rootPart = character:WaitForChild("HumanoidRootPart")
+    task.wait() -- 等待一帧确保角色完全加载
+    rootPart.CFrame = CFrame.new(spawnLocation)
+end
+
+player.CharacterAdded:Connect(onCharacterAdded)
+
+-- 如果已经有角色，立即传送
+if player.Character then
+    onCharacterAdded(player.Character)
+end
+
+print("重生点已设置为当前位置: " .. tostring(spawnLocation))
+   end,
+})
+
+local Button = MainTab:CreateButton({
+   Name = "每隔0.5秒自杀(无法关闭除非退出",
+   Callback = function()
+   while wait(0.5) do
+    game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid").Health = 0
+end
+   end,
+})
+
+local Button = MainTab:CreateButton({
+   Name = "受到伤害就定身0.4秒",
+   Callback = function()
+   local Players = game:GetService("Players")
+local localPlayer = Players.LocalPlayer
+
+local function freezeOnDamage(character)
+    local humanoid = character:WaitForChild("Humanoid")
+    local lastHealth = humanoid.Health
+    local isFrozen = false
+    
+    humanoid.HealthChanged:Connect(function(currentHealth)
+        if currentHealth < lastHealth and not isFrozen then
+            isFrozen = true
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                local bodyVelocity = Instance.new("BodyVelocity")
+                bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+                bodyVelocity.MaxForce = Vector3.new(40000, 40000, 40000)
+                bodyVelocity.Parent = rootPart
+                
+                wait(0.4)
+                bodyVelocity:Destroy()
+                isFrozen = false
+            end
+        end
+        lastHealth = currentHealth
+    end)
+end
+
+localPlayer.CharacterAdded:Connect(freezeOnDamage)
+if localPlayer.Character then
+    freezeOnDamage(localPlayer.Character)
+end
+   end,
+})
+
+local Button = MainTab:CreateButton({
    Name = "保存当前位置",
    Callback = function()
         local character = LocalPlayer.Character
@@ -1717,6 +1808,13 @@ local Button = MainTab:CreateButton({
    Name = "传送虚空",
    Callback = function()
    loadstring(game:HttpGet("https://raw.githubusercontent.com/JOzhe510/JOjiaoben/main/传送虚空.lua"))()
+   end,
+})
+
+local Button = MainTab:CreateButton({
+   Name = "传送玩家",
+   Callback = function()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/JOzhe510/JOjiaoben/main/传送玩家.lua"))()
    end,
 })
 

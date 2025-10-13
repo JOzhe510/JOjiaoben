@@ -7,6 +7,10 @@ local teleportLoop = nil
 local isTeleportingAll = false
 local teleportDistance = 2.7 -- 传送距离（身后）
 
+-- 新增变量
+local isTeleportingToLowest = false
+local teleportLowestLoop = nil
+
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "TeleportAllUI"
 screenGui.ResetOnSpawn = false
@@ -89,7 +93,7 @@ teleportToLowestHealthButton.Size = UDim2.new(0, 280, 0, 50)
 teleportToLowestHealthButton.Position = UDim2.new(0.5, -140, 0.35, 0)
 teleportToLowestHealthButton.BackgroundColor3 = Color3.fromRGB(200, 100, 80)
 teleportToLowestHealthButton.BorderSizePixel = 0
-teleportToLowestHealthButton.Text = "传送至血量最低玩家"
+teleportToLowestHealthButton.Text = "循环传送至血量最低玩家"
 teleportToLowestHealthButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 teleportToLowestHealthButton.Font = Enum.Font.GothamBold
 teleportToLowestHealthButton.TextSize = 16
@@ -242,6 +246,15 @@ local function StopTeleportAll()
     end
 end
 
+-- 新增：停止传送血量最低的函数
+local function StopTeleportToLowestHealth()
+    if teleportLowestLoop then
+        teleportLowestLoop:Disconnect()
+        teleportLowestLoop = nil
+    end
+    isTeleportingToLowest = false
+end
+
 -- 传送指定玩家函数
 local function TeleportSpecificPlayer(playerName)
     local targetPlayer = Players:FindFirstChild(playerName)
@@ -290,30 +303,29 @@ local function FindLowestHealthPlayer()
     return lowestHealthPlayer
 end
 
--- 传送至血量最低玩家
-local function TeleportToLowestHealthPlayer()
-    local targetPlayer = FindLowestHealthPlayer()
-    if not targetPlayer then
-        return false, "没有找到血量最低的玩家"
+-- 新增：循环传送至血量最低玩家
+local function StartTeleportToLowestHealth()
+    if teleportLowestLoop then 
+        teleportLowestLoop:Disconnect()
+        teleportLowestLoop = nil
     end
-    
-    local myCharacter = player.Character
-    local targetCharacter = targetPlayer.Character
-    if not myCharacter or not targetCharacter then
-        return false, "角色不存在"
-    end
-    
-    local myRoot = myCharacter:FindFirstChild("HumanoidRootPart")
-    local targetRoot = targetCharacter:FindFirstChild("HumanoidRootPart")
-    if not myRoot or not targetRoot then
-        return false, "没有找到RootPart"
-    end
-    
-    -- 传送到目标玩家身后
-    local behindPos = targetRoot.Position - targetRoot.CFrame.LookVector * teleportDistance
-    myRoot.CFrame = CFrame.new(behindPos)
-    
-    return true, "已传送至 " .. targetPlayer.Name .. " (血量: " .. math.floor(targetCharacter:FindFirstChildOfClass("Humanoid").Health) .. ")"
+
+    teleportLowestLoop = RunService.Heartbeat:Connect(function()
+        local targetPlayer = FindLowestHealthPlayer()
+        if not targetPlayer then return end
+        
+        local myCharacter = player.Character
+        local targetCharacter = targetPlayer.Character
+        if not myCharacter or not targetCharacter then return end
+        
+        local myRoot = myCharacter:FindFirstChild("HumanoidRootPart")
+        local targetRoot = targetCharacter:FindFirstChild("HumanoidRootPart")
+        if not myRoot or not targetRoot then return end
+        
+        -- 传送到目标玩家身后
+        local behindPos = targetRoot.Position - targetRoot.CFrame.LookVector * teleportDistance
+        myRoot.CFrame = CFrame.new(behindPos)
+    end)
 end
 
 -- 按钮悬停效果
@@ -337,6 +349,7 @@ setupButtonHover(openUIButton)
 closeButton.MouseButton1Click:Connect(function()
     mainFrame.Visible = false
     openUIButton.Visible = true
+    StopTeleportToLowestHealth() -- 关闭时停止循环
 end)
 
 openUIButton.MouseButton1Click:Connect(function()
@@ -347,6 +360,7 @@ end)
 
 deleteButton.MouseButton1Click:Connect(function()
     StopTeleportAll()
+    StopTeleportToLowestHealth() -- 删除时停止循环
     screenGui:Destroy()
 end)
 
@@ -365,18 +379,17 @@ teleportAllToggleButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- 传送至血量最低玩家
+-- 传送至血量最低玩家（改为循环开关）
 teleportToLowestHealthButton.MouseButton1Click:Connect(function()
-    local success, message = TeleportToLowestHealthPlayer()
-    if success then
-        teleportToLowestHealthButton.Text = message
-        -- 3秒后恢复原文本
-        wait(3)
-        teleportToLowestHealthButton.Text = "传送至血量最低玩家"
+    if isTeleportingToLowest then
+        StopTeleportToLowestHealth()
+        teleportToLowestHealthButton.Text = "循环传送至血量最低玩家"
+        teleportToLowestHealthButton.BackgroundColor3 = Color3.fromRGB(200, 100, 80)
     else
-        teleportToLowestHealthButton.Text = message or "传送失败"
-        wait(2)
-        teleportToLowestHealthButton.Text = "传送至血量最低玩家"
+        StartTeleportToLowestHealth()
+        teleportToLowestHealthButton.Text = "停止循环传送"
+        teleportToLowestHealthButton.BackgroundColor3 = Color3.fromRGB(80, 200, 100)
+        isTeleportingToLowest = true
     end
 end)
 

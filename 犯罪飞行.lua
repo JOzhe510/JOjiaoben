@@ -6,8 +6,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CFSpeed = 50
 local CFLoop = nil
 local isFlying = false
-local ChangeState = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ChangeState") -- RemoteEvent
-local stateLoop = nil -- 用于控制状态事件的循环
+local ChangeState = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ChangeState")
+local stateLoop = nil
+
+-- 添加安全检查
+local function SafeDisconnect(connection)
+    if connection and typeof(connection) == "RBXScriptConnection" then
+        connection:Disconnect()
+    end
+    return nil
+end
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "VoidTeleportUI"
@@ -15,8 +23,8 @@ screenGui.ResetOnSpawn = false
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 320, 0, 350)
-mainFrame.Position = UDim2.new(0.5, -160, 0.5, -175)
+mainFrame.Size = UDim2.new(0, 320, 0, 250) -- 减小高度
+mainFrame.Position = UDim2.new(0.5, -160, 0.5, -125)
 mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
@@ -172,57 +180,77 @@ local openCorner = Instance.new("UICorner")
 openCorner.CornerRadius = UDim.new(0, 8)
 openCorner.Parent = openUIButton
 
+-- 优化的飞行函数，避免卡顿
 local function StartCFly()
     local speaker = game.Players.LocalPlayer
     local character = speaker.Character
-    if not character then return end
+    if not character or not character.Parent then return end
     
     local humanoid = character:FindFirstChildOfClass('Humanoid')
-    local head = character:WaitForChild("Head")
+    local head = character:FindFirstChild("Head")
     
     if not humanoid or not head then return end
+    
+    -- 安全检查
+    if humanoid:GetState() == Enum.HumanoidStateType.Dead then return end
     
     humanoid.PlatformStand = true
     head.Anchored = true
     
-    if CFLoop then 
-        CFLoop:Disconnect() 
-        CFLoop = nil
-    end
+    -- 安全断开连接
+    CFLoop = SafeDisconnect(CFLoop)
+    stateLoop = SafeDisconnect(stateLoop)
     
-    -- 开始状态事件循环
-    if stateLoop then
-        stateLoop:Disconnect()
-        stateLoop = nil
-    end
-    
+    -- 状态循环（保持原样）
     stateLoop = RunService.Heartbeat:Connect(function()
-        firesignal(ChangeState.OnClientEvent, 
-            Enum.HumanoidStateType.FallingDown, -- 改为落地状态
-            5
-        )
+        if character and character.Parent and humanoid and humanoid.Parent then
+            pcall(function()
+                firesignal(ChangeState.OnClientEvent, 
+                    Enum.HumanoidStateType.FallingDown,
+                    5
+                )
+            end)
+        end
     end)
     
-    CFLoop = RunService.Heartbeat:Connect(function(deltaTime)
-        if not character or not humanoid or not head then 
-            if CFLoop then 
-                CFLoop:Disconnect() 
-                CFLoop = nil
-            end
+    -- 使用Stepped而不是RenderStepped，更稳定
+    CFLoop = RunService.Stepped:Connect(function(_, deltaTime)
+        -- 多重安全检查
+        if not character or not character.Parent then 
+            CFLoop = SafeDisconnect(CFLoop)
             return 
         end
         
-        local moveDirection = humanoid.MoveDirection * (CFSpeed * deltaTime)
-        local headCFrame = head.CFrame
-        local camera = workspace.CurrentCamera
-        local cameraCFrame = camera.CFrame
-        local cameraOffset = headCFrame:ToObjectSpace(cameraCFrame).Position
-        cameraCFrame = cameraCFrame * CFrame.new(-cameraOffset.X, -cameraOffset.Y, -cameraOffset.Z + 1)
-        local cameraPosition = cameraCFrame.Position
-        local headPosition = headCFrame.Position
+        if not humanoid or not humanoid.Parent or not head or not head.Parent then
+            CFLoop = SafeDisconnect(CFLoop)
+            return
+        end
+        
+        -- 检查角色是否死亡
+        if humanoid:GetState() == Enum.HumanoidStateType.Dead then
+            StopCFly()
+            return
+        end
+        
+        -- 使用pcall包装飞行逻辑，防止错误传播
+        local success, errorMsg = pcall(function()
+            local moveDirection = humanoid.MoveDirection * (CFSpeed * deltaTime)
+            local headCFrame = head.CFrame
+            local camera = workspace.CurrentCamera
+            local cameraCFrame = camera.CFrame
+            local cameraOffset = headCFrame:ToObjectSpace(cameraCFrame).Position
+            cameraCFrame = cameraCFrame * CFrame.new(-cameraOffset.X, -cameraOffset.Y, -cameraOffset.Z + 1)
+            local cameraPosition = cameraCFrame.Position
+            local headPosition = headCFrame.Position
 
-        local objectSpaceVelocity = CFrame.new(cameraPosition, Vector3.new(headPosition.X, cameraPosition.Y, headPosition.Z)):VectorToObjectSpace(moveDirection)
-        head.CFrame = CFrame.new(headPosition) * (cameraCFrame - cameraPosition) * CFrame.new(objectSpaceVelocity)
+            local objectSpaceVelocity = CFrame.new(cameraPosition, Vector3.new(headPosition.X, cameraPosition.Y, headPosition.Z)):VectorToObjectSpace(moveDirection)
+            head.CFrame = CFrame.new(headPosition) * (cameraCFrame - cameraPosition) * CFrame.new(objectSpaceVelocity)
+        end)
+        
+        if not success then
+            warn("飞行错误: " .. tostring(errorMsg))
+            StopCFly()
+        end
     end)
 end
 
@@ -230,25 +258,18 @@ local function StopCFly()
     local speaker = game.Players.LocalPlayer
     local character = speaker.Character
     
-    if CFLoop then
-        CFLoop:Disconnect()
-        CFLoop = nil
-    end
+    -- 安全断开连接
+    CFLoop = SafeDisconnect(CFLoop)
+    stateLoop = SafeDisconnect(stateLoop)
     
-    -- 停止状态事件循环
-    if stateLoop then
-        stateLoop:Disconnect()
-        stateLoop = nil
-    end
-    
-    if character then
+    if character and character.Parent then
         local humanoid = character:FindFirstChildOfClass('Humanoid')
         local head = character:FindFirstChild("Head")
         
-        if humanoid then
+        if humanoid and humanoid.Parent then
             humanoid.PlatformStand = false
         end
-        if head then
+        if head and head.Parent then
             head.Anchored = false
         end
     end
@@ -318,6 +339,18 @@ flyToggleButton.MouseButton1Click:Connect(function()
         flyToggleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
         isFlying = true
     end
+end)
+
+-- 角色死亡时自动停止飞行
+game.Players.LocalPlayer.CharacterAdded:Connect(function(character)
+    character:WaitForChild("Humanoid").Died:Connect(function()
+        if isFlying then
+            StopCFly()
+            flyToggleButton.Text = "开启飞行"
+            flyToggleButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
+            isFlying = false
+        end
+    end)
 end)
 
 screenGui.Parent = playerGui

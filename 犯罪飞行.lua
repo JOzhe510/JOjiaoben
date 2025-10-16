@@ -4,6 +4,7 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CFSpeed = 50
+local RagdollDuration = 5  -- 默认布偶状态持续时间
 local CFLoop = nil
 local isFlying = false
 local ChangeState = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ChangeState")
@@ -23,8 +24,8 @@ screenGui.ResetOnSpawn = false
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 320, 0, 250) -- 减小高度
-mainFrame.Position = UDim2.new(0.5, -160, 0.5, -125)
+mainFrame.Size = UDim2.new(0, 320, 0, 320) -- 增加高度以容纳新控件
+mainFrame.Position = UDim2.new(0.5, -160, 0.5, -160)
 mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
@@ -91,10 +92,68 @@ local flyCorner = Instance.new("UICorner")
 flyCorner.CornerRadius = UDim.new(0, 10)
 flyCorner.Parent = flyToggleButton
 
+-- 布偶状态持续时间设置
+local ragdollLabel = Instance.new("TextLabel")
+ragdollLabel.Name = "RagdollLabel"
+ragdollLabel.Size = UDim2.new(0, 280, 0, 25)
+ragdollLabel.Position = UDim2.new(0.5, -140, 0.35, 0)
+ragdollLabel.BackgroundTransparency = 1
+ragdollLabel.Text = "布偶状态持续时间: 5"
+ragdollLabel.TextColor3 = Color3.fromRGB(200, 200, 220)
+ragdollLabel.Font = Enum.Font.Gotham
+ragdollLabel.TextSize = 14
+ragdollLabel.Parent = mainFrame
+
+local ragdollInputFrame = Instance.new("Frame")
+ragdollInputFrame.Name = "RagdollInputFrame"
+ragdollInputFrame.Size = UDim2.new(0, 280, 0, 35)
+ragdollInputFrame.Position = UDim2.new(0.5, -140, 0.42, 0)
+ragdollInputFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+ragdollInputFrame.BorderSizePixel = 0
+ragdollInputFrame.Parent = mainFrame
+
+local ragdollInputCorner = Instance.new("UICorner")
+ragdollInputCorner.CornerRadius = UDim.new(0, 8)
+ragdollInputCorner.Parent = ragdollInputFrame
+
+local ragdollTextBox = Instance.new("TextBox")
+ragdollTextBox.Name = "RagdollTextBox"
+ragdollTextBox.Size = UDim2.new(0.6, 0, 0.7, 0)
+ragdollTextBox.Position = UDim2.new(0.05, 0, 0.15, 0)
+ragdollTextBox.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+ragdollTextBox.BorderSizePixel = 0
+ragdollTextBox.Text = "5"
+ragdollTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+ragdollTextBox.Font = Enum.Font.Gotham
+ragdollTextBox.TextSize = 14
+ragdollTextBox.PlaceholderText = "输入持续时间 (1-1000)"
+ragdollTextBox.Parent = ragdollInputFrame
+
+local ragdollTextBoxCorner = Instance.new("UICorner")
+ragdollTextBoxCorner.CornerRadius = UDim.new(0, 6)
+ragdollTextBoxCorner.Parent = ragdollTextBox
+
+local applyRagdollButton = Instance.new("TextButton")
+applyRagdollButton.Name = "ApplyRagdollButton"
+applyRagdollButton.Size = UDim2.new(0.3, 0, 0.7, 0)
+applyRagdollButton.Position = UDim2.new(0.67, 0, 0.15, 0)
+applyRagdollButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
+applyRagdollButton.BorderSizePixel = 0
+applyRagdollButton.Text = "应用持续时间"
+applyRagdollButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+applyRagdollButton.Font = Enum.Font.Gotham
+applyRagdollButton.TextSize = 13
+applyRagdollButton.Parent = ragdollInputFrame
+
+local applyRagdollCorner = Instance.new("UICorner")
+applyRagdollCorner.CornerRadius = UDim.new(0, 6)
+applyRagdollCorner.Parent = applyRagdollButton
+
+-- 飞行速度设置
 local speedLabel = Instance.new("TextLabel")
 speedLabel.Name = "SpeedLabel"
 speedLabel.Size = UDim2.new(0, 280, 0, 25)
-speedLabel.Position = UDim2.new(0.5, -140, 0.45, 0)
+speedLabel.Position = UDim2.new(0.5, -140, 0.58, 0)
 speedLabel.BackgroundTransparency = 1
 speedLabel.Text = "飞行速度: 50"
 speedLabel.TextColor3 = Color3.fromRGB(200, 200, 220)
@@ -105,7 +164,7 @@ speedLabel.Parent = mainFrame
 local speedInputFrame = Instance.new("Frame")
 speedInputFrame.Name = "SpeedInputFrame"
 speedInputFrame.Size = UDim2.new(0, 280, 0, 35)
-speedInputFrame.Position = UDim2.new(0.5, -140, 0.55, 0)
+speedInputFrame.Position = UDim2.new(0.5, -140, 0.65, 0)
 speedInputFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
 speedInputFrame.BorderSizePixel = 0
 speedInputFrame.Parent = mainFrame
@@ -194,24 +253,19 @@ local function StartCFly()
     -- 安全检查
     if humanoid:GetState() == Enum.HumanoidStateType.Dead then return end
     
+    -- 先设置布偶状态
+    pcall(function()
+        firesignal(ChangeState.OnClientEvent, 
+            Enum.HumanoidStateType.FallingDown,
+            RagdollDuration
+        )
+    end)
+    
     humanoid.PlatformStand = true
     head.Anchored = true
     
     -- 安全断开连接
     CFLoop = SafeDisconnect(CFLoop)
-    stateLoop = SafeDisconnect(stateLoop)
-    
-    -- 状态循环（保持原样）
-    stateLoop = RunService.Heartbeat:Connect(function()
-        if character and character.Parent and humanoid and humanoid.Parent then
-            pcall(function()
-                firesignal(ChangeState.OnClientEvent, 
-                    Enum.HumanoidStateType.FallingDown,
-                    5
-                )
-            end)
-        end
-    end)
     
     -- 使用Stepped而不是RenderStepped，更稳定
     CFLoop = RunService.Stepped:Connect(function(_, deltaTime)
@@ -260,7 +314,6 @@ local function StopCFly()
     
     -- 安全断开连接
     CFLoop = SafeDisconnect(CFLoop)
-    stateLoop = SafeDisconnect(stateLoop)
     
     if character and character.Parent then
         local humanoid = character:FindFirstChildOfClass('Humanoid')
@@ -290,6 +343,7 @@ setupButtonHover(flyToggleButton)
 setupButtonHover(deleteButton)
 setupButtonHover(openUIButton)
 setupButtonHover(applySpeedButton)
+setupButtonHover(applyRagdollButton)
 
 closeButton.MouseButton1Click:Connect(function()
     mainFrame.Visible = false
@@ -306,6 +360,7 @@ deleteButton.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
+-- 应用飞行速度
 applySpeedButton.MouseButton1Click:Connect(function()
     local inputSpeed = tonumber(speedTextBox.Text)
     if inputSpeed and inputSpeed >= 1 and inputSpeed <= 200 then
@@ -324,6 +379,28 @@ speedTextBox.FocusLost:Connect(function(enterPressed)
         speedLabel.Text = "飞行速度: " .. CFSpeed
     else
         speedTextBox.Text = tostring(CFSpeed)
+    end
+end)
+
+-- 应用布偶状态持续时间
+applyRagdollButton.MouseButton1Click:Connect(function()
+    local inputDuration = tonumber(ragdollTextBox.Text)
+    if inputDuration and inputDuration >= 1 and inputDuration <= 1000 then
+        RagdollDuration = inputDuration
+        ragdollLabel.Text = "布偶状态持续时间: " .. RagdollDuration
+        ragdollTextBox.Text = tostring(RagdollDuration)
+    else
+        ragdollTextBox.Text = tostring(RagdollDuration)
+    end
+end)
+
+ragdollTextBox.FocusLost:Connect(function(enterPressed)
+    local inputDuration = tonumber(ragdollTextBox.Text)
+    if inputDuration and inputDuration >= 1 and inputDuration <= 1000 then
+        RagdollDuration = inputDuration
+        ragdollLabel.Text = "布偶状态持续时间: " .. RagdollDuration
+    else
+        ragdollTextBox.Text = tostring(RagdollDuration)
     end
 end)
 

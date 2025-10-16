@@ -1,435 +1,473 @@
-local player = game.Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+--[[
+═══════════════════════════════════════════════════════════
+    🎭 Ragdoll 伪装飞行系统
+    
+    核心思路：
+    1. 使用 BodyGyro + BodyPosition（和游戏 Ragdoll 相同）
+    2. 伪装成"持续的 Ragdoll 状态"
+    3. 低频率 firesignal（防止崩溃）
+    4. 服务器会认为这是正常的摔倒物理
+═══════════════════════════════════════════════════════════
+--]]
+
+-- ==================== 服务和变量 ====================
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local CFSpeed = 50
-local RagdollDuration = 5  -- 默认布偶状态持续时间
-local CFLoop = nil
-local isFlying = false
-local ChangeState = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ChangeState")
-local stateLoop = nil
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
--- 添加安全检查
-local function SafeDisconnect(connection)
-    if connection and typeof(connection) == "RBXScriptConnection" then
-        connection:Disconnect()
-    end
-    return nil
-end
-
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "VoidTeleportUI"
-screenGui.ResetOnSpawn = false
-
-local mainFrame = Instance.new("Frame")
-mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 320, 0, 320) -- 增加高度以容纳新控件
-mainFrame.Position = UDim2.new(0.5, -160, 0.5, -160)
-mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-mainFrame.Draggable = true
-mainFrame.Parent = screenGui
-
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 10)
-corner.Parent = mainFrame
-
-local titleBar = Instance.new("Frame")
-titleBar.Name = "TitleBar"
-titleBar.Size = UDim2.new(1, 0, 0, 35)
-titleBar.Position = UDim2.new(0, 0, 0, 0)
-titleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-titleBar.BorderSizePixel = 0
-titleBar.Parent = mainFrame
-
-local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 10)
-titleCorner.Parent = titleBar
-
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Name = "TitleLabel"
-titleLabel.Size = UDim2.new(1, -70, 1, 0)
-titleLabel.Position = UDim2.new(0, 15, 0, 0)
-titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "飞行功能"
-titleLabel.TextColor3 = Color3.fromRGB(220, 220, 255)
-titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.Font = Enum.Font.GothamBold
-titleLabel.TextSize = 16
-titleLabel.Parent = titleBar
-
-local closeButton = Instance.new("TextButton")
-closeButton.Name = "CloseButton"
-closeButton.Size = UDim2.new(0, 50, 0, 25)
-closeButton.Position = UDim2.new(1, -60, 0, 5)
-closeButton.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
-closeButton.BorderSizePixel = 0
-closeButton.Text = "关闭UI"
-closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeButton.Font = Enum.Font.Gotham
-closeButton.TextSize = 12
-closeButton.Parent = titleBar
-
-local closeCorner = Instance.new("UICorner")
-closeCorner.CornerRadius = UDim.new(0, 6)
-closeCorner.Parent = closeButton
-
-local flyToggleButton = Instance.new("TextButton")
-flyToggleButton.Name = "FlyToggleButton"
-flyToggleButton.Size = UDim2.new(0, 280, 0, 60)
-flyToggleButton.Position = UDim2.new(0.5, -140, 0.1, 0)
-flyToggleButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
-flyToggleButton.BorderSizePixel = 0
-flyToggleButton.Text = "开启飞行"
-flyToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-flyToggleButton.Font = Enum.Font.GothamBold
-flyToggleButton.TextSize = 18
-flyToggleButton.Parent = mainFrame
-
-local flyCorner = Instance.new("UICorner")
-flyCorner.CornerRadius = UDim.new(0, 10)
-flyCorner.Parent = flyToggleButton
-
--- 布偶状态持续时间设置
-local ragdollLabel = Instance.new("TextLabel")
-ragdollLabel.Name = "RagdollLabel"
-ragdollLabel.Size = UDim2.new(0, 280, 0, 25)
-ragdollLabel.Position = UDim2.new(0.5, -140, 0.35, 0)
-ragdollLabel.BackgroundTransparency = 1
-ragdollLabel.Text = "布偶状态持续时间: 5"
-ragdollLabel.TextColor3 = Color3.fromRGB(200, 200, 220)
-ragdollLabel.Font = Enum.Font.Gotham
-ragdollLabel.TextSize = 14
-ragdollLabel.Parent = mainFrame
-
-local ragdollInputFrame = Instance.new("Frame")
-ragdollInputFrame.Name = "RagdollInputFrame"
-ragdollInputFrame.Size = UDim2.new(0, 280, 0, 35)
-ragdollInputFrame.Position = UDim2.new(0.5, -140, 0.42, 0)
-ragdollInputFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-ragdollInputFrame.BorderSizePixel = 0
-ragdollInputFrame.Parent = mainFrame
-
-local ragdollInputCorner = Instance.new("UICorner")
-ragdollInputCorner.CornerRadius = UDim.new(0, 8)
-ragdollInputCorner.Parent = ragdollInputFrame
-
-local ragdollTextBox = Instance.new("TextBox")
-ragdollTextBox.Name = "RagdollTextBox"
-ragdollTextBox.Size = UDim2.new(0.6, 0, 0.7, 0)
-ragdollTextBox.Position = UDim2.new(0.05, 0, 0.15, 0)
-ragdollTextBox.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-ragdollTextBox.BorderSizePixel = 0
-ragdollTextBox.Text = "5"
-ragdollTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-ragdollTextBox.Font = Enum.Font.Gotham
-ragdollTextBox.TextSize = 14
-ragdollTextBox.PlaceholderText = "输入持续时间 (1-1000)"
-ragdollTextBox.Parent = ragdollInputFrame
-
-local ragdollTextBoxCorner = Instance.new("UICorner")
-ragdollTextBoxCorner.CornerRadius = UDim.new(0, 6)
-ragdollTextBoxCorner.Parent = ragdollTextBox
-
-local applyRagdollButton = Instance.new("TextButton")
-applyRagdollButton.Name = "ApplyRagdollButton"
-applyRagdollButton.Size = UDim2.new(0.3, 0, 0.7, 0)
-applyRagdollButton.Position = UDim2.new(0.67, 0, 0.15, 0)
-applyRagdollButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
-applyRagdollButton.BorderSizePixel = 0
-applyRagdollButton.Text = "应用持续时间"
-applyRagdollButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-applyRagdollButton.Font = Enum.Font.Gotham
-applyRagdollButton.TextSize = 13
-applyRagdollButton.Parent = ragdollInputFrame
-
-local applyRagdollCorner = Instance.new("UICorner")
-applyRagdollCorner.CornerRadius = UDim.new(0, 6)
-applyRagdollCorner.Parent = applyRagdollButton
-
--- 飞行速度设置
-local speedLabel = Instance.new("TextLabel")
-speedLabel.Name = "SpeedLabel"
-speedLabel.Size = UDim2.new(0, 280, 0, 25)
-speedLabel.Position = UDim2.new(0.5, -140, 0.58, 0)
-speedLabel.BackgroundTransparency = 1
-speedLabel.Text = "飞行速度: 50"
-speedLabel.TextColor3 = Color3.fromRGB(200, 200, 220)
-speedLabel.Font = Enum.Font.Gotham
-speedLabel.TextSize = 14
-speedLabel.Parent = mainFrame
-
-local speedInputFrame = Instance.new("Frame")
-speedInputFrame.Name = "SpeedInputFrame"
-speedInputFrame.Size = UDim2.new(0, 280, 0, 35)
-speedInputFrame.Position = UDim2.new(0.5, -140, 0.65, 0)
-speedInputFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-speedInputFrame.BorderSizePixel = 0
-speedInputFrame.Parent = mainFrame
-
-local speedInputCorner = Instance.new("UICorner")
-speedInputCorner.CornerRadius = UDim.new(0, 8)
-speedInputCorner.Parent = speedInputFrame
-
-local speedTextBox = Instance.new("TextBox")
-speedTextBox.Name = "SpeedTextBox"
-speedTextBox.Size = UDim2.new(0.6, 0, 0.7, 0)
-speedTextBox.Position = UDim2.new(0.05, 0, 0.15, 0)
-speedTextBox.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-speedTextBox.BorderSizePixel = 0
-speedTextBox.Text = "50"
-speedTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-speedTextBox.Font = Enum.Font.Gotham
-speedTextBox.TextSize = 14
-speedTextBox.PlaceholderText = "输入速度 (1-200)"
-speedTextBox.Parent = speedInputFrame
-
-local textBoxCorner = Instance.new("UICorner")
-textBoxCorner.CornerRadius = UDim.new(0, 6)
-textBoxCorner.Parent = speedTextBox
-
-local applySpeedButton = Instance.new("TextButton")
-applySpeedButton.Name = "ApplySpeedButton"
-applySpeedButton.Size = UDim2.new(0.3, 0, 0.7, 0)
-applySpeedButton.Position = UDim2.new(0.67, 0, 0.15, 0)
-applySpeedButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
-applySpeedButton.BorderSizePixel = 0
-applySpeedButton.Text = "应用飞行速度"
-applySpeedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-applySpeedButton.Font = Enum.Font.Gotham
-applySpeedButton.TextSize = 13
-applySpeedButton.Parent = speedInputFrame
-
-local applyCorner = Instance.new("UICorner")
-applyCorner.CornerRadius = UDim.new(0, 6)
-applyCorner.Parent = applySpeedButton
-
-local deleteButton = Instance.new("TextButton")
-deleteButton.Name = "DeleteButton"
-deleteButton.Size = UDim2.new(0, 120, 0, 35)
-deleteButton.Position = UDim2.new(0.5, -60, 0.85, 0)
-deleteButton.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-deleteButton.BorderSizePixel = 0
-deleteButton.Text = "删除UI"
-deleteButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-deleteButton.Font = Enum.Font.Gotham
-deleteButton.TextSize = 13
-deleteButton.Parent = mainFrame
-
-local deleteCorner = Instance.new("UICorner")
-deleteCorner.CornerRadius = UDim.new(0, 6)
-deleteCorner.Parent = deleteButton
-
-local openUIButton = Instance.new("TextButton")
-openUIButton.Name = "OpenUIButton"
-openUIButton.Size = UDim2.new(0, 80, 0, 35)
-openUIButton.Position = UDim2.new(0, 10, 0, 10)
-openUIButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
-openUIButton.BorderSizePixel = 0
-openUIButton.Text = "飞行功能"
-openUIButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-openUIButton.Font = Enum.Font.Gotham
-openUIButton.TextSize = 12
-openUIButton.Visible = false
-openUIButton.Parent = screenGui
-
-local openCorner = Instance.new("UICorner")
-openCorner.CornerRadius = UDim.new(0, 8)
-openCorner.Parent = openUIButton
-
--- 优化的飞行函数，避免卡顿
-local function StartCFly()
-    local speaker = game.Players.LocalPlayer
-    local character = speaker.Character
-    if not character or not character.Parent then return end
+-- ==================== 飞行配置 ====================
+local Config = {
+    Speed = 50,              -- 飞行速度
+    IsFlying = false,        -- 飞行状态
     
-    local humanoid = character:FindFirstChildOfClass('Humanoid')
-    local head = character:FindFirstChild("Head")
+    -- 防崩溃配置
+    StateUpdateInterval = 0.15,  -- firesignal 调用间隔（秒）
+    LastStateUpdate = 0,
     
-    if not humanoid or not head then return end
+    -- BodyMovers
+    BodyGyro = nil,
+    BodyPosition = nil,
     
-    -- 安全检查
-    if humanoid:GetState() == Enum.HumanoidStateType.Dead then return end
-    
-    -- 先设置布偶状态
-    pcall(function()
-        firesignal(ChangeState.OnClientEvent, 
-            Enum.HumanoidStateType.FallingDown,
-            RagdollDuration
-        )
-    end)
-    
-    humanoid.PlatformStand = true
-    head.Anchored = true
-    
-    -- 安全断开连接
-    CFLoop = SafeDisconnect(CFLoop)
-    
-    -- 使用Stepped而不是RenderStepped，更稳定
-    CFLoop = RunService.Stepped:Connect(function(_, deltaTime)
-        -- 多重安全检查
-        if not character or not character.Parent then 
-            CFLoop = SafeDisconnect(CFLoop)
-            return 
-        end
-        
-        if not humanoid or not humanoid.Parent or not head or not head.Parent then
-            CFLoop = SafeDisconnect(CFLoop)
-            return
-        end
-        
-        -- 检查角色是否死亡
-        if humanoid:GetState() == Enum.HumanoidStateType.Dead then
-            StopCFly()
-            return
-        end
-        
-        -- 使用pcall包装飞行逻辑，防止错误传播
-        local success, errorMsg = pcall(function()
-            local moveDirection = humanoid.MoveDirection * (CFSpeed * deltaTime)
-            local headCFrame = head.CFrame
-            local camera = workspace.CurrentCamera
-            local cameraCFrame = camera.CFrame
-            local cameraOffset = headCFrame:ToObjectSpace(cameraCFrame).Position
-            cameraCFrame = cameraCFrame * CFrame.new(-cameraOffset.X, -cameraOffset.Y, -cameraOffset.Z + 1)
-            local cameraPosition = cameraCFrame.Position
-            local headPosition = headCFrame.Position
+    -- 循环
+    FlyLoop = nil,
+    StateLoop = nil,
+}
 
-            local objectSpaceVelocity = CFrame.new(cameraPosition, Vector3.new(headPosition.X, cameraPosition.Y, headPosition.Z)):VectorToObjectSpace(moveDirection)
-            head.CFrame = CFrame.new(headPosition) * (cameraCFrame - cameraPosition) * CFrame.new(objectSpaceVelocity)
+-- ==================== 查找 ChangeState 事件 ====================
+local function findChangeStateEvent()
+    local searchPaths = {
+        {"ReplicatedStorage", "Events", "ChangeState"},
+        {"ReplicatedStorage", "ChangeState"},
+        {"ReplicatedStorage", "Remotes", "ChangeState"},
+        {"ReplicatedStorage", "Remote", "ChangeState"},
+    }
+    
+    for _, path in ipairs(searchPaths) do
+        local success, result = pcall(function()
+            local obj = game:GetService(path[1])
+            for i = 2, #path do
+                local child = obj:FindFirstChild(path[i])
+                if not child then return nil end
+                obj = child
+            end
+            return obj
         end)
         
-        if not success then
-            warn("飞行错误: " .. tostring(errorMsg))
-            StopCFly()
+        if success and result and result:IsA("RemoteEvent") then
+            return result, table.concat(path, ".")
         end
-    end)
+    end
+    
+    return nil, "未找到"
 end
 
-local function StopCFly()
-    local speaker = game.Players.LocalPlayer
-    local character = speaker.Character
+-- ==================== 启动飞行 ====================
+local function StartFly()
+    if Config.IsFlying then return end
+    Config.IsFlying = true
     
-    -- 安全断开连接
-    CFLoop = SafeDisconnect(CFLoop)
+    print("🚀 启动 Ragdoll 伪装飞行...")
     
-    if character and character.Parent then
-        local humanoid = character:FindFirstChildOfClass('Humanoid')
-        local head = character:FindFirstChild("Head")
+    -- 获取角色组件
+    Character = LocalPlayer.Character
+    if not Character then 
+        print("❌ 未找到角色")
+        Config.IsFlying = false
+        return 
+    end
+    
+    Humanoid = Character:FindFirstChildOfClass("Humanoid")
+    HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart") or Character:FindFirstChild("Torso")
+    
+    if not Humanoid or not HumanoidRootPart then 
+        print("❌ 缺少必要组件")
+        Config.IsFlying = false
+        return 
+    end
+    
+    -- 清理旧的 BodyMovers
+    for _, v in pairs(HumanoidRootPart:GetChildren()) do
+        if v:IsA("BodyGyro") or v:IsA("BodyPosition") then
+            v:Destroy()
+        end
+    end
+    
+    -- 创建 BodyGyro（稳定旋转）
+    Config.BodyGyro = Instance.new("BodyGyro")
+    Config.BodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    Config.BodyGyro.P = 3000
+    Config.BodyGyro.D = 500
+    Config.BodyGyro.Parent = HumanoidRootPart
+    
+    -- 创建 BodyPosition（控制位置）
+    Config.BodyPosition = Instance.new("BodyPosition")
+    Config.BodyPosition.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    Config.BodyPosition.P = 5000
+    Config.BodyPosition.D = 200
+    Config.BodyPosition.Parent = HumanoidRootPart
+    
+    -- 设置 PlatformStand（让角色失去行走能力）
+    Humanoid.PlatformStand = true
+    
+    print("✅ BodyGyro + BodyPosition 已创建（伪装 Ragdoll）")
+    
+    -- 查找 ChangeState 事件
+    local changeStateEvent, eventPath = findChangeStateEvent()
+    local hasFireSignal = changeStateEvent ~= nil
+    
+    if hasFireSignal then
+        print("✅ 找到 ChangeState: " .. eventPath)
+        print("🛡️ 将使用低频 firesignal 欺骗（" .. Config.StateUpdateInterval .. "s 间隔）")
+    else
+        print("⚠️ 未找到 ChangeState，仅使用物理控制")
+    end
+    
+    -- 飞行移动循环
+    Config.FlyLoop = RunService.Heartbeat:Connect(function(deltaTime)
+        if not Config.IsFlying then return end
         
-        if humanoid and humanoid.Parent then
+        -- 检查角色有效性
+        Character = LocalPlayer.Character
+        if not Character then
+            StopFly()
+            return
+        end
+        
+        Humanoid = Character:FindFirstChildOfClass("Humanoid")
+        HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart") or Character:FindFirstChild("Torso")
+        
+        if not Humanoid or not HumanoidRootPart or not Config.BodyPosition or not Config.BodyGyro then
+            StopFly()
+            return
+        end
+        
+        -- 获取摄像机方向
+        local camera = workspace.CurrentCamera
+        local cameraCFrame = camera.CFrame
+        
+        -- 获取移动输入
+        local moveVector = Vector3.new(0, 0, 0)
+        
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveVector = moveVector + (cameraCFrame.LookVector * Config.Speed * deltaTime)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveVector = moveVector - (cameraCFrame.LookVector * Config.Speed * deltaTime)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveVector = moveVector - (cameraCFrame.RightVector * Config.Speed * deltaTime)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveVector = moveVector + (cameraCFrame.RightVector * Config.Speed * deltaTime)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveVector = moveVector + (Vector3.new(0, 1, 0) * Config.Speed * deltaTime)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+            moveVector = moveVector - (Vector3.new(0, 1, 0) * Config.Speed * deltaTime)
+        end
+        
+        -- 更新目标位置
+        local targetPosition = HumanoidRootPart.Position + moveVector
+        Config.BodyPosition.Position = targetPosition
+        
+        -- 更新旋转（面向摄像机方向）
+        Config.BodyGyro.CFrame = CFrame.new(HumanoidRootPart.Position, HumanoidRootPart.Position + cameraCFrame.LookVector)
+    end)
+    
+    -- 状态欺骗循环（低频）
+    if hasFireSignal then
+        Config.StateLoop = RunService.Heartbeat:Connect(function()
+            if not Config.IsFlying then return end
+            
+            local currentTime = tick()
+            
+            -- 限制调用频率（防止崩溃）
+            if currentTime - Config.LastStateUpdate >= Config.StateUpdateInterval then
+                Config.LastStateUpdate = currentTime
+                
+                pcall(function()
+                    -- 使用 Ragdoll 状态（最像摔倒）
+                    firesignal(changeStateEvent.OnClientEvent,
+                        Enum.HumanoidStateType.Ragdoll,  -- 或 FallingDown
+                        5
+                    )
+                end)
+            end
+        end)
+    end
+    
+    print("🎭 Ragdoll 伪装飞行已启动！")
+    print("📌 操作: WASD移动 | 空格上升 | Shift下降")
+end
+
+-- ==================== 停止飞行 ====================
+function StopFly()
+    if not Config.IsFlying then return end
+    Config.IsFlying = false
+    
+    print("🛑 停止飞行...")
+    
+    -- 断开循环
+    if Config.FlyLoop then
+        Config.FlyLoop:Disconnect()
+        Config.FlyLoop = nil
+    end
+    
+    if Config.StateLoop then
+        Config.StateLoop:Disconnect()
+        Config.StateLoop = nil
+    end
+    
+    -- 清理 BodyMovers
+    if Config.BodyGyro then
+        Config.BodyGyro:Destroy()
+        Config.BodyGyro = nil
+    end
+    
+    if Config.BodyPosition then
+        Config.BodyPosition:Destroy()
+        Config.BodyPosition = nil
+    end
+    
+    -- 恢复角色
+    Character = LocalPlayer.Character
+    if Character then
+        local humanoid = Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
             humanoid.PlatformStand = false
         end
-        if head and head.Parent then
-            head.Anchored = false
-        end
     end
+    
+    print("✅ 飞行已停止，角色已恢复")
 end
 
-local function setupButtonHover(button)
-    local originalColor = button.BackgroundColor3
-    button.MouseEnter:Connect(function()
-        button.BackgroundColor3 = originalColor * 1.2
+-- ==================== 创建 UI ====================
+local function CreateUI()
+    -- 检查是否已存在
+    local existingUI = LocalPlayer:FindFirstChild("PlayerGui"):FindFirstChild("RagdollFlyUI")
+    if existingUI then
+        existingUI:Destroy()
+    end
+    
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "RagdollFlyUI"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    ScreenGui.Parent = LocalPlayer:FindFirstChild("PlayerGui")
+    
+    -- 主框架
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 380, 0, 280)
+    MainFrame.Position = UDim2.new(0.5, -190, 0.5, -140)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Parent = ScreenGui
+    
+    -- 圆角
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 12)
+    Corner.Parent = MainFrame
+    
+    -- 标题
+    local Title = Instance.new("TextLabel")
+    Title.Name = "Title"
+    Title.Size = UDim2.new(1, 0, 0, 50)
+    Title.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    Title.BorderSizePixel = 0
+    Title.Font = Enum.Font.GothamBold
+    Title.Text = "🎭 Ragdoll 伪装飞行"
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.TextSize = 20
+    Title.Parent = MainFrame
+    
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 12)
+    TitleCorner.Parent = Title
+    
+    -- 副标题
+    local Subtitle = Instance.new("TextLabel")
+    Subtitle.Size = UDim2.new(1, -20, 0, 40)
+    Subtitle.Position = UDim2.new(0, 10, 0, 55)
+    Subtitle.BackgroundTransparency = 1
+    Subtitle.Font = Enum.Font.Gotham
+    Subtitle.Text = "🛡️ 伪装策略: BodyGyro + BodyPosition"
+    Subtitle.TextColor3 = Color3.fromRGB(100, 200, 255)
+    Subtitle.TextSize = 13
+    Subtitle.TextXAlignment = Enum.TextXAlignment.Left
+    Subtitle.Parent = MainFrame
+    
+    -- 状态标签
+    local StatusLabel = Instance.new("TextLabel")
+    StatusLabel.Name = "StatusLabel"
+    StatusLabel.Size = UDim2.new(1, -20, 0, 50)
+    StatusLabel.Position = UDim2.new(0, 10, 0, 95)
+    StatusLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    StatusLabel.BorderSizePixel = 0
+    StatusLabel.Font = Enum.Font.GothamMedium
+    StatusLabel.Text = "⏸️ 状态: 未启动\n💡 检测风险: 极低（伪装 Ragdoll）"
+    StatusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    StatusLabel.TextSize = 14
+    StatusLabel.Parent = MainFrame
+    
+    local StatusCorner = Instance.new("UICorner")
+    StatusCorner.CornerRadius = UDim.new(0, 8)
+    StatusCorner.Parent = StatusLabel
+    
+    -- 速度滑块标签
+    local SpeedLabel = Instance.new("TextLabel")
+    SpeedLabel.Size = UDim2.new(1, -20, 0, 20)
+    SpeedLabel.Position = UDim2.new(0, 10, 0, 155)
+    SpeedLabel.BackgroundTransparency = 1
+    SpeedLabel.Font = Enum.Font.GothamMedium
+    SpeedLabel.Text = "⚡ 飞行速度: 50"
+    SpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    SpeedLabel.TextSize = 14
+    SpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
+    SpeedLabel.Parent = MainFrame
+    
+    -- 速度滑块
+    local SpeedSlider = Instance.new("Frame")
+    SpeedSlider.Size = UDim2.new(1, -20, 0, 30)
+    SpeedSlider.Position = UDim2.new(0, 10, 0, 180)
+    SpeedSlider.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    SpeedSlider.BorderSizePixel = 0
+    SpeedSlider.Parent = MainFrame
+    
+    local SliderCorner = Instance.new("UICorner")
+    SliderCorner.CornerRadius = UDim.new(0, 8)
+    SliderCorner.Parent = SpeedSlider
+    
+    local SliderButton = Instance.new("TextButton")
+    SliderButton.Size = UDim2.new(0, 30, 1, 0)
+    SliderButton.Position = UDim2.new((Config.Speed - 10) / 190, -15, 0, 0)
+    SliderButton.BackgroundColor3 = Color3.fromRGB(100, 200, 255)
+    SliderButton.BorderSizePixel = 0
+    SliderButton.Text = ""
+    SliderButton.Parent = SpeedSlider
+    
+    local ButtonCorner = Instance.new("UICorner")
+    ButtonCorner.CornerRadius = UDim.new(0, 6)
+    ButtonCorner.Parent = SliderButton
+    
+    -- 滑块逻辑
+    local dragging = false
+    SliderButton.MouseButton1Down:Connect(function()
+        dragging = true
     end)
-    button.MouseLeave:Connect(function()
-        button.BackgroundColor3 = originalColor
-    end)
-end
-
-setupButtonHover(closeButton)
-setupButtonHover(flyToggleButton)
-setupButtonHover(deleteButton)
-setupButtonHover(openUIButton)
-setupButtonHover(applySpeedButton)
-setupButtonHover(applyRagdollButton)
-
-closeButton.MouseButton1Click:Connect(function()
-    mainFrame.Visible = false
-    openUIButton.Visible = true
-end)
-
-openUIButton.MouseButton1Click:Connect(function()
-    mainFrame.Visible = true
-    openUIButton.Visible = false
-end)
-
-deleteButton.MouseButton1Click:Connect(function()
-    StopCFly()
-    screenGui:Destroy()
-end)
-
--- 应用飞行速度
-applySpeedButton.MouseButton1Click:Connect(function()
-    local inputSpeed = tonumber(speedTextBox.Text)
-    if inputSpeed and inputSpeed >= 1 and inputSpeed <= 200 then
-        CFSpeed = inputSpeed
-        speedLabel.Text = "飞行速度: " .. CFSpeed
-        speedTextBox.Text = tostring(CFSpeed)
-    else
-        speedTextBox.Text = tostring(CFSpeed)
-    end
-end)
-
-speedTextBox.FocusLost:Connect(function(enterPressed)
-    local inputSpeed = tonumber(speedTextBox.Text)
-    if inputSpeed and inputSpeed >= 1 and inputSpeed <= 200 then
-        CFSpeed = inputSpeed
-        speedLabel.Text = "飞行速度: " .. CFSpeed
-    else
-        speedTextBox.Text = tostring(CFSpeed)
-    end
-end)
-
--- 应用布偶状态持续时间
-applyRagdollButton.MouseButton1Click:Connect(function()
-    local inputDuration = tonumber(ragdollTextBox.Text)
-    if inputDuration and inputDuration >= 1 and inputDuration <= 1000 then
-        RagdollDuration = inputDuration
-        ragdollLabel.Text = "布偶状态持续时间: " .. RagdollDuration
-        ragdollTextBox.Text = tostring(RagdollDuration)
-    else
-        ragdollTextBox.Text = tostring(RagdollDuration)
-    end
-end)
-
-ragdollTextBox.FocusLost:Connect(function(enterPressed)
-    local inputDuration = tonumber(ragdollTextBox.Text)
-    if inputDuration and inputDuration >= 1 and inputDuration <= 1000 then
-        RagdollDuration = inputDuration
-        ragdollLabel.Text = "布偶状态持续时间: " .. RagdollDuration
-    else
-        ragdollTextBox.Text = tostring(RagdollDuration)
-    end
-end)
-
-flyToggleButton.MouseButton1Click:Connect(function()
-    if isFlying then
-        StopCFly()
-        flyToggleButton.Text = "开启飞行"
-        flyToggleButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
-        isFlying = false
-    else
-        StartCFly()
-        flyToggleButton.Text = "关闭飞行"
-        flyToggleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-        isFlying = true
-    end
-end)
-
--- 角色死亡时自动停止飞行
-game.Players.LocalPlayer.CharacterAdded:Connect(function(character)
-    character:WaitForChild("Humanoid").Died:Connect(function()
-        if isFlying then
-            StopCFly()
-            flyToggleButton.Text = "开启飞行"
-            flyToggleButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
-            isFlying = false
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
         end
     end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local mousePos = UserInputService:GetMouseLocation().X
+            local sliderPos = SpeedSlider.AbsolutePosition.X
+            local sliderSize = SpeedSlider.AbsoluteSize.X
+            local relativePos = math.clamp((mousePos - sliderPos) / sliderSize, 0, 1)
+            
+            Config.Speed = math.floor(10 + (relativePos * 190))
+            SpeedLabel.Text = "⚡ 飞行速度: " .. Config.Speed
+            SliderButton.Position = UDim2.new(relativePos, -15, 0, 0)
+        end
+    end)
+    
+    -- 开关按钮
+    local ToggleButton = Instance.new("TextButton")
+    ToggleButton.Name = "ToggleButton"
+    ToggleButton.Size = UDim2.new(1, -20, 0, 40)
+    ToggleButton.Position = UDim2.new(0, 10, 0, 225)
+    ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+    ToggleButton.BorderSizePixel = 0
+    ToggleButton.Font = Enum.Font.GothamBold
+    ToggleButton.Text = "🚀 启动飞行"
+    ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleButton.TextSize = 16
+    ToggleButton.Parent = MainFrame
+    
+    local ToggleCorner = Instance.new("UICorner")
+    ToggleCorner.CornerRadius = UDim.new(0, 8)
+    ToggleCorner.Parent = ToggleButton
+    
+    -- 按钮点击
+    ToggleButton.MouseButton1Click:Connect(function()
+        if Config.IsFlying then
+            StopFly()
+            ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+            ToggleButton.Text = "🚀 启动飞行"
+            StatusLabel.Text = "⏸️ 状态: 未启动\n💡 检测风险: 极低（伪装 Ragdoll）"
+        else
+            StartFly()
+            ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+            ToggleButton.Text = "🛑 停止飞行"
+            StatusLabel.Text = "✅ 状态: 飞行中\n🎭 伪装: Ragdoll 物理状态"
+        end
+    end)
+    
+    -- 拖动功能
+    local dragToggle = nil
+    local dragStart = nil
+    local startPos = nil
+    
+    local function updateInput(input)
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+    
+    Title.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragToggle = true
+            dragStart = input.Position
+            startPos = MainFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragToggle = false
+                end
+            end)
+        end
+    end)
+    
+    Title.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            if dragToggle then
+                updateInput(input)
+            end
+        end
+    end)
+    
+    print("✅ UI 已创建")
+end
+
+-- ==================== 角色重生处理 ====================
+LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+    Character = newCharacter
+    Humanoid = Character:WaitForChild("Humanoid")
+    HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+    
+    if Config.IsFlying then
+        StopFly()
+        print("🔄 角色重生，飞行已停止")
+    end
 end)
 
-screenGui.Parent = playerGui
+-- ==================== 初始化 ====================
+print("═══════════════════════════════════════════════")
+print("🎭 Ragdoll 伪装飞行系统已加载")
+print("📌 特点:")
+print("   • 使用 BodyGyro + BodyPosition（和游戏 Ragdoll 相同）")
+print("   • 低频 firesignal（防崩溃）")
+print("   • 伪装成持续摔倒状态")
+print("═══════════════════════════════════════════════")
 
-print("飞行控制面板已加载！")
+CreateUI()
+

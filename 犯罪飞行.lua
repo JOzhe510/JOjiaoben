@@ -8,6 +8,9 @@ local lastExecute = 0
 local mainUIVisible = true
 local isFlying = false
 local flightStartTime = 0
+local lastPosition = nil
+local isMoving = false
+local moveCheckLoop
 
 -- 创建主UI
 local ScreenGui = Instance.new("ScreenGui")
@@ -108,6 +111,39 @@ local function executeFlightCode()
     )
 end
 
+-- 检测玩家是否在移动
+local function startMoveDetection()
+    if moveCheckLoop then return end
+    
+    moveCheckLoop = RunService.Heartbeat:Connect(function()
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local currentPosition = LocalPlayer.Character.HumanoidRootPart.Position
+            
+            if lastPosition then
+                -- 计算移动距离
+                local distance = (currentPosition - lastPosition).Magnitude
+                -- 如果移动距离大于0.5，则认为玩家在移动
+                isMoving = distance > 0.5
+            else
+                lastPosition = currentPosition
+                isMoving = false
+            end
+        else
+            lastPosition = nil
+            isMoving = false
+        end
+    end)
+end
+
+local function stopMoveDetection()
+    if moveCheckLoop then
+        moveCheckLoop:Disconnect()
+        moveCheckLoop = nil
+    end
+    lastPosition = nil
+    isMoving = false
+end
+
 local function startLoop()
     if flyLoop then return end
     
@@ -119,9 +155,13 @@ local function startLoop()
         
         -- 延长间隔到3秒，避免频繁重置
         if lastExecute >= 3.0 then
-            -- 只有在飞行状态下才继续执行
+            -- 只有在飞行状态下才继续执行，但根据移动状态调整
             if isFlying then
-                executeFlightCode()
+                if not isMoving then
+                    -- 玩家没有移动时执行飞行代码
+                    executeFlightCode()
+                end
+                -- 玩家在移动时不执行飞行代码，避免干扰
             end
             lastExecute = 0
         end
@@ -152,7 +192,13 @@ local function togglePlayerFlight()
             humanoid.PlatformStand = true
             isFlying = true
             
-            -- 如果循环已开启，立即执行一次飞行代码
+            -- 开始移动检测
+            startMoveDetection()
+            
+            -- 立即执行飞行代码来启动飞行
+            executeFlightCode()
+            
+            -- 如果循环已开启，确保循环运行
             if flyLoop then
                 executeFlightCode()
             end
@@ -163,6 +209,9 @@ local function togglePlayerFlight()
             -- 关闭飞行
             humanoid.PlatformStand = false
             isFlying = false
+            
+            -- 停止移动检测
+            stopMoveDetection()
             
             FlyToggle.Text = "开启飞行"
             FlyToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
@@ -196,9 +245,22 @@ end)
 -- 防内存泄漏
 LocalPlayer.CharacterRemoving:Connect(function()
     stopLoop()
+    stopMoveDetection()
     isFlying = false
     if FlyToggle then
         FlyToggle.Text = "开启飞行"
         FlyToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    end
+end)
+
+-- 角色添加时重新初始化
+LocalPlayer.CharacterAdded:Connect(function(character)
+    character:WaitForChild("Humanoid")
+    if isFlying then
+        -- 如果之前是飞行状态，重新启用飞行
+        local humanoid = character.Humanoid
+        humanoid.PlatformStand = true
+        startMoveDetection()
+        executeFlightCode()
     end
 end)

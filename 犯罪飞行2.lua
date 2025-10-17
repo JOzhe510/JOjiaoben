@@ -3,6 +3,10 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
+-- 连接管理
+local connections = {}
+local isRunning = false
+
 -- UI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RagdollUI"
@@ -32,7 +36,7 @@ closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 closeButton.Parent = frame
 closeButton.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
+    cleanup()
 end)
 
 local ragdollButton = Instance.new("TextButton")
@@ -48,6 +52,31 @@ local originalStates = {}
 local ragdollParts = {}
 local bodyVelocities = {}
 
+-- 清理函数
+local function cleanup()
+    ragdollEnabled = false
+    ragdollButton.Text = "开启布娃娃"
+    
+    -- 断开所有连接
+    for _, connection in pairs(connections) do
+        if connection then
+            connection:Disconnect()
+        end
+    end
+    connections = {}
+    
+    -- 恢复物理状态
+    local character = LocalPlayer.Character
+    if character then
+        restoreOriginalPhysics(character)
+    end
+    
+    -- 清理UI
+    if screenGui and screenGui.Parent then
+        screenGui:Destroy()
+    end
+end
+
 -- 获取玩家框架结构
 local function getCharacterRig(character)
     local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -59,15 +88,26 @@ end
 
 -- 创建布娃娃物理
 local function createRagdollPhysics(character)
+    -- 先清理可能存在的旧实例
+    restoreOriginalPhysics(character)
+    
     local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
+    if not humanoid then return false end
+    
+    -- 等待角色完全加载
+    if not character:FindFirstChild("HumanoidRootPart") then
+        character:WaitForChild("HumanoidRootPart")
+    end
+    
+    -- 重置状态
+    originalStates = {}
+    ragdollParts = {}
+    bodyVelocities = {}
     
     -- 保存原始状态
-    originalStates = {
-        humanoid = {
-            PlatformStand = humanoid.PlatformStand,
-            AutoRotate = humanoid.AutoRotate
-        }
+    originalStates.humanoid = {
+        PlatformStand = humanoid.PlatformStand,
+        AutoRotate = humanoid.AutoRotate
     }
     
     -- 设置人类状态
@@ -75,45 +115,47 @@ local function createRagdollPhysics(character)
     humanoid.AutoRotate = false
     
     -- 处理所有身体部件
-    ragdollParts = {}
-    bodyVelocities = {}
-    
     for _, part in pairs(character:GetDescendants()) do
-        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+        if part:IsA("BasePart") then
+            -- 跳过HumanoidRootPart的特殊处理
+            if part.Name == "HumanoidRootPart" then
+                originalStates[part] = {
+                    CanCollide = part.CanCollide
+                }
+                part.CanCollide = true
+                continue
+            end
+            
             -- 保存原始状态
             originalStates[part] = {
                 CanCollide = part.CanCollide,
-                Anchored = part.Anchored,
-                Massless = part.Massless
+                Anchored = part.Anchored
             }
             
             -- 启用物理
             part.CanCollide = true
             part.Anchored = false
-            part.Massless = false
             
-            -- 创建BodyVelocity用于控制
-            local bodyVelocity = Instance.new("BodyVelocity")
-            bodyVelocity.Velocity = Vector3.new()
-            bodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)
-            bodyVelocity.P = 1000
-            bodyVelocity.Parent = part
-            
-            table.insert(ragdollParts, part)
-            bodyVelocities[part] = bodyVelocity
+            -- 为除HRP外的部件创建BodyVelocity
+            if part.Name ~= "HumanoidRootPart" then
+                local bodyVelocity = Instance.new("BodyVelocity")
+                bodyVelocity.Velocity = Vector3.new()
+                bodyVelocity.MaxForce = Vector3.new(1000, 1000, 1000) -- 减少力的大小
+                bodyVelocity.P = 500
+                bodyVelocity.Parent = part
+                
+                table.insert(ragdollParts, part)
+                bodyVelocities[part] = bodyVelocity
+            end
+        elseif part:IsA("Motor6D") then
+            originalStates[part] = {
+                Enabled = part.Enabled
+            }
+            part.Enabled = false
         end
     end
     
-    -- 禁用Motor6D关节但保持连接
-    for _, motor in pairs(character:GetDescendants()) do
-        if motor:IsA("Motor6D") then
-            originalStates[motor] = {
-                Enabled = motor.Enabled,
-                DesiredAngle = motor.CurrentAngle
-            }
-            motor.Enabled = false
-        end
-    end
+    return true
 end
 
 -- 恢复原始状态
@@ -131,7 +173,6 @@ local function restoreOriginalPhysics(character)
         if part:IsA("BasePart") and part.Parent then
             part.CanCollide = state.CanCollide
             part.Anchored = state.Anchored
-            part.Massless = state.Massless
         elseif part:IsA("Motor6D") and part.Parent then
             part.Enabled = state.Enabled
         end
@@ -156,37 +197,36 @@ local function updateRagdollMovement(character, moveDirection, jump)
     
     if not hrp or not humanoid then return end
     
-    local speed = humanoid.WalkSpeed
+    -- 更温和的移动控制
+    local speed = humanoid.WalkSpeed * 0.7 -- 降低速度
     
-    -- 控制HumanoidRootPart移动
     if moveDirection.Magnitude > 0 then
-        local moveForce = moveDirection * speed
+        local camera = workspace.CurrentCamera
+        local cameraCFrame = camera.CFrame
+        local moveVector = cameraCFrame:VectorToWorldSpace(moveDirection)
+        moveVector = Vector3.new(moveVector.X, 0, moveVector.Z).Unit
+        
+        local moveForce = moveVector * speed
         hrp.Velocity = Vector3.new(moveForce.X, hrp.Velocity.Y, moveForce.Z)
     else
-        -- 减速
-        hrp.Velocity = Vector3.new(hrp.Velocity.X * 0.9, hrp.Velocity.Y, hrp.Velocity.Z * 0.9)
+        -- 更温和的减速
+        hrp.Velocity = Vector3.new(hrp.Velocity.X * 0.8, hrp.Velocity.Y, hrp.Velocity.Z * 0.8)
     end
     
-    -- 跳跃
-    if jump then
+    -- 跳跃控制
+    if jump and hrp.Velocity.Y > -5 then
         hrp.Velocity = Vector3.new(hrp.Velocity.X, 50, hrp.Velocity.Z)
     end
     
-    -- 控制身体部件跟随（柔和的物理跟随）
+    -- 更温和的身体部件跟随
     for part, bodyVelocity in pairs(bodyVelocities) do
-        if part and part.Parent then
-            -- 计算部件相对于HRP的目标位置
-            local targetPosition = hrp.Position
+        if part and part.Parent and part ~= hrp then
             local offset = part.Position - hrp.Position
-            
-            -- 限制最大偏移距离
-            if offset.Magnitude > 5 then
-                offset = offset.Unit * 5
+            if offset.Magnitude > 3 then
+                offset = offset.Unit * 3
             end
             
-            -- 计算目标速度
-            local targetVelocity = hrp.Velocity + (offset * -2) -- 弹性回归
-            
+            local targetVelocity = hrp.Velocity + (offset * -1.5) -- 减少弹性系数
             bodyVelocity.Velocity = targetVelocity
         end
     end
@@ -212,9 +252,11 @@ end)
 local currentMoveDirection = Vector3.new()
 local jumpRequested = false
 
-UserInputService.JumpRequest:Connect(function()
+-- 跳跃请求
+local jumpConnection = UserInputService.JumpRequest:Connect(function()
     jumpRequested = true
 end)
+table.insert(connections, jumpConnection)
 
 -- 移动输入处理
 local function onInputChanged(input, gameProcessed)
@@ -235,34 +277,50 @@ local function onInputChanged(input, gameProcessed)
     end
 end
 
-UserInputService.InputChanged:Connect(onInputChanged)
+local inputConnection = UserInputService.InputChanged:Connect(onInputChanged)
+table.insert(connections, inputConnection)
 
 -- 主循环
-RunService.Heartbeat:Connect(function(deltaTime)
+local heartbeatConnection = RunService.Heartbeat:Connect(function(deltaTime)
     local character = LocalPlayer.Character
-    if not character then return end
+    if not character or not ragdollEnabled then return end
     
-    if ragdollEnabled then
-        updateRagdollMovement(character, currentMoveDirection, jumpRequested)
-        jumpRequested = false
+    -- 安全检查
+    if not character:FindFirstChild("HumanoidRootPart") or not character:FindFirstChildOfClass("Humanoid") then
+        return
     end
+    
+    updateRagdollMovement(character, currentMoveDirection, jumpRequested)
+    jumpRequested = false
 end)
+table.insert(connections, heartbeatConnection)
 
 -- 角色重生处理
-LocalPlayer.CharacterAdded:Connect(function(character)
+local characterAddedConnection = LocalPlayer.CharacterAdded:Connect(function(character)
     -- 等待角色完全加载
-    character:WaitForChild("HumanoidRootPart")
-    character:WaitForChild("Humanoid")
+    repeat 
+        wait(0.1) 
+    until character:FindFirstChild("HumanoidRootPart") and character:FindFirstChildOfClass("Humanoid")
     
     if ragdollEnabled then
-        wait(0.5) -- 给角色加载一些时间
+        wait(1) -- 给更多加载时间
         createRagdollPhysics(character)
     end
 end)
+table.insert(connections, characterAddedConnection)
 
 -- 角色移除时清理
-LocalPlayer.CharacterRemoving:Connect(function()
+local characterRemovingConnection = LocalPlayer.CharacterRemoving:Connect(function()
     ragdollParts = {}
     bodyVelocities = {}
     originalStates = {}
 end)
+table.insert(connections, characterRemovingConnection)
+
+-- 玩家离开时清理
+local playerRemovingConnection = Players.PlayerRemoving:Connect(function(player)
+    if player == LocalPlayer then
+        cleanup()
+    end
+end)
+table.insert(connections, playerRemovingConnection)

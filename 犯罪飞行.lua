@@ -7,6 +7,7 @@ local flyLoop
 local lastExecute = 0
 local mainUIVisible = true
 local isFlying = false
+local flightStartTime = 0
 
 -- 创建主UI
 local ScreenGui = Instance.new("ScreenGui")
@@ -110,11 +111,18 @@ end
 local function startLoop()
     if flyLoop then return end
     
+    flightStartTime = tick()  -- 记录飞行开始时间
+    executeFlightCode()  -- 立即执行一次
+    
     flyLoop = RunService.Heartbeat:Connect(function(deltaTime)
         lastExecute = lastExecute + deltaTime
         
-        if lastExecute >= 0.5 then
-            executeFlightCode()
+        -- 延长间隔到3秒，避免频繁重置
+        if lastExecute >= 3.0 then
+            -- 只有在飞行状态下才继续执行
+            if isFlying then
+                executeFlightCode()
+            end
             lastExecute = 0
         end
     end)
@@ -138,13 +146,24 @@ end
 local function togglePlayerFlight()
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         local humanoid = LocalPlayer.Character.Humanoid
-        humanoid.PlatformStand = not humanoid.PlatformStand
-        isFlying = humanoid.PlatformStand
         
-        if isFlying then
+        if not isFlying then
+            -- 开启飞行
+            humanoid.PlatformStand = true
+            isFlying = true
+            
+            -- 如果循环已开启，立即执行一次飞行代码
+            if flyLoop then
+                executeFlightCode()
+            end
+            
             FlyToggle.Text = "关闭飞行"
             FlyToggle.BackgroundColor3 = Color3.fromRGB(215, 60, 60)
         else
+            -- 关闭飞行
+            humanoid.PlatformStand = false
+            isFlying = false
+            
             FlyToggle.Text = "开启飞行"
             FlyToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
         end
@@ -178,4 +197,8 @@ end)
 LocalPlayer.CharacterRemoving:Connect(function()
     stopLoop()
     isFlying = false
+    if FlyToggle then
+        FlyToggle.Text = "开启飞行"
+        FlyToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    end
 end)

@@ -13,7 +13,7 @@ local Config = {
     FixedCFrame = CFrame.new(-4895, 55, -68, 0, -1, -1, -0, 1, -1, 1, 0, -0),
     Flight = {
         SwimFly = false,
-        SwimFlySpeed = 50,
+        SwimFlySpeed = 100,
         SwimFlyVertPower = 35,
         OriginalGravity = Workspace.Gravity
     }
@@ -278,7 +278,7 @@ local function Stop()
     end
     
     print("━━━━━━━━━━━━━━━━━━━━━━━━")
-    print("⏹️ 飞行与布偶循环已停止")
+    print("⏹️ 飞行已停止")
     print(string.format("📊 总共触发: %d 次", TriggerCount))
     print("━━━━━━━━━━━━━━━━━━━━━━━━")
     
@@ -334,7 +334,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -50, 0, 40)
 Title.Position = UDim2.new(0, 10, 0, 5)
 Title.BackgroundTransparency = 1
-Title.Text = "🔄 飞行布偶循环"
+Title.Text = "🔄 犯罪飞行"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 16
 Title.Font = Enum.Font.GothamBold
@@ -366,7 +366,7 @@ local Info = Instance.new("TextLabel")
 Info.Size = UDim2.new(1, -20, 0, 60)
 Info.Position = UDim2.new(0, 10, 0, 50)
 Info.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-Info.Text = "🚫 禁用 GettingUp & Running\n🔄 布偶间隔: 0.7秒/次\n✈️ 飞行: 游泳飞行（WASD+视角控制）"
+Info.Text = "🚫 禁用 GettingUp & Running\n🔄 间隔: 0.7秒/次\n✈️ 飞行: 游泳飞行（WASD+视角控制）"
 Info.TextColor3 = Color3.fromRGB(200, 255, 200)
 Info.TextSize = 12
 Info.Font = Enum.Font.Code
@@ -383,7 +383,7 @@ local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(1, -20, 0, 35)
 ToggleBtn.Position = UDim2.new(0, 10, 0, 120)
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
-ToggleBtn.Text = "▶ 启动飞行布偶循环"
+ToggleBtn.Text = "▶ 启动飞行"
 ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleBtn.TextSize = 14
 ToggleBtn.Font = Enum.Font.GothamBold
@@ -397,11 +397,11 @@ ToggleBtnCorner.Parent = ToggleBtn
 ToggleBtn.MouseButton1Click:Connect(function()
     if Config.Enabled then
         Stop()
-        ToggleBtn.Text = "▶ 启动飞行布偶循环"
+        ToggleBtn.Text = "▶ 启动飞行"
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
     else
         Start()
-        ToggleBtn.Text = "⏹ 停止飞行布偶循环"
+        ToggleBtn.Text = "⏹ 停止飞行"
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
     end
 end)
@@ -439,7 +439,7 @@ LocalPlayer.CharacterAdded:Connect(function(newChar)
 end)
 
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-print("🔄 飞行布偶循环已加载")
+print("🔄 犯罪飞行已加载")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 print("功能:")
 print("  🚫 状态禁用: 彻底禁用 GettingUp & Running")

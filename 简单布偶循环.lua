@@ -12,7 +12,7 @@ local LocalPlayer = Players.LocalPlayer
 -- 配置
 local Config = {
     Enabled = false,
-    Interval = 0.7,  -- 循环间隔（秒）
+    Interval = 0.016,  -- 循环间隔（秒）
     UsePlayerPosition = true,
     FixedVector = Vector3.new(70, 60, -280),  -- 使用你提供的向量
     FixedCFrame = CFrame.new(-4895, 55, -68, 0, -1, -1, -0, 1, -1, 1, 0, -0)  -- 使用你提供的CFrame

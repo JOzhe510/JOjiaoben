@@ -13,7 +13,7 @@ local Config = {
     FixedCFrame = CFrame.new(-4895, 55, -68, 0, -1, -1, -0, 1, -1, 1, 0, -0),
     Flight = {
         SwimFly = false,
-        SwimFlySpeed = 10,
+        SwimFlySpeed = 50,
         SwimFlyVertPower = 35,
         OriginalGravity = Workspace.Gravity
     }

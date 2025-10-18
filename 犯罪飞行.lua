@@ -360,6 +360,7 @@ CloseBtn.MouseButton1Click:Connect(function()
     if Config.Enabled then Stop() end
     MainGui.Enabled = false
     MiniGui.Parent = PlayerGui -- 显示小UI
+    MainGui.Enabled = true
 end)
 
 local Info = Instance.new("TextLabel")

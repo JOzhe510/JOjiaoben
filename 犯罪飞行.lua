@@ -9,12 +9,12 @@ local Config = {
     Enabled = false,
     Interval = 2,
     UsePlayerPosition = true,
-    FixedVector = Vector3.new(7, 6, -28),
-    FixedCFrame = CFrame.new(-4895, 55, -68, 0, -1, -1, -0, 1, -1, 1, 0, -0),
+    FixedVector = Vector3.new(700, 600, -2800),
+    FixedCFrame = CFrame.new(-48950, 550, -680, 110, -100, -100, -10, 11, -100, 100, 111, -100),
     Flight = {
         SwimFly = false,
         SwimFlySpeed = 50,
-        SwimFlyVertPower = 10,
+        SwimFlyVertPower = 50,
         OriginalGravity = Workspace.Gravity
     }
 }

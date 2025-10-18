@@ -7,14 +7,14 @@ local LocalPlayer = Players.LocalPlayer
 
 local Config = {
     Enabled = false,
-    Interval = 2,
+    Interval = 1.8,
     UsePlayerPosition = true,
     FixedVector = Vector3.new(700, 600, -2800),
     FixedCFrame = CFrame.new(-48950, 550, -680, 110, -100, -100, -10, 11, -100, 100, 111, -100),
     Flight = {
         SwimFly = false,
         SwimFlySpeed = 50,
-        SwimFlyVertPower = 50,
+        SwimFlyVertPower = 70,
         OriginalGravity = Workspace.Gravity
     }
 }

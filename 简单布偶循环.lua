@@ -1,5 +1,5 @@
 --[[
-🔄 简单布偶循环器 + PlatformStand 拦截
+🔄 简单布偶循环器 + PlatformStand 拦截 - 增强版
 基于 Sigma Spy 生成的代码原理
 --]]
 
@@ -12,10 +12,11 @@ local LocalPlayer = Players.LocalPlayer
 -- 配置
 local Config = {
     Enabled = false,
-    Interval = 0.016,  -- 循环间隔（秒）
+    Interval = 0.08,  -- 优化后的间隔（更稳定）
     UsePlayerPosition = true,
     FixedVector = Vector3.new(70, 60, -280),  -- 使用你提供的向量
-    FixedCFrame = CFrame.new(-4895, 55, -68, 0, -1, -1, -0, 1, -1, 1, 0, -0)  -- 使用你提供的CFrame
+    FixedCFrame = CFrame.new(-4895, 55, -68, 0, -1, -1, -0, 1, -1, 1, 0, -0),  -- 使用你提供的CFrame
+    AggressiveMode = true  -- 激进模式，更强力维持
 }
 
 -- 变量
@@ -54,6 +55,45 @@ local function TriggerRagdoll(reason)
     end
 end
 
+-- 禁用所有可能导致站立的状态
+local function DisableStandingStates(humanoid)
+    pcall(function()
+        -- 禁用所有可能导致站立的状态
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Flying, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Strafing, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Landed, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
+        print("🚫 已禁用所有可能导致站立的状态")
+    end)
+end
+
+-- 重新启用所有状态
+local function EnableAllStates(humanoid)
+    pcall(function()
+        -- 重新启用所有状态
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, true)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, true)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Flying, true)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Strafing, true)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Landed, true)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, true)
+    end)
+end
+
 -- 启动循环
 local function Start()
     if Config.Enabled then return end
@@ -64,21 +104,16 @@ local function Start()
     -- 初始触发
     TriggerRagdoll("启动")
     
-    -- 禁用站立相关状态
+    -- 增强状态禁用
     local character = LocalPlayer.Character
     if character then
         local humanoid = character:FindFirstChildOfClass("Humanoid")
         if humanoid then
-            pcall(function()
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, false)
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, false) -- 拦截 PlatformStand
-                print("🚫 已禁用 GettingUp & Running & PlatformStanding 状态")
-            end)
+            DisableStandingStates(humanoid)
         end
     end
     
-    -- 循环触发
+    -- 强力循环触发
     LoopConnection = RunService.Heartbeat:Connect(function()
         if not Config.Enabled then return end
         
@@ -87,16 +122,16 @@ local function Start()
             TriggerRagdoll("定时循环")
         end
         
-        -- 强制维持布偶状态
+        -- 强力状态维持
         local character = LocalPlayer.Character
         if character then
             local humanoid = character:FindFirstChildOfClass("Humanoid")
             if humanoid then
                 local state = humanoid:GetState()
-                if state == Enum.HumanoidStateType.GettingUp or 
-                   state == Enum.HumanoidStateType.Running or 
-                   state == Enum.HumanoidStateType.PlatformStanding then  -- 拦截 PlatformStand
+                -- 如果检测到任何非布偶状态，立即强制切回布偶
+                if state ~= Enum.HumanoidStateType.Ragdoll then
                     humanoid:ChangeState(Enum.HumanoidStateType.Ragdoll)
+                    print("🔄 强制维持布偶状态 | 检测到状态: " .. tostring(state))
                 end
             end
         end
@@ -119,16 +154,31 @@ local function Stop()
     if character then
         local humanoid = character:FindFirstChildOfClass("Humanoid")
         if humanoid then
-            pcall(function()
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, true)
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, true) -- 恢复 PlatformStand
-            end)
+            EnableAllStates(humanoid)
         end
     end
     
     print("⏹️ 布偶循环已停止 | 总触发: " .. TriggerCount .. " 次")
     TriggerCount = 0
+end
+
+-- 角色重生处理
+local function onCharacterAdded(character)
+    wait(1) -- 等待角色完全加载
+    
+    if Config.Enabled then
+        print("🔄 检测到角色重生，重新应用布偶设置...")
+        
+        -- 重新应用状态禁用
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            DisableStandingStates(humanoid)
+        end
+        
+        -- 重新触发布偶
+        wait(0.5)
+        TriggerRagdoll("角色重生")
+    end
 end
 
 -- 创建简单GUI
@@ -141,7 +191,7 @@ local function CreateGUI()
     ScreenGui.Parent = PlayerGui
     
     local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(0, 200, 0, 120)
+    Frame.Size = UDim2.new(0, 220, 0, 140)
     Frame.Position = UDim2.new(0, 10, 0, 10)
     Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     Frame.BorderSizePixel = 0
@@ -158,7 +208,7 @@ local function CreateGUI()
     Title.Size = UDim2.new(1, 0, 0, 30)
     Title.Position = UDim2.new(0, 0, 0, 0)
     Title.BackgroundTransparency = 1
-    Title.Text = "🔄 布偶循环"
+    Title.Text = "🔄 布偶循环 - 增强版"
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
     Title.TextSize = 16
     Title.Font = Enum.Font.GothamBold
@@ -176,10 +226,22 @@ local function CreateGUI()
     Status.TextXAlignment = Enum.TextXAlignment.Left
     Status.Parent = Frame
     
+    -- 触发计数
+    local CountLabel = Instance.new("TextLabel")
+    CountLabel.Size = UDim2.new(1, -10, 0, 20)
+    CountLabel.Position = UDim2.new(0, 5, 0, 55)
+    CountLabel.BackgroundTransparency = 1
+    CountLabel.Text = "触发: 0 次"
+    CountLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    CountLabel.TextSize = 12
+    CountLabel.Font = Enum.Font.Gotham
+    CountLabel.TextXAlignment = Enum.TextXAlignment.Left
+    CountLabel.Parent = Frame
+    
     -- 控制按钮
     local ToggleBtn = Instance.new("TextButton")
     ToggleBtn.Size = UDim2.new(1, -20, 0, 40)
-    ToggleBtn.Position = UDim2.new(0, 10, 0, 70)
+    ToggleBtn.Position = UDim2.new(0, 10, 0, 85)
     ToggleBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
     ToggleBtn.Text = "▶ 启动"
     ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -191,6 +253,11 @@ local function CreateGUI()
     local BtnCorner = Instance.new("UICorner")
     BtnCorner.CornerRadius = UDim.new(0, 6)
     BtnCorner.Parent = ToggleBtn
+    
+    -- 更新计数显示的函数
+    local function updateCount()
+        CountLabel.Text = "触发: " .. TriggerCount .. " 次"
+    end
     
     ToggleBtn.MouseButton1Click:Connect(function()
         if Config.Enabled then
@@ -204,20 +271,30 @@ local function CreateGUI()
             ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
             Status.Text = "状态: 运行中"
         end
+        updateCount()
     end)
+    
+    -- 定期更新计数
+    game:GetService("RunService").Heartbeat:Connect(updateCount)
     
     return ScreenGui
 end
 
 -- 初始化
-print("🔄 简单布偶循环器已加载")
-print("📋 功能: 定时触发布偶 + 状态禁用 + 强制维持 + PlatformStand拦截")
+print("🔄 简单布偶循环器已加载 - 增强版")
+print("📋 功能: 定时触发布偶 + 全状态禁用 + 强力维持 + 重生处理")
 
--- 预加载角色
+-- 预加载角色和重生监听
 local character = LocalPlayer.Character
-if not character then
+if character then
+    -- 已有角色，等待一下确保加载完成
+    wait(1)
+else
     LocalPlayer.CharacterAdded:Wait()
 end
+
+-- 设置角色重生监听
+LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
 
 -- 创建GUI
 CreateGUI()

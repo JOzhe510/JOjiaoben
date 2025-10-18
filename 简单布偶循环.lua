@@ -1,5 +1,5 @@
 --[[
-🔄 简单布偶循环器
+🔄 简单布偶循环器 + PlatformStand 拦截
 基于 Sigma Spy 生成的代码原理
 --]]
 
@@ -72,7 +72,8 @@ local function Start()
             pcall(function()
                 humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
                 humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, false)
-                print("🚫 已禁用 GettingUp & Running 状态")
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, false) -- 拦截 PlatformStand
+                print("🚫 已禁用 GettingUp & Running & PlatformStanding 状态")
             end)
         end
     end
@@ -92,7 +93,9 @@ local function Start()
             local humanoid = character:FindFirstChildOfClass("Humanoid")
             if humanoid then
                 local state = humanoid:GetState()
-                if state == Enum.HumanoidStateType.GettingUp or state == Enum.HumanoidStateType.Running then
+                if state == Enum.HumanoidStateType.GettingUp or 
+                   state == Enum.HumanoidStateType.Running or 
+                   state == Enum.HumanoidStateType.PlatformStanding then  -- 拦截 PlatformStand
                     humanoid:ChangeState(Enum.HumanoidStateType.Ragdoll)
                 end
             end
@@ -119,6 +122,7 @@ local function Stop()
             pcall(function()
                 humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
                 humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, true)
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, true) -- 恢复 PlatformStand
             end)
         end
     end
@@ -162,15 +166,15 @@ local function CreateGUI()
     
     -- 状态显示
     local Status = Instance.new("TextLabel")
-    Title.Size = UDim2.new(1, -10, 0, 20)
-    Title.Position = UDim2.new(0, 5, 0, 35)
-    Title.BackgroundTransparency = 1
-    Title.Text = "状态: 未启动"
-    Title.TextColor3 = Color3.fromRGB(200, 200, 200)
-    Title.TextSize = 12
-    Title.Font = Enum.Font.Gotham
-    Title.TextXAlignment = Enum.TextXAlignment.Left
-    Title.Parent = Frame
+    Status.Size = UDim2.new(1, -10, 0, 20)
+    Status.Position = UDim2.new(0, 5, 0, 35)
+    Status.BackgroundTransparency = 1
+    Status.Text = "状态: 未启动"
+    Status.TextColor3 = Color3.fromRGB(200, 200, 200)
+    Status.TextSize = 12
+    Status.Font = Enum.Font.Gotham
+    Status.TextXAlignment = Enum.TextXAlignment.Left
+    Status.Parent = Frame
     
     -- 控制按钮
     local ToggleBtn = Instance.new("TextButton")
@@ -207,7 +211,7 @@ end
 
 -- 初始化
 print("🔄 简单布偶循环器已加载")
-print("📋 功能: 定时触发布偶 + 状态禁用 + 强制维持")
+print("📋 功能: 定时触发布偶 + 状态禁用 + 强制维持 + PlatformStand拦截")
 
 -- 预加载角色
 local character = LocalPlayer.Character

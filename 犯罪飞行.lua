@@ -9,7 +9,6 @@ local Config = {
     Enabled = false,
     Interval = 3,
     UsePlayerPosition = true,
-    FixedVector = Vector3.new(700, 600, -2800),
     FixedCFrame = CFrame.new(-48950, 550, -680, 110, -100, -100, -10, 11, -100, 100, 111, -100),
     Flight = {
         SwimFly = false,

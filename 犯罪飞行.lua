@@ -12,11 +12,9 @@ local Config = {
     FixedVector = Vector3.new(7, 6, -28),
     FixedCFrame = CFrame.new(-4895, 55, -68, 0, -1, -1, -0, 1, -1, 1, 0, -0),
     Flight = {
-        InfiniteFly = false,
         SwimFly = false,
         SwimFlySpeed = 50,
         SwimFlyVertPower = 35,
-        JumpPower = 50,
         OriginalGravity = Workspace.Gravity
     }
 }
@@ -30,7 +28,6 @@ local LastState = nil
 local StateStartTime = 0
 local LastCharacter = LocalPlayer.Character
 local swimFlyHeartbeat = nil
-local flyLoadConn = nil
 
 local function GetRemoteEvent()
     local success, result = pcall(function()
@@ -116,53 +113,6 @@ local function ShowNotify(title, content, bgColor)
     notify:Destroy()
 end
 
-local function ToggleInfiniteFly(isOn)
-    Config.Flight.InfiniteFly = isOn
-    if isOn then
-        if flyLoadConn then
-            pcall(function() flyLoadConn:Disconnect() end)
-            flyLoadConn = nil
-        end
-        local success, err = pcall(function()
-            local flyScript = game:HttpGet("https://pastebin.com/raw/V5PQy3y0", true)
-            loadstring(flyScript)()
-            flyLoadConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-                if gameProcessed then return end
-                if input.KeyCode == Enum.KeyCode.Space or input.UserInputType == Enum.UserInputType.Jump then
-                    local character = LocalPlayer.Character
-                    local humanoid = character and character:FindFirstChild("Humanoid")
-                    if humanoid and humanoid:GetState() ~= Enum.HumanoidStateType.Dead then
-                        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                    end
-                end
-            end)
-        end)
-        if success then
-            ShowNotify("无限跳跃开启", "按下空格即可无限跳跃", Color3.new(0, 0.6, 0))
-        else
-            ShowNotify("加载失败", "请检查网络或链接有效性", Color3.new(0.8, 0, 0))
-        end
-    else
-        if flyLoadConn and flyLoadConn.Connected then
-            flyLoadConn:Disconnect()
-            flyLoadConn = nil
-        end
-        pcall(function()
-            for _, v in pairs(LocalPlayer.PlayerGui:GetChildren()) do
-                if v.Name:find("InfiniteJump") or v.Name:find("Fly") then
-                    v:Destroy()
-                end
-            end
-            for _, v in pairs(LocalPlayer.Character:GetChildren()) do
-                if v:IsA("Script") and v.Name:find("Jump") then
-                    v:Destroy()
-                end
-            end
-        end)
-        ShowNotify("无限跳跃关闭", "清理所有跳跃相关实例", Color3.new(0.8, 0, 0))
-    end
-end
-
 local function ToggleSwimFly(isOn)
     Config.Flight.SwimFly = isOn
     if isOn then
@@ -210,33 +160,12 @@ local function ToggleSwimFly(isOn)
     end
 end
 
-local function UpdateJumpPower(value)
-    Config.Flight.JumpPower = tonumber(value) or 50
-    local character = LocalPlayer.Character
-    if character and character:FindFirstChild("Humanoid") then
-        character.Humanoid.JumpPower = Config.Flight.JumpPower
-    end
-    ShowNotify("跳跃力度更新", "无限跳跃力度：" .. Config.Flight.JumpPower, Color3.new(0, 0.6, 0))
-end
-
-local function ToggleFlightGravity(isOn)
-    if isOn then
-        Workspace.Gravity = 0
-        ShowNotify("重力关闭", "飞行时重力已禁用", Color3.new(0, 0.6, 0))
-    else
-        if not Config.Flight.SwimFly then
-            Workspace.Gravity = Config.Flight.OriginalGravity
-            ShowNotify("重力恢复", "已恢复默认重力", Color3.new(0.8, 0, 0))
-        end
-    end
-end
-
 local function Start()
     if Config.Enabled then return end
     
     Config.Enabled = true
     print("━━━━━━━━━━━━━━━━━━━━━━━━")
-    print("✅ 简单布偶循环已启动")
+    print("✅ 飞行与布偶循环已启动")
     print("━━━━━━━━━━━━━━━━━━━━━━━━")
     print("⏱️ 循环间隔: " .. Config.Interval .. " 秒")
     
@@ -307,12 +236,15 @@ local function Start()
         end
     end)
     
+    -- 开启飞行
+    ToggleSwimFly(true)
+    
     print("━━━━━━━━━━━━━━━━━━━━━━━━")
     print("✅ 监控已启动")
     print("  🚫 状态禁用: GettingUp & Running")
     print("  🔄 定时触发: 每 " .. Config.Interval .. " 秒")
     print("  🛡️ Heartbeat: 每帧强制检查")
-    print("  ✈️ 飞行: 小仰脚本版（游泳飞行+无限跳跃）")
+    print("  ✈️ 飞行: 游泳飞行（WASD+视角控制）")
     print("━━━━━━━━━━━━━━━━━━━━━━━━")
 end
 
@@ -331,6 +263,9 @@ local function Stop()
         StateListener = nil
     end
     
+    -- 关闭飞行
+    ToggleSwimFly(false)
+    
     local character = LocalPlayer.Character
     if character then
         local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -343,7 +278,7 @@ local function Stop()
     end
     
     print("━━━━━━━━━━━━━━━━━━━━━━━━")
-    print("⏹️ 简单布偶循环已停止")
+    print("⏹️ 飞行与布偶循环已停止")
     print(string.format("📊 总共触发: %d 次", TriggerCount))
     print("━━━━━━━━━━━━━━━━━━━━━━━━")
     
@@ -357,8 +292,8 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = PlayerGui
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 320, 0, 380)
-Frame.Position = UDim2.new(0.5, -160, 0.5, -190)
+Frame.Size = UDim2.new(0, 320, 0, 280)
+Frame.Position = UDim2.new(0.5, -160, 0.5, -140)
 Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 Frame.BorderSizePixel = 0
 Frame.Active = true
@@ -379,7 +314,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -50, 0, 40)
 Title.Position = UDim2.new(0, 10, 0, 5)
 Title.BackgroundTransparency = 1
-Title.Text = "🔄 布偶循环（小仰脚本飞行版）"
+Title.Text = "🔄 飞行布偶循环"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 16
 Title.Font = Enum.Font.GothamBold
@@ -403,16 +338,14 @@ CloseBtnCorner.Parent = CloseBtn
 
 CloseBtn.MouseButton1Click:Connect(function()
     if Config.Enabled then Stop() end
-    if Config.Flight.SwimFly then ToggleSwimFly(false) end
-    if Config.Flight.InfiniteFly then ToggleInfiniteFly(false) end
     ScreenGui:Destroy()
-    end)
+end)
 
 local Info = Instance.new("TextLabel")
 Info.Size = UDim2.new(1, -20, 0, 60)
 Info.Position = UDim2.new(0, 10, 0, 50)
 Info.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-Info.Text = "🚫 禁用 GettingUp & Running\n🔄 布偶间隔: 0.7秒/次\n✈️ 飞行: 游泳飞行（WASD）+ 无限跳跃（空格）"
+Info.Text = "🚫 禁用 GettingUp & Running\n🔄 布偶间隔: 0.7秒/次\n✈️ 飞行: 游泳飞行（WASD+视角控制）"
 Info.TextColor3 = Color3.fromRGB(200, 255, 200)
 Info.TextSize = 12
 Info.Font = Enum.Font.Code
@@ -492,154 +425,11 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-local FlightTitle = Instance.new("TextLabel")
-FlightTitle.Size = UDim2.new(1, -20, 0, 20)
-FlightTitle.Position = UDim2.new(0, 10, 0, 180)
-FlightTitle.BackgroundTransparency = 1
-FlightTitle.Text = "✈️ 小仰脚本飞行控制"
-FlightTitle.TextColor3 = Color3.fromRGB(100, 200, 255)
-FlightTitle.TextSize = 13
-FlightTitle.Font = Enum.Font.GothamBold
-FlightTitle.TextXAlignment = Enum.TextXAlignment.Left
-FlightTitle.Parent = Frame
-
-local InfiniteFlyToggle = Instance.new("TextButton")
-InfiniteFlyToggle.Size = UDim2.new(1, -20, 0, 30)
-InfiniteFlyToggle.Position = UDim2.new(0, 10, 0, 210)
-InfiniteFlyToggle.BackgroundColor3 = Color3.fromRGB(70, 150, 200)
-InfiniteFlyToggle.Text = "无限跳跃：关闭（空格触发）"
-InfiniteFlyToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-InfiniteFlyToggle.TextSize = 12
-InfiniteFlyToggle.Font = Enum.Font.GothamMedium
-InfiniteFlyToggle.BorderSizePixel = 0
-InfiniteFlyToggle.Parent = Frame
-
-local InfiniteFlyCorner = Instance.new("UICorner")
-InfiniteFlyCorner.CornerRadius = UDim.new(0, 6)
-InfiniteFlyCorner.Parent = InfiniteFlyToggle
-
-InfiniteFlyToggle.MouseButton1Click:Connect(function()
-    local newState = not Config.Flight.InfiniteFly
-    ToggleInfiniteFly(newState)
-    InfiniteFlyToggle.Text = newState and "无限跳跃：开启（空格触发）" or "无限跳跃：关闭（空格触发）"
-    InfiniteFlyToggle.BackgroundColor3 = newState and Color3.fromRGB(70, 200, 255) or Color3.fromRGB(70, 150, 200)
-end)
-
-local SwimFlyToggle = Instance.new("TextButton")
-SwimFlyToggle.Size = UDim2.new(1, -20, 0, 30)
-SwimFlyToggle.Position = UDim2.new(0, 10, 0, 250)
-SwimFlyToggle.BackgroundColor3 = Color3.fromRGB(70, 150, 200)
-SwimFlyToggle.Text = "游泳飞行：关闭（WASD+视角）"
-SwimFlyToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-SwimFlyToggle.TextSize = 12
-SwimFlyToggle.Font = Enum.Font.GothamMedium
-SwimFlyToggle.BorderSizePixel = 0
-SwimFlyToggle.Parent = Frame
-
-local SwimFlyCorner = Instance.new("UICorner")
-SwimFlyCorner.CornerRadius = UDim.new(0, 6)
-SwimFlyCorner.Parent = SwimFlyToggle
-
-SwimFlyToggle.MouseButton1Click:Connect(function()
-    local newState = not Config.Flight.SwimFly
-    ToggleSwimFly(newState)
-    SwimFlyToggle.Text = newState and "游泳飞行：开启（WASD+视角）" or "游泳飞行：关闭（WASD+视角）"
-    SwimFlyToggle.BackgroundColor3 = newState and Color3.fromRGB(70, 200, 255) or Color3.fromRGB(70, 150, 200)
-end)
-
-local GravityToggle = Instance.new("TextButton")
-GravityToggle.Size = UDim2.new(1, -20, 0, 30)
-GravityToggle.Position = UDim2.new(0, 10, 0, 290)
-GravityToggle.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
-GravityToggle.Text = "飞行强制关重力：关闭"
-GravityToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-GravityToggle.TextSize = 12
-GravityToggle.Font = Enum.Font.GothamMedium
-GravityToggle.BorderSizePixel = 0
-GravityToggle.Parent = Frame
-
-local GravityCorner = Instance.new("UICorner")
-GravityCorner.CornerRadius = UDim.new(0, 6)
-GravityCorner.Parent = GravityToggle
-
-local gravityEnabled = false
-GravityToggle.MouseButton1Click:Connect(function()
-    gravityEnabled = not gravityEnabled
-    ToggleFlightGravity(gravityEnabled)
-    GravityToggle.Text = gravityEnabled and "飞行强制关重力：开启" or "飞行强制关重力：关闭"
-    GravityToggle.BackgroundColor3 = gravityEnabled and Color3.fromRGB(70, 200, 150) or Color3.fromRGB(150, 150, 150)
-end)
-
-local JumpPowerLabel = Instance.new("TextLabel")
-JumpPowerLabel.Size = UDim2.new(1, -20, 0, 20)
-JumpPowerLabel.Position = UDim2.new(0, 10, 0, 330)
-JumpPowerLabel.BackgroundTransparency = 1
-JumpPowerLabel.Text = "无限跳跃力度：50"
-JumpPowerLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-JumpPowerLabel.TextSize = 11
-JumpPowerLabel.Font = Enum.Font.GothamMedium
-JumpPowerLabel.TextXAlignment = Enum.TextXAlignment.Left
-JumpPowerLabel.Parent = Frame
-
-local JumpPowerSlider = Instance.new("Frame")
-JumpPowerSlider.Size = UDim2.new(1, -20, 0, 15)
-JumpPowerSlider.Position = UDim2.new(0, 10, 0, 350)
-JumpPowerSlider.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-JumpPowerSlider.BorderSizePixel = 0
-JumpPowerSlider.Parent = Frame
-
-local JumpPowerSliderCorner = Instance.new("UICorner")
-JumpPowerSliderCorner.CornerRadius = UDim.new(0, 4)
-JumpPowerSliderCorner.Parent = JumpPowerSlider
-
-local JumpPowerSliderFill = Instance.new("Frame")
-JumpPowerSliderFill.Size = UDim2.new((Config.Flight.JumpPower - 50) / 450, 0, 1, 0)
-JumpPowerSliderFill.BackgroundColor3 = Color3.fromRGB(100, 200, 150)
-JumpPowerSliderFill.BorderSizePixel = 0
-JumpPowerSliderFill.Parent = JumpPowerSlider
-
-local JumpPowerSliderBtn = Instance.new("TextButton")
-JumpPowerSliderBtn.Size = UDim2.new(0, 12, 0, 12)
-JumpPowerSliderBtn.Position = UDim2.new((Config.Flight.JumpPower - 50) / 450, -6, 0.5, -6)
-JumpPowerSliderBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-JumpPowerSliderBtn.Text = ""
-JumpPowerSliderBtn.BorderSizePixel = 0
-JumpPowerSliderBtn.Parent = JumpPowerSlider
-
-local JumpPowerSliderBtnCorner = Instance.new("UICorner")
-JumpPowerSliderBtnCorner.CornerRadius = UDim.new(1, 0)
-JumpPowerSliderBtnCorner.Parent = JumpPowerSliderBtn
-
-local jumpPowerDragging = false
-JumpPowerSliderBtn.MouseButton1Down:Connect(function()
-    jumpPowerDragging = true
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        jumpPowerDragging = false
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
-    if jumpPowerDragging then
-        local mouse = LocalPlayer:GetMouse()
-        local relativePos = mouse.X - JumpPowerSlider.AbsolutePosition.X
-        local percentage = math.clamp(relativePos / JumpPowerSlider.AbsoluteSize.X, 0, 1)
-        local newPower = 50 + (percentage * 450)
-        Config.Flight.JumpPower = newPower
-        UpdateJumpPower(newPower)
-        JumpPowerSliderFill.Size = UDim2.new(percentage, 0, 1, 0)
-        JumpPowerSliderBtn.Position = UDim2.new(percentage, -6, 0.5, -6)
-        JumpPowerLabel.Text = string.format("无限跳跃力度：%.0f", newPower)
-    end
-end)
-
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(1, -20, 0, 35)
-ToggleBtn.Position = UDim2.new(0, 10, 0, 370)
+ToggleBtn.Position = UDim2.new(0, 10, 0, 170)
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
-ToggleBtn.Text = "▶ 启动布偶循环"
+ToggleBtn.Text = "▶ 启动飞行布偶循环"
 ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleBtn.TextSize = 14
 ToggleBtn.Font = Enum.Font.GothamBold
@@ -653,46 +443,45 @@ ToggleBtnCorner.Parent = ToggleBtn
 ToggleBtn.MouseButton1Click:Connect(function()
     if Config.Enabled then
         Stop()
-        ToggleBtn.Text = "▶ 启动布偶循环"
+        ToggleBtn.Text = "▶ 启动飞行布偶循环"
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
     else
         Start()
-        ToggleBtn.Text = "⏹ 停止布偶循环"
+        ToggleBtn.Text = "⏹ 停止飞行布偶循环"
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
     end
 end)
 
 LocalPlayer.CharacterAdded:Connect(function(newChar)
     LastCharacter = newChar
-    local humanoid = newChar:WaitForChild("Humanoid")
-    humanoid.JumpPower = Config.Flight.JumpPower
     if Config.Enabled then
         task.wait(0.1)
+        local humanoid = newChar:WaitForChild("Humanoid")
         pcall(function()
             humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
             humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, false)
             humanoid:ChangeState(Enum.HumanoidStateType.Ragdoll)
         end)
         TriggerRagdoll("角色重生重新固定")
-    end
-    if Config.Flight.SwimFly then
-        local rootPart = newChar:WaitForChild("HumanoidRootPart")
-        rootPart.CanCollide = false
-        Workspace.Gravity = 0
+        
+        -- 重新开启飞行
+        if Config.Flight.SwimFly then
+            local rootPart = newChar:WaitForChild("HumanoidRootPart")
+            rootPart.CanCollide = false
+            Workspace.Gravity = 0
+        end
     end
 end)
 
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-print("🔄 布偶循环（小仰脚本飞行版）已加载")
+print("🔄 飞行布偶循环已加载")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 print("功能:")
 print("  🚫 状态禁用: 彻底禁用 GettingUp & Running")
 print("  🔄 布偶循环: 定时触发 RemoteEvent（0.5-2.0秒可调）")
 print("  🛡️ Heartbeat: 每帧强制维持布偶状态")
-print("  ✈️ 飞行功能（小仰脚本版）:")
-print("    - 无限跳跃：空格触发，力度50-500可调")
-print("    - 游泳飞行：WASD控制，视角控上下飞")
-print("    - 支持飞行时强制关闭重力")
+print("  ✈️ 飞行功能: 游泳飞行（WASD控制，视角控上下飞）")
+print("  🔗 联动: 开启飞行同时开启布偶循环，关闭同时关闭")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 task.spawn(function()

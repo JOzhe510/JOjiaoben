@@ -285,20 +285,40 @@ local function Stop()
     TriggerCount = 0
 end
 
+-- 创建小UI（关闭主UI后显示）
+local MiniGui = Instance.new("ScreenGui")
+MiniGui.Name = "MiniFlightGui"
+MiniGui.ResetOnSpawn = false
+
+local MiniButton = Instance.new("TextButton")
+MiniButton.Size = UDim2.new(0, 50, 0, 50)
+MiniButton.Position = UDim2.new(0, 10, 0.5, -25)
+MiniButton.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+MiniButton.Text = "✈️"
+MiniButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MiniButton.TextSize = 18
+MiniButton.Font = Enum.Font.GothamBold
+MiniButton.BorderSizePixel = 0
+MiniButton.Parent = MiniGui
+
+local MiniCorner = Instance.new("UICorner")
+MiniCorner.CornerRadius = UDim.new(0, 8)
+MiniCorner.Parent = MiniButton
+
+-- 创建主UI
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SimpleLoopGui"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = PlayerGui
+local MainGui = Instance.new("ScreenGui")
+MainGui.Name = "MainFlightGui"
+MainGui.ResetOnSpawn = false
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 320, 0, 280)
-Frame.Position = UDim2.new(0.5, -160, 0.5, -140)
+Frame.Size = UDim2.new(0, 280, 0, 200)
+Frame.Position = UDim2.new(0.5, -140, 0.5, -100)
 Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 Frame.BorderSizePixel = 0
 Frame.Active = true
 Frame.Draggable = true
-Frame.Parent = ScreenGui
+Frame.Parent = MainGui
 
 local Corner = Instance.new("UICorner")
 Corner.CornerRadius = UDim.new(0, 12)
@@ -338,7 +358,8 @@ CloseBtnCorner.Parent = CloseBtn
 
 CloseBtn.MouseButton1Click:Connect(function()
     if Config.Enabled then Stop() end
-    ScreenGui:Destroy()
+    MainGui.Enabled = false
+    MiniGui.Parent = PlayerGui -- 显示小UI
 end)
 
 local Info = Instance.new("TextLabel")
@@ -358,76 +379,9 @@ local InfoCorner = Instance.new("UICorner")
 InfoCorner.CornerRadius = UDim.new(0, 8)
 InfoCorner.Parent = Info
 
-local IntervalLabel = Instance.new("TextLabel")
-IntervalLabel.Size = UDim2.new(1, -20, 0, 20)
-IntervalLabel.Position = UDim2.new(0, 10, 0, 120)
-IntervalLabel.BackgroundTransparency = 1
-IntervalLabel.Text = "⏱️ 布偶间隔: 0.7 秒"
-IntervalLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-IntervalLabel.TextSize = 11
-IntervalLabel.Font = Enum.Font.GothamMedium
-IntervalLabel.TextXAlignment = Enum.TextXAlignment.Left
-IntervalLabel.Parent = Frame
-
-local Slider = Instance.new("Frame")
-Slider.Size = UDim2.new(1, -20, 0, 20)
-Slider.Position = UDim2.new(0, 10, 0, 140)
-Slider.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-Slider.BorderSizePixel = 0
-Slider.Parent = Frame
-
-local SliderCorner = Instance.new("UICorner")
-SliderCorner.CornerRadius = UDim.new(0, 6)
-SliderCorner.Parent = Slider
-
-local SliderFill = Instance.new("Frame")
-SliderFill.Size = UDim2.new((0.7 - 0.5) / 1.5, 0, 1, 0)
-SliderFill.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
-SliderFill.BorderSizePixel = 0
-SliderFill.Parent = Slider
-
-local SliderFillCorner = Instance.new("UICorner")
-SliderFillCorner.CornerRadius = UDim.new(0, 6)
-SliderFillCorner.Parent = SliderFill
-
-local SliderBtn = Instance.new("TextButton")
-SliderBtn.Size = UDim2.new(0, 18, 0, 18)
-SliderBtn.Position = UDim2.new((0.7 - 0.5) / 1.5, -9, 0.5, -9)
-SliderBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-SliderBtn.Text = ""
-SliderBtn.BorderSizePixel = 0
-SliderBtn.Parent = Slider
-
-local SliderBtnCorner = Instance.new("UICorner")
-SliderBtnCorner.CornerRadius = UDim.new(1, 0)
-SliderBtnCorner.Parent = SliderBtn
-
-local dragging = false
-SliderBtn.MouseButton1Down:Connect(function()
-    dragging = true
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
-    if dragging then
-        local mouse = LocalPlayer:GetMouse()
-        local relativePos = mouse.X - Slider.AbsolutePosition.X
-        local percentage = math.clamp(relativePos / Slider.AbsoluteSize.X, 0, 1)
-        Config.Interval = 0.5 + (percentage * 1.5)
-        SliderFill.Size = UDim2.new(percentage, 0, 1, 0)
-        SliderBtn.Position = UDim2.new(percentage, -9, 0.5, -9)
-        IntervalLabel.Text = string.format("⏱️ 布偶间隔: %.2f 秒", Config.Interval)
-    end
-end)
-
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(1, -20, 0, 35)
-ToggleBtn.Position = UDim2.new(0, 10, 0, 170)
+ToggleBtn.Position = UDim2.new(0, 10, 0, 120)
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
 ToggleBtn.Text = "▶ 启动飞行布偶循环"
 ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -451,6 +405,17 @@ ToggleBtn.MouseButton1Click:Connect(function()
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
     end
 end)
+
+-- 小UI按钮点击事件
+MiniButton.MouseButton1Click:Connect(function()
+    MiniGui.Enabled = false
+    MainGui.Enabled = true
+    MainGui.Parent = PlayerGui
+end)
+
+-- 初始设置
+MainGui.Parent = PlayerGui
+MiniGui.Enabled = false
 
 LocalPlayer.CharacterAdded:Connect(function(newChar)
     LastCharacter = newChar
@@ -478,7 +443,7 @@ print("🔄 飞行布偶循环已加载")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 print("功能:")
 print("  🚫 状态禁用: 彻底禁用 GettingUp & Running")
-print("  🔄 布偶循环: 定时触发 RemoteEvent（0.5-2.0秒可调）")
+print("  🔄 布偶循环: 定时触发 RemoteEvent（0.7秒）")
 print("  🛡️ Heartbeat: 每帧强制维持布偶状态")
 print("  ✈️ 飞行功能: 游泳飞行（WASD控制，视角控上下飞）")
 print("  🔗 联动: 开启飞行同时开启布偶循环，关闭同时关闭")

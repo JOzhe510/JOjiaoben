@@ -53,15 +53,6 @@ local function UpdateFireRate(rps)
     Notifier.new({Title = "Success", Content = "Fire rate set to: "..rps.." RPS"})
 end
 
-local function RandomString(length)
-    local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
-    local str = ""
-    for i = 1, length do
-        str = str .. chars:sub(math.random(1, #chars), math.random(1, #chars))
-    end
-    return str
-end
-
 local function IsVisible(targetPart)
     if not Ragebot.WallCheck then return true end
     
@@ -145,7 +136,7 @@ local function Shoot(target)
     local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
     if not tool then return false end
     
-    -- 弹药检查 - 使用 Ammo 而不是 SERVER_Ammo
+    -- 弹药检查 - 使用 Ammo
     local ammo = tool:FindFirstChild("Ammo")
     if not ammo or ammo.Value <= 0 then
         return false
@@ -156,8 +147,8 @@ local function Shoot(target)
     
     local dir = (hitPos - shootPos).Unit
     
-    -- 使用 fire 事件而不是 GNX_S
-    ReplicatedStorage.Events.fire:FireServer(
+    -- 使用 Fire 事件（大写）
+    ReplicatedStorage.Events.Fire:FireServer(
         tool,
         shootPos,
         hitPos,

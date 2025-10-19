@@ -17,7 +17,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
 
 -- 创建标签页
 Window:DrawCategory({Name = "Main"});
@@ -28,7 +28,6 @@ local Ragebot = {
     Enabled = false,
     Cooldown = 1/30,
     LastShot = 0,
-    DownedCheck = false,
     TargetPart = "Head",
     MaxDistance = 800,
     CurrentDistance = 100,
@@ -36,51 +35,96 @@ local Ragebot = {
     WallCheck = false,
 }
 
-local originalFireEvent
-local isHooked = false
-
--- 获取当前武器的Fire事件
-local function GetCurrentWeaponFireEvent()
-    local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-    if not tool then return nil end
-    
-    local weaponData = ReplicatedStorage.Weapons:FindFirstChild(tool.Name)
-    if weaponData then
-        local sync = weaponData:FindFirstChild("Sync")
-        if sync then
-            return sync:FindFirstChild("Fire")
-        end
-    end
-    return nil
+-- 生成随机数据
+local function GenerateRandomData()
+    return {
+        Timestamp = tick(),
+        RandomID = HttpService:GenerateGUID(false),
+        Seed = math.random(1, 1000000),
+        ClientTick = os.time(),
+        SessionID = math.random(1000, 9999)
+    }
 end
 
--- 钩住Fire事件
-local function HookFireEvent()
-    if isHooked then return end
+-- 生成伪装子弹数据
+local function GenerateFakeBulletData(origin, hit, direction)
+    local randomData = GenerateRandomData()
     
-    local fireEvent = GetCurrentWeaponFireEvent()
-    if not fireEvent then return end
+    return {
+        -- 真实数据
+        Origin = origin,
+        Hit = hit,
+        Direction = direction,
+        
+        -- 伪装数据
+        ClientTime = randomData.Timestamp,
+        RandomSeed = randomData.Seed,
+        SessionID = randomData.SessionID,
+        BulletID = randomData.RandomID,
+        
+        -- 物理参数
+        Velocity = direction * math.random(800, 1200),
+        Spread = Vector3.new(
+            (math.random() - 0.5) * 0.01,
+            (math.random() - 0.5) * 0.01,
+            (math.random() - 0.5) * 0.01
+        ),
+        
+        -- 武器数据
+        WeaponType = "Rifle",
+        Damage = math.random(25, 35),
+        Penetration = math.random(1, 3),
+        
+        -- 网络数据
+        NetworkTimestamp = os.time(),
+        ClientID = LocalPlayer.UserId,
+        Sequence = math.random(1, 1000)
+    }
+end
+
+-- 生成伪装射击参数
+local function GenerateFakeShootParams()
+    local randomData = GenerateRandomData()
     
-    -- 保存原事件
-    originalFireEvent = fireEvent.FireServer
-    isHooked = true
-    
-    -- 重写FireServer方法
-    fireEvent.FireServer = function(self, bulletData)
-        if Ragebot.Enabled and bulletData then
-            local target = GetClosestEnemy()
-            if target and target.Character then
-                local hitPart = target.Character:FindFirstChild(Ragebot.TargetPart)
-                if hitPart then
-                    -- 修改子弹数据中的命中位置
-                    bulletData.Hit = hitPart.Position
-                    bulletData.Direction = (hitPart.Position - bulletData.Origin).Unit
-                end
-            end
-        end
-        -- 调用原事件
-        return originalFireEvent(self, bulletData)
+    return {
+        -- 基础参数
+        ShootTime = randomData.Timestamp,
+        WeaponState = "Firing",
+        AmmoCount = math.random(15, 30),
+        
+        -- 随机偏移
+        Recoil = Vector3.new(
+            (math.random() - 0.5) * 0.05,
+            (math.random() - 0.5) * 0.05,
+            0
+        ),
+        
+        -- 网络验证
+        Checksum = math.random(100000, 999999),
+        AuthToken = randomData.RandomID:sub(1, 8),
+        
+        -- 客户端信息
+        ClientVersion = "1.0.0",
+        Platform = "Windows"
+    }
+end
+
+-- 搜索 ViewModel.Gun 下的 Fire 和 DryFire 事件
+local function FindGunEvents()
+    local viewModel = workspace:FindFirstChild("ViewModel")
+    if not viewModel then 
+        return nil, nil 
     end
+    
+    local gun = viewModel:FindFirstChild("Gun")
+    if not gun then 
+        return nil, nil 
+    end
+    
+    local fireEvent = gun:FindFirstChild("Fire")
+    local dryFireEvent = gun:FindFirstChild("DryFire")
+    
+    return fireEvent, dryFireEvent
 end
 
 -- 简单的目标获取
@@ -113,13 +157,103 @@ local function GetClosestEnemy()
     return closest
 end
 
--- 自动钩住事件
+-- 新的射击函数 - 使用伪装数据包
+local function Shoot()
+    local target = GetClosestEnemy()
+    if not target or not target.Character then 
+        return false 
+    end
+    
+    local hitPart = target.Character:FindFirstChild(Ragebot.TargetPart)
+    if not hitPart then
+        return false
+    end
+    
+    -- 搜索 gun 事件
+    local fireEvent, dryFireEvent = FindGunEvents()
+    
+    local hitPos = hitPart.Position
+    local shootPos = Camera.CFrame.Position
+    local direction = (hitPos - shootPos).Unit
+    
+    -- 生成伪装数据
+    local fakeBulletData = GenerateFakeBulletData(shootPos, hitPos, direction)
+    local fakeShootParams = GenerateFakeShootParams()
+    
+    -- 尝试不同的参数格式（包含伪装数据）
+    local function tryFire(event)
+        if not event or not event:IsA("RemoteEvent") then
+            return false
+        end
+        
+        -- 格式1: 完整伪装数据包
+        local success1 = pcall(function()
+            event:FireServer(fakeBulletData)
+        end)
+        
+        -- 格式2: 基础参数 + 伪装参数
+        local success2 = pcall(function()
+            event:FireServer(
+                shootPos,
+                hitPos,
+                direction,
+                fakeShootParams
+            )
+        end)
+        
+        -- 格式3: 伪装射击参数
+        local success3 = pcall(function()
+            event:FireServer(fakeShootParams)
+        end)
+        
+        -- 格式4: 混合参数
+        local success4 = pcall(function()
+            event:FireServer({
+                Position = shootPos,
+                Target = hitPos,
+                Data = fakeBulletData,
+                Params = fakeShootParams
+            })
+        end)
+        
+        -- 格式5: 简单参数（备用）
+        local success5 = pcall(function()
+            event:FireServer(shootPos, hitPos)
+        end)
+        
+        return success1 or success2 or success3 or success4 or success5
+    end
+    
+    -- 优先使用 Fire 事件
+    if fireEvent then
+        if tryFire(fireEvent) then
+            return true
+        end
+    end
+    
+    -- 如果没有 Fire 事件或失败，尝试 DryFire
+    if dryFireEvent then
+        if tryFire(dryFireEvent) then
+            return true
+        end
+    end
+    
+    return false
+end
+
+-- Ragebot 主循环
 task.spawn(function()
     while true do
-        if not isHooked then
-            HookFireEvent()
+        if Ragebot.Enabled then
+            local now = tick()
+            if now - Ragebot.LastShot >= Ragebot.Cooldown then
+                local success = Shoot()
+                if success then
+                    Ragebot.LastShot = now
+                end
+            end
         end
-        task.wait(1)
+        task.wait()
     end
 end)
 
@@ -171,4 +305,4 @@ CombatSection:AddDropdown({
     end
 })
 
-print("自动瞄准脚本加载完成! 按左Alt打开菜单")
+print("Ragebot 脚本加载完成! 按左Alt打开菜单")

@@ -17,7 +17,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
-local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- 创建标签页
 Window:DrawCategory({Name = "Main"});
@@ -28,106 +28,78 @@ local Ragebot = {
     Enabled = false,
     Cooldown = 1/30,
     LastShot = 0,
+    DownedCheck = false,
     TargetPart = "Head",
     MaxDistance = 800,
     CurrentDistance = 100,
     FireRate = 30,
-    WallCheck = false,
+    WallCheck = true,
+    WallCheckDistance = 50,
+    WallCheckParts = {"Head", "UpperTorso", "LowerTorso"},
+    LastNotificationTime = 0,
+    BulletTeleport = true, -- 新增：子弹传送功能
+    Prediction = true, -- 新增：预测移动目标
+    PredictionAmount = 0.1 -- 新增：预测量
 }
 
--- 生成随机数据
-local function GenerateRandomData()
-    return {
-        Timestamp = tick(),
-        RandomID = HttpService:GenerateGUID(false),
-        Seed = math.random(1, 1000000),
-        ClientTick = os.time(),
-        SessionID = math.random(1000, 9999)
-    }
+local visibilityCache = {}
+local lastCacheClear = tick()
+
+-- Functions
+local function UpdateFireRate(rps)
+    if type(rps) ~= "number" or rps < 1 or rps > 100 then
+        Notifier.new({Title = "Error", Content = "Invalid RPS (1-100)"})
+        return
+    end
+    Ragebot.Cooldown = 1/rps
+    Ragebot.FireRate = rps
+    Notifier.new({Title = "Success", Content = "Fire rate set to: "..rps.." RPS"})
 end
 
--- 生成伪装子弹数据
-local function GenerateFakeBulletData(origin, hit, direction)
-    local randomData = GenerateRandomData()
+local function RandomString(length)
+    local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
+    local str = ""
+    for i = 1, length do
+        str = str .. chars:sub(math.random(1, #chars), math.random(1, #chars))
+    end
+    return str
+end
+
+local function IsVisible(targetPart)
+    if not Ragebot.WallCheck then return true end
     
-    return {
-        -- 真实数据
-        Origin = origin,
-        Hit = hit,
-        Direction = direction,
-        
-        -- 伪装数据
-        ClientTime = randomData.Timestamp,
-        RandomSeed = randomData.Seed,
-        SessionID = randomData.SessionID,
-        BulletID = randomData.RandomID,
-        
-        -- 物理参数
-        Velocity = direction * math.random(800, 1200),
-        Spread = Vector3.new(
-            (math.random() - 0.5) * 0.01,
-            (math.random() - 0.5) * 0.01,
-            (math.random() - 0.5) * 0.01
-        ),
-        
-        -- 武器数据
-        WeaponType = "Rifle",
-        Damage = math.random(25, 35),
-        Penetration = math.random(1, 3),
-        
-        -- 网络数据
-        NetworkTimestamp = os.time(),
-        ClientID = LocalPlayer.UserId,
-        Sequence = math.random(1, 1000)
-    }
-end
-
--- 生成伪装射击参数
-local function GenerateFakeShootParams()
-    local randomData = GenerateRandomData()
-    
-    return {
-        -- 基础参数
-        ShootTime = randomData.Timestamp,
-        WeaponState = "Firing",
-        AmmoCount = math.random(15, 30),
-        
-        -- 随机偏移
-        Recoil = Vector3.new(
-            (math.random() - 0.5) * 0.05,
-            (math.random() - 0.5) * 0.05,
-            0
-        ),
-        
-        -- 网络验证
-        Checksum = math.random(100000, 999999),
-        AuthToken = randomData.RandomID:sub(1, 8),
-        
-        -- 客户端信息
-        ClientVersion = "1.0.0",
-        Platform = "Windows"
-    }
-end
-
--- 搜索 ViewModel.Gun 下的 Fire 和 DryFire 事件
-local function FindGunEvents()
-    local viewModel = workspace:FindFirstChild("ViewModel")
-    if not viewModel then 
-        return nil, nil 
+    if tick() - lastCacheClear > 5 then
+        visibilityCache = {}
+        lastCacheClear = tick()
     end
     
-    local gun = viewModel:FindFirstChild("Gun")
-    if not gun then 
-        return nil, nil 
+    local cacheKey = targetPart:GetFullName()..tostring(math.floor(tick()*10)/10)
+    if visibilityCache[cacheKey] ~= nil then
+        return visibilityCache[cacheKey]
     end
     
-    local fireEvent = gun:FindFirstChild("Fire")
-    local dryFireEvent = gun:FindFirstChild("DryFire")
+    local cameraPos = Camera.CFrame.Position
+    local targetPos = targetPart.Position
+    local direction = (targetPos - cameraPos).Unit
+    local distance = (targetPos - cameraPos).Magnitude
     
-    return fireEvent, dryFireEvent
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetPart.Parent}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.IgnoreWater = true
+    
+    local raycastResult = workspace:Raycast(cameraPos, direction * distance, raycastParams)
+    
+    if raycastResult then
+        local hitDistance = (raycastResult.Position - cameraPos).Magnitude
+        visibilityCache[cacheKey] = hitDistance > (distance - Ragebot.WallCheckDistance)
+        return visibilityCache[cacheKey]
+    end
+    
+    visibilityCache[cacheKey] = true
+    return true
 end
 
--- 简单的目标获取
 local function GetClosestEnemy()
     if not LocalPlayer.Character then return nil end
     local myRoot = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -145,11 +117,19 @@ local function GetClosestEnemy()
         local root = char:FindFirstChild("HumanoidRootPart")
         local hum = char:FindFirstChildOfClass("Humanoid")
         
-        if root and hum and hum.Health > 0 then
+        if char and root and hum and hum.Health > 0 and not char:FindFirstChildOfClass("ForceField") then
+            if Ragebot.DownedCheck and (hum.Health <= 15 or hum:GetState() == Enum.HumanoidStateType.Dead) then continue end
+            
             local dist = (root.Position - myPos).Magnitude
-            if dist < minDist then
-                closest = player
-                minDist = dist
+            if dist < minDist and dist <= Ragebot.CurrentDistance then
+                for _, partName in ipairs(Ragebot.WallCheckParts) do
+                    local part = char:FindFirstChild(partName)
+                    if part and IsVisible(part) then
+                        closest = player
+                        minDist = dist
+                        break
+                    end
+                end
             end
         end
     end
@@ -157,84 +137,113 @@ local function GetClosestEnemy()
     return closest
 end
 
--- 新的射击函数 - 使用伪装数据包
-local function Shoot()
-    local target = GetClosestEnemy()
-    if not target or not target.Character then 
-        return false 
+local function CalculatePredictedPosition(target, hitPart)
+    if not Ragebot.Prediction then
+        return hitPart.Position
     end
     
-    local hitPart = target.Character:FindFirstChild(Ragebot.TargetPart)
-    if not hitPart then
+    -- 获取目标速度
+    local root = target.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return hitPart.Position end
+    
+    local velocity = root.Velocity
+    local distance = (hitPart.Position - Camera.CFrame.Position).Magnitude
+    
+    -- 计算子弹飞行时间（假设子弹速度为 studs/秒）
+    local bulletSpeed = 1000 -- 可以根据实际游戏调整
+    local travelTime = distance / bulletSpeed
+    
+    -- 计算预测位置
+    local predictedPosition = hitPart.Position + (velocity * travelTime * Ragebot.PredictionAmount)
+    
+    return predictedPosition
+end
+
+local function Shoot(target)
+    if not target or not target.Character then return false end
+    
+    local hitPart = target.Character:FindFirstChild(Ragebot.TargetPart) or
+                   target.Character:FindFirstChild("Head") or
+                   target.Character:FindFirstChild("UpperTorso")
+    if not hitPart then return false end
+    
+    local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+    if not tool then return false end
+    
+    -- 弹药检查
+    local ammo = tool:FindFirstChild("Ammo")
+    if not ammo or ammo.Value <= 0 then
         return false
     end
     
-    -- 搜索 gun 事件
-    local fireEvent, dryFireEvent = FindGunEvents()
-    
-    local hitPos = hitPart.Position
+    -- 计算命中位置（带预测）
+    local hitPos = CalculatePredictedPosition(target, hitPart)
     local shootPos = Camera.CFrame.Position
-    local direction = (hitPos - shootPos).Unit
     
-    -- 生成伪装数据
-    local fakeBulletData = GenerateFakeBulletData(shootPos, hitPos, direction)
-    local fakeShootParams = GenerateFakeShootParams()
-    
-    -- 尝试不同的参数格式（包含伪装数据）
-    local function tryFire(event)
-        if not event or not event:IsA("RemoteEvent") then
-            return false
-        end
-        
-        -- 格式1: 完整伪装数据包
-        local success1 = pcall(function()
-            event:FireServer(fakeBulletData)
-        end)
-        
-        -- 格式2: 基础参数 + 伪装参数
-        local success2 = pcall(function()
-            event:FireServer(
-                shootPos,
-                hitPos,
-                direction,
-                fakeShootParams
-            )
-        end)
-        
-        -- 格式3: 伪装射击参数
-        local success3 = pcall(function()
-            event:FireServer(fakeShootParams)
-        end)
-        
-        -- 格式4: 混合参数
-        local success4 = pcall(function()
-            event:FireServer({
-                Position = shootPos,
-                Target = hitPos,
-                Data = fakeBulletData,
-                Params = fakeShootParams
-            })
-        end)
-        
-        -- 格式5: 简单参数（备用）
-        local success5 = pcall(function()
-            event:FireServer(shootPos, hitPos)
-        end)
-        
-        return success1 or success2 or success3 or success4 or success5
+    if Ragebot.BulletTeleport then
+        -- 子弹传送模式：直接将射击位置设置为目标位置附近
+        -- 这样可以确保100%命中
+        shootPos = hitPos - (hitPos - shootPos).Unit * 5 -- 在目标前方5studs处射击
     end
     
-    -- 优先使用 Fire 事件
-    if fireEvent then
-        if tryFire(fireEvent) then
-            return true
-        end
-    end
+    local dir = (hitPos - shootPos).Unit
     
-    -- 如果没有 Fire 事件或失败，尝试 DryFire
-    if dryFireEvent then
-        if tryFire(dryFireEvent) then
-            return true
+    -- 使用 fire 事件
+    local success, errorMsg = pcall(function()
+        ReplicatedStorage.Events.fire:FireServer(
+            tool,
+            shootPos,
+            hitPos,
+            dir
+        )
+    end)
+    
+    if success then
+        Notifier.new({Title = "Hit", Content = "Shot "..target.Name.." in "..hitPart.Name})
+        return true
+    else
+        Notifier.new({Title = "Error", Content = "Shoot failed: "..tostring(errorMsg)})
+        return false
+    end
+end
+
+-- 备用射击方法（如果主方法无效）
+local function AlternativeShoot(target)
+    if not target or not target.Character then return false end
+    
+    local hitPart = target.Character:FindFirstChild(Ragebot.TargetPart) or
+                   target.Character:FindFirstChild("Head")
+    if not hitPart then return false end
+    
+    local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+    if not tool then return false end
+    
+    -- 尝试不同的远程事件名称
+    local remoteEvents = {
+        "fire",
+        "Fire",
+        "Shoot",
+        "shoot",
+        "FireServer",
+        "fireServer"
+    }
+    
+    for _, eventName in ipairs(remoteEvents) do
+        local remote = ReplicatedStorage:FindFirstChild(eventName) or ReplicatedStorage.Events:FindFirstChild(eventName)
+        if remote then
+            local hitPos = CalculatePredictedPosition(target, hitPart)
+            local success = pcall(function()
+                remote:FireServer(
+                    tool,
+                    hitPos,
+                    target.Character,
+                    hitPart.Name
+                )
+            end)
+            if success then
+                Notifier.new({Title = "Success", Content = "Used alternative method"})
+                return true
+            end
         end
     end
     
@@ -247,9 +256,16 @@ task.spawn(function()
         if Ragebot.Enabled then
             local now = tick()
             if now - Ragebot.LastShot >= Ragebot.Cooldown then
-                local success = Shoot()
-                if success then
-                    Ragebot.LastShot = now
+                local target = GetClosestEnemy()
+                if target then
+                    local shotFired = Shoot(target)
+                    if not shotFired then
+                        -- 如果主方法失败，尝试备用方法
+                        shotFired = AlternativeShoot(target)
+                    end
+                    if shotFired then
+                        Ragebot.LastShot = now
+                    end
                 end
             end
         end
@@ -258,10 +274,13 @@ task.spawn(function()
 end)
 
 -- ========== UI SETUP ========== --
+
+-- Combat Tab
 local CombatSection = CombatTab:DrawSection({Name = "Ragebot Settings"});
 
+-- 主开关
 CombatSection:AddToggle({
-    Name = "启用自动瞄准",
+    Name = "Enable Ragebot",
     Flag = "RagebotToggle",
     Default = false,
     Callback = function(Value)
@@ -269,40 +288,118 @@ CombatSection:AddToggle({
     end
 })
 
+-- 子弹传送开关
+CombatSection:AddToggle({
+    Name = "Bullet Teleport",
+    Flag = "BulletTeleport",
+    Default = true,
+    Tooltip = "Teleport bullets to target for guaranteed hits",
+    Callback = function(Value)
+        Ragebot.BulletTeleport = Value
+    end
+})
+
+-- 预测开关
+CombatSection:AddToggle({
+    Name = "Movement Prediction",
+    Flag = "PredictionToggle",
+    Default = true,
+    Tooltip = "Predict target movement for better accuracy",
+    Callback = function(Value)
+        Ragebot.Prediction = Value
+    end
+})
+
+-- 预测量调节
 CombatSection:AddSlider({
-    Name = "射速 (RPS)",
+    Name = "Prediction Amount",
+    Min = 0.05,
+    Max = 0.3,
+    Default = 0.1,
+    Round = 2,
+    Tooltip = "How much to predict target movement",
+    Flag = "PredictionAmount",
+    Callback = function(Value)
+        Ragebot.PredictionAmount = Value
+    end
+})
+
+-- 射速调节
+CombatSection:AddSlider({
+    Name = "Fire Rate (RPS)",
     Min = 1,
     Max = 100,
     Default = 30,
     Round = 0,
     Flag = "FireRateSlider",
+    Callback = UpdateFireRate
+})
+
+-- 忽略倒地玩家
+CombatSection:AddToggle({
+    Name = "Ignore Downed Players",
+    Default = false,
+    Tooltip = "Skip players with low health",
+    Flag = "DownedCheck",
     Callback = function(Value)
-        Ragebot.Cooldown = 1/Value
-        Ragebot.FireRate = Value
+        Ragebot.DownedCheck = Value
     end
 })
 
+-- 墙壁检测
+CombatSection:AddToggle({
+    Name = "Wall Check",
+    Default = true,
+    Tooltip = "Don't shoot through walls",
+    Flag = "WallCheckToggle",
+    Callback = function(Value)
+        Ragebot.WallCheck = Value
+    end
+})
+
+-- 墙壁穿透距离
+CombatSection:AddSlider({
+    Name = "Wall Penetration",
+    Min = 0,
+    Max = 100,
+    Default = 20,
+    Round = 0,
+    Tooltip = "How much wall penetration to allow",
+    Flag = "WallCheckDistance",
+    Callback = function(Value)
+        Ragebot.WallCheckDistance = Value
+    end
+})
+
+-- 最大距离
 CombatSection:AddTextBox({
-    Name = "最大距离",
-    Placeholder = "100",
+    Name = "Max Distance (1-800)",
+    Placeholder = "Set Distance",
     Default = "100",
     Flag = "DistanceInput",
     Callback = function(Value)
         local num = tonumber(Value)
-        if num and num > 0 then
+        if num and num >= 1 and num <= 800 then
+            Ragebot.MaxDistance = num
             Ragebot.CurrentDistance = num
+            Notifier.new({Title = "Success", Content = "Distance set to: "..num.." studs"})
+        else
+            Notifier.new({Title = "Error", Content = "Invalid distance (must be 1-800)"})
         end
     end
 })
 
+-- 目标部位
 CombatSection:AddDropdown({
-    Name = "目标部位",
-    Values = {"Head", "UpperTorso", "LowerTorso"},
+    Name = "Target Part",
+    Values = {"Head", "UpperTorso", "LowerTorso", "Random"},
     Default = "Head",
     Flag = "TargetPartDropdown",
     Callback = function(Value)
-        Ragebot.TargetPart = Value
+        Ragebot.TargetPart = Value == "Random" and 
+            ({"Head","UpperTorso","LowerTorso"})[math.random(1,3)] or Value
     end
 })
 
-print("Ragebot 脚本加载完成! 按左Alt打开菜单")
+print("Enhanced Ragebot Script loaded! Press Left Alt to toggle UI.")
+print("Bullet Teleport: ON - Bullets will teleport to targets for guaranteed hits.")

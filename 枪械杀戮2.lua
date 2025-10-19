@@ -1,4 +1,4 @@
--- 电击枪专用Ragebot
+-- 电击枪专用Ragebot - 诊断版
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -13,15 +13,65 @@ local Ragebot = {
     TargetPart = "Head",
     CurrentDistance = 100,
     FireRate = 30,
-    WallCheck = true,
-    MouseHit = true, -- 添加鼠标目标支持
-    EquipWeapon = true -- 自动装备武器
+    WallCheck = true
 }
+
+-- 诊断函数：找出正确的远程事件
+local function FindShootEvents()
+    print("🔍 开始查找射击相关事件...")
+    
+    -- 检查ReplicatedStorage中的所有远程事件
+    for _, child in pairs(ReplicatedStorage:GetDescendants()) do
+        if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
+            local name = child.Name:lower()
+            if name:find("shoot") or name:find("fire") or name:find("taser") or name:find("gun") then
+                print("🎯 找到可能的事件:", child:GetFullName(), "类型:", child.ClassName)
+            end
+        end
+    end
+    
+    -- 检查玩家背包中的工具
+    if LocalPlayer.Backpack then
+        for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
+            if tool:IsA("Tool") then
+                print("🛠️ 找到工具:", tool.Name)
+                -- 检查工具内部的事件
+                for _, child in pairs(tool:GetDescendants()) do
+                    if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
+                        print("   🔧 工具内事件:", child.Name, "类型:", child.ClassName)
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- 监听其他玩家的射击来学习参数
+local function SetupEventSpy()
+    -- 监听所有远程事件
+    for _, event in pairs(ReplicatedStorage:GetDescendants()) do
+        if event:IsA("RemoteEvent") then
+            pcall(function()
+                event.OnClientEvent:Connect(function(...)
+                    local args = {...}
+                    local eventName = event.Name
+                    if eventName:lower():find("shoot") or eventName:lower():find("hit") then
+                        print("📡 监听到射击事件:", eventName)
+                        print("   参数:", ...)
+                    end
+                end)
+            end)
+        end
+    end
+end
 
 -- 获取当前武器
 local function GetCurrentWeapon()
     if LocalPlayer.Character then
-        return LocalPlayer.Character:FindFirstChildOfClass("Tool")
+        local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+        if tool then
+            return tool
+        end
     end
     return nil
 end
@@ -30,26 +80,31 @@ end
 local function EquipTaser()
     if not LocalPlayer.Backpack then return nil end
     
-    local taser = LocalPlayer.Backpack:FindFirstChild("Taser") or 
-                  LocalPlayer.Backpack:FindFirstChild("TaserGun") or
-                  LocalPlayer.Backpack:FindFirstChild("StunGun") or
-                  LocalPlayer.Backpack:FindFirstChild("ElectricGun")
+    -- 尝试常见名称
+    local weaponNames = {"Taser", "TaserGun", "StunGun", "ElectricGun", "Gun"}
     
-    if taser then
-        LocalPlayer.Character:WaitForChild("Humanoid"):EquipTool(taser)
-        return taser
-    end
-    
-    -- 尝试通过名称匹配
-    for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
-        if tool:IsA("Tool") and (string.lower(tool.Name):find("taser") or 
-           string.lower(tool.Name):find("stun") or 
-           string.lower(tool.Name):find("electric")) then
-            LocalPlayer.Character:WaitForChild("Humanoid"):EquipTool(tool)
-            return tool
+    for _, name in pairs(weaponNames) do
+        local weapon = LocalPlayer.Backpack:FindFirstChild(name)
+        if weapon and weapon:IsA("Tool") then
+            LocalPlayer.Character:WaitForChild("Humanoid"):EquipTool(weapon)
+            print("🔫 装备武器:", name)
+            return weapon
         end
     end
     
+    -- 尝试名称包含关键词的工具
+    for _, tool in pairs(LocalPlayer.Backpack:GetChildren()) do
+        if tool:IsA("Tool") then
+            local lowerName = tool.Name:lower()
+            if lowerName:find("taser") or lowerName:find("stun") or lowerName:find("electric") or lowerName:find("gun") then
+                LocalPlayer.Character:WaitForChild("Humanoid"):EquipTool(tool)
+                print("🔫 装备武器:", tool.Name)
+                return tool
+            end
+        end
+    end
+    
+    print("❌ 未找到合适的武器")
     return nil
 end
 
@@ -83,82 +138,63 @@ local function GetClosestEnemy()
     return closest
 end
 
--- 获取鼠标目标（备用方法）
-local function GetMouseTarget()
-    if not LocalPlayer:GetMouse() then return nil end
-    return LocalPlayer:GetMouse().Hit
-end
-
--- 模拟鼠标点击
-local function SimulateMouseClick()
-    if Ragebot.MouseHit then
-        -- 尝试模拟真实点击
-        mouse1click()
-        task.wait(0.05)
-        mouse1release()
-    end
-end
-
--- 发送射击事件（改进版）
-local function SendShootEvent(targetPos, weapon)
-    local currentWeapon = weapon or GetCurrentWeapon()
-    
-    if not currentWeapon then
-        if Ragebot.EquipWeapon then
-            currentWeapon = EquipTaser()
-            task.wait(0.1) -- 等待武器装备
-        end
-        if not currentWeapon then
-            print("❌ 未找到武器")
-            return false
-        end
+-- 尝试所有可能的射击方法
+local function TryAllShootMethods(targetPos)
+    local weapon = GetCurrentWeapon() or EquipTaser()
+    if not weapon then
+        print("❌ 没有武器可用")
+        return false
     end
     
-    -- 尝试多种射击参数格式
     local success = false
+    local methods = {
+        {"GunRemotes", "ShootEvent"},
+        {"WeaponRemotes", "Fire"},
+        {"CombatRemotes", "Shoot"},
+        {"TaserRemotes", "Shoot"},
+        {"GunSystem", "Shoot"},
+        {"WeaponSystem", "Fire"}
+    }
     
-    -- 方法1: 带武器引用的射击
-    pcall(function()
-        ReplicatedStorage.GunRemotes.ShootEvent:FireServer(currentWeapon, targetPos)
-        success = true
-        print("✅ 射击方法1成功")
-    end)
-    
-    if not success then
-        -- 方法2: 带时间戳的射击
-        pcall(function()
-            ReplicatedStorage.GunRemotes.ShootEvent:FireServer({
-                weapon = currentWeapon,
-                position = targetPos,
-                timestamp = tick(),
-                origin = LocalPlayer.Character.Head.Position
-            })
-            success = true
-            print("✅ 射击方法2成功")
-        end)
-    end
-    
-    if not success then
-        -- 方法3: 原始方法但带更多参数
-        pcall(function()
-            ReplicatedStorage.GunRemotes.ShootEvent:FireServer(
-                currentWeapon,
-                targetPos,
-                tick(),
-                LocalPlayer.Character.Head.Position
-            )
-            success = true
-            print("✅ 射击方法3成功")
-        end)
-    end
-    
-    if not success then
-        -- 方法4: 尝试鼠标点击方式
-        pcall(function()
-            SimulateMouseClick()
-            success = true
-            print("✅ 使用鼠标点击方式")
-        end)
+    for _, method in pairs(methods) do
+        local folder = ReplicatedStorage:FindFirstChild(method[1])
+        if folder then
+            local event = folder:FindFirstChild(method[2])
+            if event and (event:IsA("RemoteEvent") or event:IsA("RemoteFunction")) then
+                print("🎯 尝试方法:", method[1] .. "." .. method[2])
+                
+                -- 尝试不同参数组合
+                local paramCombinations = {
+                    {weapon, targetPos},
+                    {targetPos, weapon},
+                    {
+                        Start = LocalPlayer.Character.Head.Position,
+                        End = targetPos,
+                        Weapon = weapon
+                    },
+                    {
+                        weapon = weapon,
+                        target = targetPos,
+                        player = LocalPlayer
+                    }
+                }
+                
+                for i, params in ipairs(paramCombinations) do
+                    pcall(function()
+                        if event:IsA("RemoteEvent") then
+                            event:FireServer(unpack(params))
+                        else
+                            event:InvokeServer(unpack(params))
+                        end
+                        success = true
+                        print("✅ 成功使用:", method[1] .. "." .. method[2], "参数组合", i)
+                        return true
+                    end)
+                    if success then break end
+                end
+            end
+        end
+        if success then break end
     end
     
     return success
@@ -179,21 +215,13 @@ task.spawn(function()
                     if hitPart then
                         local targetPos = hitPart.Position
                         
-                        -- 添加随机偏移避免检测
-                        local offset = Vector3.new(
-                            math.random(-0.1, 0.1),
-                            math.random(-0.1, 0.1), 
-                            math.random(-0.1, 0.1)
-                        )
-                        targetPos = targetPos + offset
-                        
-                        local shotSuccess = SendShootEvent(targetPos)
+                        local shotSuccess = TryAllShootMethods(targetPos)
                         
                         if shotSuccess then
                             Ragebot.LastShot = now
-                            print("⚡ Electric Shot at:", target.Name)
+                            print("⚡ 成功射击:", target.Name)
                         else
-                            print("❌ 射击失败")
+                            print("❌ 所有射击方法都失败了")
                         end
                     end
                 end
@@ -203,11 +231,11 @@ task.spawn(function()
     end
 end)
 
--- 创建简单UI
+-- 创建UI
 local Compkiller = loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/CompKiller/refs/heads/main/src/source.luau"))();
 
 local ElectricWindow = Compkiller.new({
-    Name = "⚡ Electric Ragebot",
+    Name = "⚡ Electric Ragebot - 诊断版",
     Keybind = "RightAlt",
     Logo = "rbxassetid://73021542394361",
     TextSize = 15,
@@ -227,14 +255,30 @@ MainSection:AddToggle({
         Ragebot.Enabled = Value
         if Value then
             Compkiller.newNotify().new({Title = "Electric Ragebot", Content = "ON - Auto-shooting enemies"})
-            -- 自动尝试装备武器
-            if Ragebot.EquipWeapon then
-                task.wait(0.5)
-                EquipTaser()
-            end
+            -- 自动装备武器
+            task.wait(0.5)
+            EquipTaser()
         else
             Compkiller.newNotify().new({Title = "Electric Ragebot", Content = "OFF"})
         end
+    end
+})
+
+-- 诊断按钮
+MainSection:AddButton({
+    Name = "🔍 诊断射击事件",
+    Callback = function()
+        FindShootEvents()
+        Compkiller.newNotify().new({Title = "诊断", Content = "检查输出窗口查看结果"})
+    end
+})
+
+-- 监听按钮
+MainSection:AddButton({
+    Name = "📡 开始监听事件",
+    Callback = function()
+        SetupEventSpy()
+        Compkiller.newNotify().new({Title = "监听", Content = "开始监听射击事件"})
     end
 })
 
@@ -279,27 +323,12 @@ MainSection:AddDropdown({
     end
 })
 
--- 自动装备武器
-MainSection:AddToggle({
-    Name = "Auto Equip Weapon",
-    Flag = "AutoEquipToggle",
-    Default = true,
-    Callback = function(Value)
-        Ragebot.EquipWeapon = Value
-        Compkiller.newNotify().new({Title = "Auto Equip", Content = Value and "ON" or "OFF"})
-    end
-})
+print("⚡ Electric Ragebot 诊断版加载完成!")
+print("📝 使用方法:")
+print("1. 点击'诊断射击事件'查看可用事件")
+print("2. 点击'开始监听事件'学习参数")
+print("3. 开启主开关测试射击")
 
--- 鼠标点击模式
-MainSection:AddToggle({
-    Name = "Use Mouse Click",
-    Flag = "MouseClickToggle",
-    Default = false,
-    Callback = function(Value)
-        Ragebot.MouseHit = Value
-        Compkiller.newNotify().new({Title = "Mouse Mode", Content = Value and "ON" or "OFF"})
-    end
-})
-
-print("⚡ Electric Ragebot loaded! Press RightAlt to toggle UI.")
-print("🔫 Features: Auto equip, Multiple shoot methods, Anti-detection")
+-- 自动开始诊断
+task.wait(2)
+FindShootEvents()

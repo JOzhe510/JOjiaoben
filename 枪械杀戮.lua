@@ -42,6 +42,11 @@ local Ragebot = {
 local visibilityCache = {}
 local lastCacheClear = tick()
 
+-- 调试函数
+local function DebugPrint(message)
+    print("[Ragebot Debug]: " .. message)
+end
+
 -- Functions
 local function UpdateFireRate(rps)
     if type(rps) ~= "number" or rps < 1 or rps > 100 then
@@ -51,10 +56,14 @@ local function UpdateFireRate(rps)
     Ragebot.Cooldown = 1/rps
     Ragebot.FireRate = rps
     Notifier.new({Title = "Success", Content = "Fire rate set to: "..rps.." RPS"})
+    DebugPrint("Fire rate updated to: " .. rps .. " RPS, Cooldown: " .. Ragebot.Cooldown)
 end
 
 local function IsVisible(targetPart)
-    if not Ragebot.WallCheck then return true end
+    if not Ragebot.WallCheck then 
+        DebugPrint("Wall check disabled, target visible")
+        return true 
+    end
     
     if tick() - lastCacheClear > 5 then
         visibilityCache = {}
@@ -80,21 +89,34 @@ local function IsVisible(targetPart)
     
     if raycastResult then
         local hitDistance = (raycastResult.Position - cameraPos).Magnitude
-        visibilityCache[cacheKey] = hitDistance > (distance - Ragebot.WallCheckDistance)
-        return visibilityCache[cacheKey]
+        local isVisible = hitDistance > (distance - Ragebot.WallCheckDistance)
+        DebugPrint("Raycast hit: " .. raycastResult.Instance:GetFullName() .. ", Visible: " .. tostring(isVisible))
+        visibilityCache[cacheKey] = isVisible
+        return isVisible
     end
     
+    DebugPrint("Raycast clear, target visible")
     visibilityCache[cacheKey] = true
     return true
 end
 
 local function GetClosestEnemy()
-    if not LocalPlayer.Character then return nil end
+    if not LocalPlayer.Character then 
+        DebugPrint("No local player character")
+        return nil 
+    end
+    
     local myRoot = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return nil end
+    if not myRoot then 
+        DebugPrint("No HumanoidRootPart found")
+        return nil 
+    end
     
     local closest, minDist = nil, Ragebot.CurrentDistance
     local myPos = myRoot.Position
+    local foundPlayers = 0
+    
+    DebugPrint("Searching for enemies within " .. Ragebot.CurrentDistance .. " studs")
     
     for _, player in ipairs(Players:GetPlayers()) do
         if player == LocalPlayer then continue end
@@ -106,39 +128,74 @@ local function GetClosestEnemy()
         local hum = char:FindFirstChildOfClass("Humanoid")
         
         if char and root and hum and hum.Health > 0 and not char:FindFirstChildOfClass("ForceField") then
-            if Ragebot.DownedCheck and (hum.Health <= 15 or hum:GetState() == Enum.HumanoidStateType.Dead) then continue end
+            if Ragebot.DownedCheck and (hum.Health <= 15 or hum:GetState() == Enum.HumanoidStateType.Dead) then 
+                DebugPrint("Skipping downed player: " .. player.Name)
+                continue 
+            end
             
             local dist = (root.Position - myPos).Magnitude
+            DebugPrint("Found player: " .. player.Name .. " at distance: " .. math.floor(dist))
+            
             if dist < minDist and dist <= Ragebot.CurrentDistance then
                 for _, partName in ipairs(Ragebot.WallCheckParts) do
                     local part = char:FindFirstChild(partName)
-                    if part and IsVisible(part) then
-                        closest = player
-                        minDist = dist
-                        break
+                    if part then
+                        local visible = IsVisible(part)
+                        DebugPrint("Part " .. partName .. " visible: " .. tostring(visible))
+                        if visible then
+                            closest = player
+                            minDist = dist
+                            foundPlayers = foundPlayers + 1
+                            DebugPrint("Valid target found: " .. player.Name .. " at " .. math.floor(dist) .. " studs")
+                            break
+                        end
                     end
                 end
             end
         end
     end
     
+    DebugPrint("Total valid targets found: " .. foundPlayers)
     return closest
 end
 
 local function Shoot(target)
-    if not target or not target.Character then return false end
+    if not target or not target.Character then 
+        DebugPrint("No target or target character")
+        return false 
+    end
     
     local hitPart = target.Character:FindFirstChild(Ragebot.TargetPart) or
                    target.Character:FindFirstChild("Head") or
                    target.Character:FindFirstChild("UpperTorso")
-    if not hitPart then return false end
+    if not hitPart then 
+        DebugPrint("No valid hit part found")
+        return false 
+    end
     
     local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
-    if not tool then return false end
+    if not tool then 
+        DebugPrint("No tool equipped")
+        return false 
+    end
     
-    -- 弹药检查 - 使用 Ammo
+    -- 弹药检查
     local ammo = tool:FindFirstChild("Ammo")
-    if not ammo or ammo.Value <= 0 then
+    if not ammo then
+        DebugPrint("No Ammo object found, checking for other ammo types...")
+        -- 尝试查找其他可能的弹药名称
+        for _, child in ipairs(tool:GetChildren()) do
+            if string.lower(child.Name):find("ammo") or string.lower(child.Name):find("bullet") then
+                DebugPrint("Found potential ammo: " .. child.Name)
+                if child.Value <= 0 then
+                    DebugPrint("Ammo depleted: " .. child.Name)
+                    return false
+                end
+                break
+            end
+        end
+    elseif ammo.Value <= 0 then
+        DebugPrint("Ammo depleted")
         return false
     end
     
@@ -147,30 +204,69 @@ local function Shoot(target)
     
     local dir = (hitPos - shootPos).Unit
     
-    -- 使用 Fire 事件（大写）
-    ReplicatedStorage.Events.Fire:FireServer(
-        tool,
-        shootPos,
-        hitPos,
-        dir
-    )
+    DebugPrint("Attempting to shoot " .. target.Name .. " at part: " .. hitPart.Name)
     
-    return true
+    -- 尝试不同的开火事件
+    local fired = false
+    local eventsToTry = {"Fire", "fire", "Shoot", "shoot", "RemoteEvent"}
+    
+    for _, eventName in ipairs(eventsToTry) do
+        local event = ReplicatedStorage:FindFirstChild("Events")
+        if event then
+            event = event:FindFirstChild(eventName)
+            if event and event:IsA("RemoteEvent") then
+                DebugPrint("Found event: " .. eventName)
+                event:FireServer(tool, shootPos, hitPos, dir)
+                fired = true
+                break
+            end
+        end
+    end
+    
+    -- 如果没找到Events文件夹，直接搜索
+    if not fired then
+        for _, eventName in ipairs(eventsToTry) do
+            local event = ReplicatedStorage:FindFirstChild(eventName)
+            if event and event:IsA("RemoteEvent") then
+                DebugPrint("Found event in ReplicatedStorage: " .. eventName)
+                event:FireServer(tool, shootPos, hitPos, dir)
+                fired = true
+                break
+            end
+        end
+    end
+    
+    if fired then
+        DebugPrint("Shot fired successfully!")
+        return true
+    else
+        DebugPrint("No valid fire event found!")
+        return false
+    end
 end
 
 -- Ragebot 主循环
 task.spawn(function()
+    DebugPrint("Ragebot loop started")
     while true do
         if Ragebot.Enabled then
             local now = tick()
             if now - Ragebot.LastShot >= Ragebot.Cooldown then
                 local target = GetClosestEnemy()
                 if target then
+                    DebugPrint("Target acquired: " .. target.Name .. ", attempting shot...")
                     local shotFired = Shoot(target)
                     if shotFired then
                         Ragebot.LastShot = now
+                        DebugPrint("Shot cooldown reset")
+                    else
+                        DebugPrint("Shot failed")
                     end
+                else
+                    DebugPrint("No target found")
                 end
+            else
+                DebugPrint("On cooldown: " .. (now - Ragebot.LastShot) .. "/" .. Ragebot.Cooldown)
             end
         end
         task.wait()
@@ -189,6 +285,7 @@ CombatSection:AddToggle({
     Default = false,
     Callback = function(Value)
         Ragebot.Enabled = Value
+        DebugPrint("Ragebot " .. (Value and "enabled" or "disabled"))
     end
 })
 
@@ -211,6 +308,7 @@ CombatSection:AddToggle({
     Flag = "DownedCheck",
     Callback = function(Value)
         Ragebot.DownedCheck = Value
+        DebugPrint("Downed check " .. (Value and "enabled" or "disabled"))
     end
 })
 
@@ -222,6 +320,7 @@ CombatSection:AddToggle({
     Flag = "WallCheckToggle",
     Callback = function(Value)
         Ragebot.WallCheck = Value
+        DebugPrint("Wall check " .. (Value and "enabled" or "disabled"))
     end
 })
 
@@ -236,6 +335,7 @@ CombatSection:AddSlider({
     Flag = "WallCheckDistance",
     Callback = function(Value)
         Ragebot.WallCheckDistance = Value
+        DebugPrint("Wall penetration set to: " .. Value)
     end
 })
 
@@ -251,6 +351,7 @@ CombatSection:AddTextBox({
             Ragebot.MaxDistance = num
             Ragebot.CurrentDistance = num
             Notifier.new({Title = "Success", Content = "Distance set to: "..num.." studs"})
+            DebugPrint("Distance set to: " .. num)
         else
             Notifier.new({Title = "Error", Content = "Invalid distance (must be 1-800)"})
         end
@@ -266,7 +367,9 @@ CombatSection:AddDropdown({
     Callback = function(Value)
         Ragebot.TargetPart = Value == "Random" and 
             ({"Head","UpperTorso","LowerTorso"})[math.random(1,3)] or Value
+        DebugPrint("Target part set to: " .. Ragebot.TargetPart)
     end
 })
 
 print("Ragebot Script loaded! Press Left Alt to toggle UI.")
+DebugPrint("Script initialized successfully")

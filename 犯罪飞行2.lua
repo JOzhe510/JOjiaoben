@@ -8,7 +8,6 @@ local LocalPlayer = Players.LocalPlayer
 local Config = {
     Enabled = false,
     Interval = 0.7,
-    UsePlayerPosition = true,
     Flight = {
         SwimFly = false,
         SwimFlySpeed = 55,
@@ -55,19 +54,8 @@ local StateNames = {
     [Enum.HumanoidStateType.Climbing] = "Climbing",
     [Enum.HumanoidStateType.Dead] = "Dead",
 }
-
 local function GetStateName(state)
     return StateNames[state] or "Unknown"
-end
-
-local function GetPlayerPosition()
-    local character = LocalPlayer.Character
-    if not character then return nil end
-    
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then return nil end
-    
-    return humanoidRootPart.Position, humanoidRootPart.CFrame
 end
 
 local function TriggerRagdoll(reason)
@@ -79,24 +67,15 @@ local function TriggerRagdoll(reason)
         end
     end
     
-    local position, cframe = GetPlayerPosition()
-    if not position then
-        print(string.format("[%.2f] ❌ 无法获取玩家位置", tick()))
-        return false
-    end
-    
-    local vectorArg = position
-    local cframeArg = Config.UsePlayerPosition and cframe or CFrame.new()
-    
     local success = pcall(function()
-        RagdollRemote:FireServer("__---r", vectorArg, cframeArg)
+        RagdollRemote:FireServer("HITRGP")
     end)
     
     TriggerCount = TriggerCount + 1
     LastTriggerTime = tick()
     
     if success then
-        print(string.format("[%.2f] ✅ 触发 #%d | 原因: %s | 位置: %s", tick(), TriggerCount, reason or "定时", tostring(vectorArg)))
+        print(string.format("[%.2f] ✅ 触发 #%d | 原因: %s", tick(), TriggerCount, reason or "定时"))
         return true
     else
         print(string.format("[%.2f] ❌ 触发失败 #%d", tick(), TriggerCount))
@@ -222,9 +201,11 @@ local function Start()
         
         local now = tick()
         local canTrigger = now - LastTriggerTime >= Config.Interval
+        local triggeredThisFrame = false
         
-        if canTrigger then
+        if canTrigger and not triggeredThisFrame then
             TriggerRagdoll("定时循环")
+            triggeredThisFrame = true
         end
         
         local c = LocalPlayer.Character

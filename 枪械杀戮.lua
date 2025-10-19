@@ -1,33 +1,16 @@
 local Compkiller = loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/CompKiller/refs/heads/main/src/source.luau"))();
 local Notifier = Compkiller.newNotify();
-local ConfigManager = Compkiller:ConfigManager({
-	Directory = "Compkiller-UI",
-	Config = "XXTI-Free"
-});
 
 -- 显示加载界面
 Compkiller:Loader("rbxassetid://73021542394361", 2.5).yield();
 
 -- 创建主窗口
 local Window = Compkiller.new({
-	Name = "XXTI [FREE]",
-	Keybind = "LeftAlt",
-	Logo = "rbxassetid://73021542394361",
-	TextSize = 15,
+    Name = "XXTI [Ragebot Only]",
+    Keybind = "LeftAlt",
+    Logo = "rbxassetid://73021542394361",
+    TextSize = 15,
 });
-
--- 创建水印
-local Watermark = Window:Watermark();
-Watermark:AddText({Icon = "user", Text = "XXTI-Free"});
-Watermark:AddText({Icon = "clock", Text = Compkiller:GetDate()});
-local Time = Watermark:AddText({Icon = "timer", Text = "TIME"});
-task.spawn(function() while task.wait() do Time:SetText(Compkiller:GetTimeNow()) end end)
-Watermark:AddText({Icon = "server", Text = Compkiller.Version});
-
--- 创建标签页
-Window:DrawCategory({Name = "Main"});
-local CombatTab = Window:DrawTab({Name = "Combat", Icon = "swords", EnableScrolling = true});
-local SettingsTab = Window:DrawTab({Name = "Settings", Icon = "settings-3", EnableScrolling = true});
 
 -- Services
 local Players = game:GetService("Players")
@@ -36,13 +19,9 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- 获取头顶位置
-local function GetHeadPosition()
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") then
-        return LocalPlayer.Character.Head.Position
-    end
-    return Camera.CFrame.Position -- 备用方案
-end
+-- 创建标签页
+Window:DrawCategory({Name = "Main"});
+local CombatTab = Window:DrawTab({Name = "Ragebot", Icon = "swords", EnableScrolling = true});
 
 -- Ragebot Config
 local Ragebot = {
@@ -54,27 +33,16 @@ local Ragebot = {
     MaxDistance = 800,
     CurrentDistance = 100,
     FireRate = 30,
-    PlayHitSound = true,
     WallCheck = true,
     WallCheckDistance = 50,
-    WallCheckParts = {"Head", "UpperTorso", "LowerTorso"}
+    WallCheckParts = {"Head", "UpperTorso", "LowerTorso"},
+    LastNotificationTime = 0
 }
 
 local visibilityCache = {}
 local lastCacheClear = tick()
 
 -- Functions
-local function PlayHitSound()
-    if not Ragebot.PlayHitSound then return end
-    
-    local sound = Instance.new("Sound")
-    sound.SoundId = "rbxassetid://4817809188"
-    sound.Volume = 1
-    sound.Parent = workspace
-    sound:Play()
-    game:GetService("Debris"):AddItem(sound, 3)
-end
-
 local function UpdateFireRate(rps)
     if type(rps) ~= "number" or rps < 1 or rps > 100 then
         Notifier.new({Title = "Error", Content = "Invalid RPS (1-100)"})
@@ -83,6 +51,15 @@ local function UpdateFireRate(rps)
     Ragebot.Cooldown = 1/rps
     Ragebot.FireRate = rps
     Notifier.new({Title = "Success", Content = "Fire rate set to: "..rps.." RPS"})
+end
+
+local function RandomString(length)
+    local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
+    local str = ""
+    for i = 1, length do
+        str = str .. chars:sub(math.random(1, #chars), math.random(1, #chars))
+    end
+    return str
 end
 
 local function IsVisible(targetPart)
@@ -157,15 +134,6 @@ local function GetClosestEnemy()
     return closest
 end
 
-local function RandomString(length)
-    local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
-    local str = ""
-    for i = 1, length do
-        str = str .. chars:sub(math.random(1, #chars), math.random(1, #chars))
-    end
-    return str
-end
-
 local function Shoot(target)
     if not target or not target.Character then return false end
     
@@ -177,49 +145,29 @@ local function Shoot(target)
     local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
     if not tool then return false end
     
-    -- 弹药检查 - 使用Ammo而不是SERVER_Ammo
-    local values = tool:FindFirstChild("Values")
-    if not values then return false end
-    
-    local ammo = values:FindFirstChild("Ammo")
+    -- 弹药检查 - 使用 Ammo 而不是 SERVER_Ammo
+    local ammo = tool:FindFirstChild("Ammo")
     if not ammo or ammo.Value <= 0 then
         return false
     end
     
     local hitPos = hitPart.Position
-    local shootPos = GetHeadPosition()
+    local shootPos = Camera.CFrame.Position
     
     local dir = (hitPos - shootPos).Unit
-    local key = RandomString(30) .. "0"
     
-    ReplicatedStorage.Events.GNX_S:FireServer(
-        tick(),
-        key,
+    -- 使用 fire 事件而不是 GNX_S
+    ReplicatedStorage.Events.fire:FireServer(
         tool,
-        "FDS9I83",
         shootPos,
-        { dir },
-        false
-    )
-    
-    ReplicatedStorage.Events["ZFKLF__H"]:FireServer(
-        "🧈",
-        tool,
-        key,
-        1,
-        hitPart,
         hitPos,
         dir
     )
     
-    if tool:FindFirstChild("Hitmarker") then
-        tool.Hitmarker:Fire(hitPart)
-        PlayHitSound()
-    end
-    
     return true
 end
 
+-- Ragebot 主循环
 task.spawn(function()
     while true do
         if Ragebot.Enabled then
@@ -244,7 +192,7 @@ end)
 local CombatSection = CombatTab:DrawSection({Name = "Ragebot Settings"});
 
 -- 主开关
-local RagebotToggle = CombatSection:AddToggle({
+CombatSection:AddToggle({
     Name = "Enable Ragebot",
     Flag = "RagebotToggle",
     Default = false,
@@ -264,22 +212,11 @@ CombatSection:AddSlider({
     Callback = UpdateFireRate
 })
 
--- 音效开关
-CombatSection:AddToggle({
-    Name = "Hit Sound",
-    Default = true,
-    Tooltip = "Play hit sound effect",
-    Flag = "HitSoundToggle",
-    Callback = function(Value)
-        Ragebot.PlayHitSound = Value
-    end
-})
-
 -- 忽略倒地玩家
 CombatSection:AddToggle({
     Name = "Ignore Downed Players",
     Default = false,
-    Tooltip = "Don't shoot downed players",
+    Tooltip = "Skip players with low health",
     Flag = "DownedCheck",
     Callback = function(Value)
         Ragebot.DownedCheck = Value
@@ -341,44 +278,4 @@ CombatSection:AddDropdown({
     end
 })
 
--- Settings Tab
-local UISettings = SettingsTab:DrawSection({Name = "UI Settings"});
-
--- UI可见性
-UISettings:AddToggle({
-    Name = "Show UI",
-    Default = true,
-    Tooltip = "Toggle UI visibility",
-    Flag = "UI_Toggle",
-    Callback = function(Value)
-        Window:SetVisibility(Value)
-    end
-})
-
--- UI透明度
-UISettings:AddSlider({
-    Name = "UI Opacity",
-    Min = 0,
-    Max = 100,
-    Default = 100,
-    Round = 0,
-    Tooltip = "Adjust UI transparency",
-    Flag = "UI_Opacity",
-    Callback = function(Value)
-        Window:SetTransparency(1 - (Value/100))
-    end
-})
-
--- UI主题
-UISettings:AddDropdown({
-    Name = "UI Theme",
-    Values = {"Default", "Dark", "Light", "Aqua"},
-    Default = "Default",
-    Tooltip = "Change UI color scheme",
-    Flag = "UI_Theme",
-    Callback = function(Value)
-        Window:SetTheme(Value)
-    end
-})
-
-print("XXTI Script fully loaded! Press Left Alt to toggle UI.")
+print("Ragebot Script loaded! Press Left Alt to toggle UI.")

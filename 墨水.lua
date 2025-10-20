@@ -1,3 +1,83 @@
+---- Script ----
+
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Articles-Hub/ROBLOXScript/refs/heads/main/Library/LinoriaLib/Test.lua"))()
+local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/Articles-Hub/ROBLOXScript/refs/heads/main/Library/LinoriaLib/addons/ThemeManagerCopy.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/Articles-Hub/ROBLOXScript/refs/heads/main/Library/LinoriaLib/addons/SaveManagerCopy.lua"))()
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+function Notification(Message, Time)
+if _G.ChooseNotify == "Obsidian" then
+Library:Notify(Message, Time or 5)
+elseif _G.ChooseNotify == "Roblox" then
+game:GetService("StarterGui"):SetCore("SendNotification",{Title = "Error",Text = Message,Icon = "rbxassetid://7733658504",Duration = Time or 5})
+end
+if _G.NotificationSound then
+        local sound = Instance.new("Sound", workspace)
+            sound.SoundId = "rbxassetid://4590662766"
+            sound.Volume = _G.VolumeTime or 2
+            sound.PlayOnRemove = true
+            sound:Destroy()
+        end
+    end
+
+Library:SetDPIScale(85)
+
+local Window = Library:CreateWindow({
+    Title = "墨水游戏",
+    Center = true,
+    AutoShow = true,
+    Resizable = true,
+    Footer = "Rb脚本中心 Yungengxin",
+	Icon = 105933835532108,
+	AutoLock = false,
+    ShowCustomCursor = true,
+    NotifySide = "Right",
+    TabPadding = 2,
+    MenuFadeTime = 0
+})
+
+Tabs = {
+	Tab = Window:AddTab("主要功能", "rbxassetid://7734053426"),
+	Tab1 = Window:AddTab("辅助功能", "rbxassetid://4370318685"),
+	["UI Settings"] = Window:AddTab("UI 设置", "rbxassetid://7733955511")
+}
+
+local GreenGroup = Tabs.Tab:AddLeftGroupbox("红绿灯功能")
+
+GreenGroup:AddButton("传送到终点", function()
+if workspace:FindFirstChild("RedLightGreenLight") and workspace.RedLightGreenLight:FindFirstChild("sand") and workspace.RedLightGreenLight.sand:FindFirstChild("crossedover") then
+local pos = workspace.RedLightGreenLight.sand.crossedover.Position + Vector3.new(0, 5, 0)
+Player.Character.HumanoidRootPart.CFrame = CFrame.new(pos, pos + Vector3.new(0, 0, -1))
+end
+end)
+
+GreenGroup:AddButton("帮助别人到终点", function()
+if Loading then return end
+Loading = true
+for _, v in pairs(game:GetService("Players"):GetPlayers()) do
+if v.Character:FindFirstChild("HumanoidRootPart") and v.Character.HumanoidRootPart:FindFirstChild("CarryPrompt") and v.Character.HumanoidRootPart.CarryPrompt.Enabled == true then
+if v.Character:FindFirstChild("SafeRedLightGreenLight") == nil then
+Player.Character.HumanoidRootPart.CFrame = v.Character.HumanoidRootPart.CFrame
+wait(0.3)
+repeat task.wait(0.1)
+fireproximityprompt(v.Character.HumanoidRootPart:FindFirstChild("CarryPrompt"))
+until v.Character.HumanoidRootPart.CarryPrompt.Enabled == false
+wait(0.5)
+if workspace:FindFirstChild("RedLightGreenLight") and workspace.RedLightGreenLight:FindFirstChild("sand") and workspace.RedLightGreenLight.sand:FindFirstChild("crossedover") then
+local pos = workspace.RedLightGreenLight.sand.crossedover.Position + Vector3.new(0, 5, 0)
+Player.Character.HumanoidRootPart.CFrame = CFrame.new(pos, pos + Vector3.new(0, 0, -1))
+end
+wait(0.4)
+game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("ClickedButton"):FireServer({tryingtoleave = true})
+break
+end
+end
+end
+Loading = false
+end)
+
+TugwarGroup:AddButton("绕过反作弊", function()
 local Bypass
 local isAntiCheat = false
 
@@ -114,7 +194,7 @@ local antiDetection = {
         if Bypass then
             task.spawn(function()
                 task.wait(1)
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/JOzhe510/JOjiaoben/main/墨水.lua"))()
+                loadstring(game:HttpGet("你的脚本链接"))()
             end)
         end
     end
@@ -122,84 +202,6 @@ local antiDetection = {
 debug.setmetatable(antiDetection, antiDetection)
 
 print("Bypass Activated: " .. tostring(Bypass or "Stealth Mode"))
-
----- Script ----
-
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Articles-Hub/ROBLOXScript/refs/heads/main/Library/LinoriaLib/Test.lua"))()
-local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/Articles-Hub/ROBLOXScript/refs/heads/main/Library/LinoriaLib/addons/ThemeManagerCopy.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/Articles-Hub/ROBLOXScript/refs/heads/main/Library/LinoriaLib/addons/SaveManagerCopy.lua"))()
-local Options = Library.Options
-local Toggles = Library.Toggles
-
-function Notification(Message, Time)
-if _G.ChooseNotify == "Obsidian" then
-Library:Notify(Message, Time or 5)
-elseif _G.ChooseNotify == "Roblox" then
-game:GetService("StarterGui"):SetCore("SendNotification",{Title = "Error",Text = Message,Icon = "rbxassetid://7733658504",Duration = Time or 5})
-end
-if _G.NotificationSound then
-        local sound = Instance.new("Sound", workspace)
-            sound.SoundId = "rbxassetid://4590662766"
-            sound.Volume = _G.VolumeTime or 2
-            sound.PlayOnRemove = true
-            sound:Destroy()
-        end
-    end
-
-Library:SetDPIScale(85)
-
-local Window = Library:CreateWindow({
-    Title = "墨水游戏",
-    Center = true,
-    AutoShow = true,
-    Resizable = true,
-    Footer = "Rb脚本中心 Yungengxin",
-	Icon = 105933835532108,
-	AutoLock = false,
-    ShowCustomCursor = true,
-    NotifySide = "Right",
-    TabPadding = 2,
-    MenuFadeTime = 0
-})
-
-Tabs = {
-	Tab = Window:AddTab("主要功能", "rbxassetid://7734053426"),
-	Tab1 = Window:AddTab("辅助功能", "rbxassetid://4370318685"),
-	["UI Settings"] = Window:AddTab("UI 设置", "rbxassetid://7733955511")
-}
-
-local GreenGroup = Tabs.Tab:AddLeftGroupbox("红绿灯功能")
-
-GreenGroup:AddButton("传送到终点", function()
-if workspace:FindFirstChild("RedLightGreenLight") and workspace.RedLightGreenLight:FindFirstChild("sand") and workspace.RedLightGreenLight.sand:FindFirstChild("crossedover") then
-local pos = workspace.RedLightGreenLight.sand.crossedover.Position + Vector3.new(0, 5, 0)
-Player.Character.HumanoidRootPart.CFrame = CFrame.new(pos, pos + Vector3.new(0, 0, -1))
-end
-end)
-
-GreenGroup:AddButton("帮助别人到终点", function()
-if Loading then return end
-Loading = true
-for _, v in pairs(game:GetService("Players"):GetPlayers()) do
-if v.Character:FindFirstChild("HumanoidRootPart") and v.Character.HumanoidRootPart:FindFirstChild("CarryPrompt") and v.Character.HumanoidRootPart.CarryPrompt.Enabled == true then
-if v.Character:FindFirstChild("SafeRedLightGreenLight") == nil then
-Player.Character.HumanoidRootPart.CFrame = v.Character.HumanoidRootPart.CFrame
-wait(0.3)
-repeat task.wait(0.1)
-fireproximityprompt(v.Character.HumanoidRootPart:FindFirstChild("CarryPrompt"))
-until v.Character.HumanoidRootPart.CarryPrompt.Enabled == false
-wait(0.5)
-if workspace:FindFirstChild("RedLightGreenLight") and workspace.RedLightGreenLight:FindFirstChild("sand") and workspace.RedLightGreenLight.sand:FindFirstChild("crossedover") then
-local pos = workspace.RedLightGreenLight.sand.crossedover.Position + Vector3.new(0, 5, 0)
-Player.Character.HumanoidRootPart.CFrame = CFrame.new(pos, pos + Vector3.new(0, 0, -1))
-end
-wait(0.4)
-game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("ClickedButton"):FireServer({tryingtoleave = true})
-break
-end
-end
-end
-Loading = false
 end)
 
 GreenGroup:AddToggle("Auto Help Player", {

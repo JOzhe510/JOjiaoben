@@ -77,7 +77,7 @@ end
 Loading = false
 end)
 
-TugwarGroup:AddButton("绕过反作弊", function()
+GreenGroup:AddButton("绕过反作弊", function()
 local Bypass
 local isAntiCheat = false
 

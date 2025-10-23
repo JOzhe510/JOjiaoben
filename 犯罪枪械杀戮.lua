@@ -117,12 +117,12 @@ local Ragebot = {
     DownedCheck = false,
     TargetLock = "",
     TargetPart = "Head",
-    MaxDistance = 800,
+    MaxDistance = 1500,
     CurrentDistance = 100,
     FireRate = 30,
     PlayHitSound = true,
     WallCheck = true,
-    WallCheckDistance = 50,
+    WallCheckDistance = 200,
     WallCheckParts = {"Head", "UpperTorso", "LowerTorso"},
     LastNotificationTime = 0,
     Wallbang = false,
@@ -517,16 +517,21 @@ local function IsVisible(targetPart)
     local direction = (targetPos - cameraPos).Unit
     local distance = (targetPos - cameraPos).Magnitude
     
+    -- 增加这行：允许检测更远距离的墙壁
+    local maxWallDistance = math.min(distance + Ragebot.WallCheckDistance, 500)
+    
     local raycastParams = RaycastParams.new()
     raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetPart.Parent}
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
     raycastParams.IgnoreWater = true
     
-    local raycastResult = workspace:Raycast(cameraPos, direction * distance, raycastParams)
+    -- 修改这行：使用maxWallDistance而不是distance
+    local raycastResult = workspace:Raycast(cameraPos, direction * maxWallDistance, raycastParams)
     
     if raycastResult then
         local hitDistance = (raycastResult.Position - cameraPos).Magnitude
-        visibilityCache[cacheKey] = hitDistance > (distance - Ragebot.WallCheckDistance)
+        -- 修改这行：放宽穿透条件
+        visibilityCache[cacheKey] = hitDistance > (distance - Ragebot.WallCheckDistance * 1.5)
         return visibilityCache[cacheKey]
     end
     
@@ -894,6 +899,28 @@ CombatSection:AddToggle({
         clearReloadConnections()
         if Value then
             InstantReloadSetup()
+        end
+    end
+})
+
+-- 在现有的墙壁穿透距离滑块后面添加：
+
+-- 穿墙模式选择
+CombatSection:AddDropdown({
+    Name = "Penetration Mode",
+    Values = {"Normal", "Enhanced", "Extreme"},
+    Default = "Normal",
+    Flag = "PenetrationMode",
+    Callback = function(Value)
+        if Value == "Normal" then
+            Ragebot.WallCheckDistance = 100
+            Ragebot.WallbangCheckRadius = 20
+        elseif Value == "Enhanced" then
+            Ragebot.WallCheckDistance = 250
+            Ragebot.WallbangCheckRadius = 40
+        elseif Value == "Extreme" then
+            Ragebot.WallCheckDistance = 500
+            Ragebot.WallbangCheckRadius = 60
         end
     end
 })

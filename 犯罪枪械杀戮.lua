@@ -903,28 +903,6 @@ CombatSection:AddToggle({
     end
 })
 
--- 在现有的墙壁穿透距离滑块后面添加：
-
--- 穿墙模式选择
-CombatSection:AddDropdown({
-    Name = "Penetration Mode",
-    Values = {"Normal", "Enhanced", "Extreme"},
-    Default = "Normal",
-    Flag = "PenetrationMode",
-    Callback = function(Value)
-        if Value == "Normal" then
-            Ragebot.WallCheckDistance = 100
-            Ragebot.WallbangCheckRadius = 20
-        elseif Value == "Enhanced" then
-            Ragebot.WallCheckDistance = 250
-            Ragebot.WallbangCheckRadius = 40
-        elseif Value == "Extreme" then
-            Ragebot.WallCheckDistance = 500
-            Ragebot.WallbangCheckRadius = 60
-        end
-    end
-})
-
 -- 忽略倒地玩家
 CombatSection:AddToggle({
     Name = "Ignore Downed Players",
@@ -951,8 +929,8 @@ CombatSection:AddToggle({
 CombatSection:AddSlider({
     Name = "Wall Penetration",
     Min = 0,
-    Max = 100,
-    Default = 20,
+    Max = 300,
+    Default = 100,
     Round = 0,
     Tooltip = "How much wall penetration to allow",
     Flag = "WallCheckDistance",

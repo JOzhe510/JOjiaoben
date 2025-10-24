@@ -117,12 +117,12 @@ local Ragebot = {
     DownedCheck = false,
     TargetLock = "",
     TargetPart = "Head",
-    MaxDistance = 1500,
+    MaxDistance = 800,
     CurrentDistance = 100,
     FireRate = 30,
     PlayHitSound = true,
     WallCheck = true,
-    WallCheckDistance = 200,
+    WallCheckDistance = 50,
     WallCheckParts = {"Head", "UpperTorso", "LowerTorso"},
     LastNotificationTime = 0,
     Wallbang = false,
@@ -517,21 +517,16 @@ local function IsVisible(targetPart)
     local direction = (targetPos - cameraPos).Unit
     local distance = (targetPos - cameraPos).Magnitude
     
-    -- 增加这行：允许检测更远距离的墙壁
-    local maxWallDistance = math.min(distance + Ragebot.WallCheckDistance, 500)
-    
     local raycastParams = RaycastParams.new()
     raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetPart.Parent}
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
     raycastParams.IgnoreWater = true
     
-    -- 修改这行：使用maxWallDistance而不是distance
-    local raycastResult = workspace:Raycast(cameraPos, direction * maxWallDistance, raycastParams)
+    local raycastResult = workspace:Raycast(cameraPos, direction * distance, raycastParams)
     
     if raycastResult then
         local hitDistance = (raycastResult.Position - cameraPos).Magnitude
-        -- 修改这行：放宽穿透条件
-        visibilityCache[cacheKey] = hitDistance > (distance - Ragebot.WallCheckDistance * 1.5)
+        visibilityCache[cacheKey] = hitDistance > (distance - Ragebot.WallCheckDistance)
         return visibilityCache[cacheKey]
     end
     
@@ -929,8 +924,8 @@ CombatSection:AddToggle({
 CombatSection:AddSlider({
     Name = "Wall Penetration",
     Min = 0,
-    Max = 300,
-    Default = 100,
+    Max = 100,
+    Default = 20,
     Round = 0,
     Tooltip = "How much wall penetration to allow",
     Flag = "WallCheckDistance",

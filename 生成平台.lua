@@ -5,7 +5,7 @@ local RunService = game:GetService("RunService")
 local platformPart = nil
 local platformLoop = nil
 local isPlatformActive = false
-local platformHeightOffset = 4 -- 平台在玩家下方的固定高度差
+local platformHeightOffset = 3.5 -- 平台在玩家下方的固定高度差
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "VoidTeleportUI"
@@ -135,16 +135,18 @@ local function CreatePlatform()
     platformPart.BrickColor = BrickColor.new("Bright violet")
     platformPart.Transparency = 0.2
     
+    -- 创建平台时添加一个光效
+    local pointLight = Instance.new("PointLight")
+    pointLight.Brightness = 1
+    pointLight.Range = 12
+    pointLight.Color = Color3.fromRGB(170, 85, 255)
+    pointLight.Parent = platformPart
+    
     local position = humanoidRootPart.Position - Vector3.new(0, platformHeightOffset, 0)
     platformPart.CFrame = CFrame.new(position)
     platformPart.Parent = workspace
     
-    -- 将平台连接到玩家，使其跟随玩家移动
-    local weld = Instance.new("Weld")
-    weld.Part0 = humanoidRootPart
-    weld.Part1 = platformPart
-    weld.C0 = CFrame.new(0, -platformHeightOffset, 0)
-    weld.Parent = humanoidRootPart
+    return platformPart
 end
 
 local function StartPlatform()
@@ -166,6 +168,13 @@ local function StartPlatform()
         if not platformPart or not platformPart.Parent then
             CreatePlatform()
         end
+        
+        -- 更新平台位置和旋转，使其跟随玩家并匹配朝向
+        local offset = Vector3.new(0, -platformHeightOffset, 0)
+        local targetPosition = humanoidRootPart.Position + offset
+        
+        -- 使用玩家的朝向来旋转平台
+        platformPart.CFrame = CFrame.new(targetPosition) * CFrame.Angles(0, humanoidRootPart.Orientation.Y * math.pi / 180, 0)
     end)
 end
 

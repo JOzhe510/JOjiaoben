@@ -3,7 +3,9 @@ local playerGui = player:WaitForChild("PlayerGui")
 local RunService = game:GetService("RunService")
 
 local platformPart = nil
+local platformLoop = nil
 local isPlatformActive = false
+local platformHeightOffset = 3.4 -- 平台在玩家下方的固定高度差
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "VoidTeleportUI"
@@ -112,59 +114,46 @@ local openCorner = Instance.new("UICorner")
 openCorner.CornerRadius = UDim.new(0, 8)
 openCorner.Parent = openUIButton
 
-local function CreatePlatform()
-    local character = game.Players.LocalPlayer.Character
-    if not character then return end
-    
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then return end
-    
-    if platformPart then
-        platformPart:Destroy()
-        platformPart = nil
-    end
-    
-    platformPart = Instance.new("Part")
-    platformPart.Name = "FlightPlatform"
-    platformPart.Size = Vector3.new(8, 1, 8) 
-    platformPart.Anchored = true
-    platformPart.CanCollide = true
-    platformPart.Material = Enum.Material.Neon
-    platformPart.BrickColor = BrickColor.new("Bright violet")
-    platformPart.Transparency = 0.2
-    
-    local pointLight = Instance.new("PointLight")
-    pointLight.Brightness = 1
-    pointLight.Range = 12
-    pointLight.Color = Color3.fromRGB(170, 85, 255)
-    pointLight.Parent = platformPart
-    
-    -- 精确计算平台位置 - 就在玩家脚下
-    local rayOrigin = humanoidRootPart.Position
-    local rayDirection = Vector3.new(0, -1000, 0)
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterDescendantsInstances = {character}
-    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-    
-    local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-    
-    if raycastResult then
-        -- 如果检测到地面，平台就在地面上方0.1的位置
-        platformPart.Position = raycastResult.Position + Vector3.new(0, 0.5, 0)
-    else
-        -- 如果没有地面，就在玩家下方5个单位
-        platformPart.Position = humanoidRootPart.Position - Vector3.new(0, 5, 0)
-    end
-    
-    platformPart.Parent = workspace
-    return platformPart
-end
-
 local function StartPlatform()
-    CreatePlatform()
+    if platformLoop then 
+        platformLoop:Disconnect()
+        platformLoop = nil
+    end
+    
+    platformLoop = RunService.Heartbeat:Connect(function()
+        local character = game.Players.LocalPlayer.Character
+        if not character then return end
+        
+        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+        if not humanoidRootPart then return end
+        
+        -- 持续在玩家脚底生成平台
+        if platformPart then
+            platformPart:Destroy()
+        end
+        
+        platformPart = Instance.new("Part")
+        platformPart.Name = "FlightPlatform"
+        platformPart.Size = Vector3.new(8, 0.2, 8) 
+        platformPart.Anchored = true
+        platformPart.CanCollide = true
+        platformPart.Material = Enum.Material.Neon
+        platformPart.BrickColor = BrickColor.new("Bright violet")
+        platformPart.Transparency = 0.2
+        
+        -- 在玩家脚底位置创建平台
+        local position = humanoidRootPart.Position - Vector3.new(0, platformHeightOffset, 0)
+        platformPart.CFrame = CFrame.new(position)
+        platformPart.Parent = workspace
+    end)
 end
 
 local function StopPlatform()
+    if platformLoop then
+        platformLoop:Disconnect()
+        platformLoop = nil
+    end
+    
     if platformPart then
         platformPart:Destroy()
         platformPart = nil

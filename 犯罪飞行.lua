@@ -296,7 +296,7 @@ local function Stop()
     -- 关闭飞行
     ToggleSwimFly(false)
     
-    -- 恢复状态启用
+    -- ✅ 恢复所有被禁用的状态
     local character = LocalPlayer.Character
     if character then
         local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -307,12 +307,20 @@ local function Stop()
                 humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
                 humanoid:SetStateEnabled(Enum.HumanoidStateType.Landed, true)
                 humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, true) -- 也恢复物理状态
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)   -- 恢复坐下状态
             end)
+            
+            -- ✅ 强制切换回正常状态（如站立）
+            if humanoid:GetState() == Enum.HumanoidStateType.Ragdoll then
+                humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+            end
         end
     end
     
     print("━━━━━━━━━━━━━━━━━━━━━━━━")
     print("⏹️ 飞行已停止")
+    print("✅ 所有状态已恢复")
     print(string.format("📊 总共触发: %d 次", TriggerCount))
     print("━━━━━━━━━━━━━━━━━━━━━━━━")
     

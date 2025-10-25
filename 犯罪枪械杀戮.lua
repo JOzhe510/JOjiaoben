@@ -134,7 +134,16 @@ local Ragebot = {
     WallbangCheckUpdateRate = 20,
     RequireValidWallbang = false,
     TargetLockList = {},
-    LastLockedPlayer = nil
+    LastLockedPlayer = nil,
+    
+    -- 🔥 新增穿透强化配置
+    PenetrationPower = 3,              -- 穿透层数
+    WallThicknessLimit = 50,           -- 最大穿透墙壁厚度
+    PenetrationCheckPrecision = 8,     -- 穿透检测精度
+    AdaptivePenetration = true,        -- 自适应穿透
+    ForcePenetrate = false,            -- 强制穿透模式
+    PenetrationFalloff = 0.7,          -- 穿透衰减系数
+    AdvancedRaycast = true,            -- 使用高级射线检测
 }
 
 -- Tracer System
@@ -191,6 +200,76 @@ local function PlayHitSound()
     sound.Parent = workspace
     sound:Play()
     game:GetService("Debris"):AddItem(sound, 3)
+end
+
+-- 🔥 新增穿透相关函数
+local function EstimateWallThickness(raycastResult, direction)
+    if not raycastResult then return 0 end
+    
+    local hitInstance = raycastResult.Instance
+    if not hitInstance then return 1 end
+    
+    if hitInstance:IsA("BasePart") then
+        local size = hitInstance.Size
+        local normal = raycastResult.Normal
+        local dot = math.abs(normal:Dot(direction))
+        local thickness = size.Magnitude * (1 - dot) * 0.5
+        return math.max(thickness, 0.1)
+    end
+    
+    return 1
+end
+
+local function CanShootThroughWalls(shootPos, targetPart, maxThickness)
+    local direction = (targetPart.Position - shootPos).Unit
+    local distance = (targetPart.Position - shootPos).Magnitude
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetPart.Parent}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.IgnoreWater = true
+    
+    local totalThickness = 0
+    local currentPos = shootPos
+    local penetrationCount = 0
+    
+    while penetrationCount < Ragebot.PenetrationPower and totalThickness < (maxThickness or Ragebot.WallThicknessLimit) do
+        local raycastResult = workspace:Raycast(currentPos, direction * (distance - totalThickness), raycastParams)
+        
+        if not raycastResult then
+            return true, totalThickness
+        end
+        
+        local hitDistance = (raycastResult.Position - currentPos).Magnitude
+        local hitThickness = EstimateWallThickness(raycastResult, direction)
+        
+        totalThickness = totalThickness + hitThickness
+        penetrationCount = penetrationCount + 1
+        currentPos = raycastResult.Position + direction * 0.1
+        
+        if Ragebot.AdaptivePenetration then
+            local remainingPower = Ragebot.PenetrationPower - penetrationCount
+            if remainingPower <= 0 or totalThickness > Ragebot.WallThicknessLimit then
+                return false, totalThickness
+            end
+        end
+    end
+    
+    return totalThickness <= (maxThickness or Ragebot.WallThicknessLimit), totalThickness
+end
+
+local function AdvancedPenetrationCheck(shootPos, targetPart)
+    if not Ragebot.AdvancedRaycast then
+        return CanShootFromPosition(shootPos, targetPart)
+    end
+    
+    local canPenetrate, thickness = CanShootThroughWalls(shootPos, targetPart, Ragebot.WallThicknessLimit)
+    
+    if Ragebot.ForcePenetrate then
+        return true
+    end
+    
+    return canPenetrate
 end
 
 local function UpdateFireRate(rps)
@@ -553,6 +632,7 @@ local function CanShootFromPosition(shootPos, targetPart)
     return true
 end
 
+-- 🔥 强化版位置搜索函数
 local function FindOptimalShootPosition(targetPart)
     if not targetPart then return nil end
     
@@ -561,17 +641,16 @@ local function FindOptimalShootPosition(targetPart)
     local radius = Ragebot.WallbangCheckRadius
     local bestPos = nil
     local bestScore = -math.huge
+    local bestThickness = math.huge
     
     local currentTime = tick()
     
-    -- 如果最近更新过且位置仍然有效，则优先使用
     if lastShootPos and (currentTime - lastShootPosUpdate) < (1/Ragebot.WallbangCheckUpdateRate) then
-        if CanShootFromPosition(lastShootPos, targetPart) then
+        if AdvancedPenetrationCheck(lastShootPos, targetPart) then
             return lastShootPos
         end
     end
     
-    -- 生成均匀分布在球面上的搜索方向
     local goldenRatio = (1 + math.sqrt(5)) / 2
     local angleIncrement = math.pi * 2 * goldenRatio
     
@@ -587,38 +666,38 @@ local function FindOptimalShootPosition(targetPart)
         local dir = Vector3.new(x, y, z)
         local testPos = basePos + dir * radius
         
-        -- 计算这个位置的得分
-        local score = 0
+        local canShoot, thickness = CanShootThroughWalls(testPos, targetPart)
         
-        -- 1. 是否能击中目标
-        if CanShootFromPosition(testPos, targetPart) then
+        if canShoot or Ragebot.ForcePenetrate then
+            local score = 0
             score = score + 100
             
-            -- 2. 距离目标的直线距离(越近越好)
-            local distToTarget = (testPos - targetPos).Magnitude
-            score = score + (radius - distToTarget) / radius * 50
+            local thicknessScore = (Ragebot.WallThicknessLimit - thickness) / Ragebot.WallThicknessLimit * 80
+            score = score + thicknessScore
             
-            -- 3. 与上次位置的连续性(减少抖动)
+            local distToTarget = (testPos - targetPos).Magnitude
+            local distScore = (radius - distToTarget) / radius * 60
+            score = score + distScore
+            
             if lastShootPos then
                 local distToLast = (testPos - lastShootPos).Magnitude
-                score = score + (radius - distToLast) / radius * 30
+                local continuityScore = (radius - distToLast) / radius * 40
+                score = score + continuityScore
             end
             
-            -- 4. 高度优势(从上方射击更好)
             local heightDiff = testPos.Y - targetPos.Y
             if heightDiff > 0 then
-                score = score + math.min(heightDiff, 10) * 2
+                score = score + math.min(heightDiff, 15) * 3
             end
             
-            -- 更新最佳位置
-            if score > bestScore then
+            if score > bestScore or (score == bestScore and thickness < bestThickness) then
                 bestScore = score
                 bestPos = testPos
+                bestThickness = thickness
             end
         end
     end
     
-    -- 更新最后使用的射击位置
     if bestPos then
         lastShootPos = bestPos
         lastShootPosUpdate = currentTime
@@ -741,6 +820,7 @@ local function GetClosestEnemy()
     return closest
 end
 
+-- 🔥 修改后的Shoot函数支持穿透
 local function Shoot(target)
     if not target or not target.Character then return false end
     
@@ -765,7 +845,7 @@ local function Shoot(target)
     local shootPos = GetHeadPosition()
     local originalPos = shootPos
     
-    -- 如果启用了WallbangCheck，使用智能位置搜索
+    -- 🔥 使用强化版wallbang
     if Ragebot.WallbangCheck then
         local optimalPos = FindOptimalShootPosition(hitPart)
         if optimalPos then
@@ -795,6 +875,7 @@ local function Shoot(target)
     local dir = (hitPos - shootPos).Unit
     local key = RandomString(30) .. "0"
     
+    -- 🔥 穿透模式射击
     ReplicatedStorage.Events.GNX_S:FireServer(
         tick(),
         key,
@@ -802,14 +883,14 @@ local function Shoot(target)
         "FDS9I83",
         shootPos,
         { dir },
-        false
+        Ragebot.ForcePenetrate  -- 传递穿透标志
     )
     
     ReplicatedStorage.Events["ZFKLF__H"]:FireServer(
         "🧈",
         tool,
         key,
-        1,
+        Ragebot.PenetrationPower,  -- 传递穿透能力
         hitPart,
         hitPos,
         dir
@@ -924,7 +1005,7 @@ CombatSection:AddToggle({
 CombatSection:AddSlider({
     Name = "Wall Penetration",
     Min = 0,
-    Max = 100,
+    Max = 800,
     Default = 20,
     Round = 0,
     Tooltip = "How much wall penetration to allow",
@@ -988,6 +1069,53 @@ CombatSection:AddToggle({
     Flag = "RequireValidWallbang",
     Callback = function(Value)
         Ragebot.RequireValidWallbang = Value
+    end
+})
+
+-- 🔥 新增穿透能力控制
+CombatSection:AddSlider({
+    Name = "Penetration Power",
+    Min = 1,
+    Max = 10,
+    Default = 3,
+    Round = 0,
+    Tooltip = "How many walls can penetrate",
+    Flag = "PenetrationPower",
+    Callback = function(Value)
+        Ragebot.PenetrationPower = Value
+    end
+})
+
+CombatSection:AddSlider({
+    Name = "Max Wall Thickness",
+    Min = 10,
+    Max = 200,
+    Default = 50,
+    Round = 0,
+    Tooltip = "Maximum wall thickness to penetrate (studs)",
+    Flag = "WallThicknessLimit",
+    Callback = function(Value)
+        Ragebot.WallThicknessLimit = Value
+    end
+})
+
+CombatSection:AddToggle({
+    Name = "Force Penetrate",
+    Default = false,
+    Tooltip = "Ignore wall thickness limits (may cause detection)",
+    Flag = "ForcePenetrate",
+    Callback = function(Value)
+        Ragebot.ForcePenetrate = Value
+    end
+})
+
+CombatSection:AddToggle({
+    Name = "Adaptive Penetration",
+    Default = true,
+    Tooltip = "Smart penetration based on wall material",
+    Flag = "AdaptivePenetration",
+    Callback = function(Value)
+        Ragebot.AdaptivePenetration = Value
     end
 })
 

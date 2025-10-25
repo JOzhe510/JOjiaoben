@@ -5,7 +5,7 @@ local RunService = game:GetService("RunService")
 local platformPart = nil
 local platformLoop = nil
 local isPlatformActive = false
-local platformHeightOffset = 0 -- 平台在玩家下方的固定高度差
+local platformHeightOffset = 4 -- 平台在玩家下方的固定高度差
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "VoidTeleportUI"

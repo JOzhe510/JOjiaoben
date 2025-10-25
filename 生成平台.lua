@@ -3,7 +3,6 @@ local playerGui = player:WaitForChild("PlayerGui")
 local RunService = game:GetService("RunService")
 
 local platformPart = nil
-local platformLoop = nil
 local isPlatformActive = false
 
 local screenGui = Instance.new("ScreenGui")
@@ -140,48 +139,32 @@ local function CreatePlatform()
     pointLight.Color = Color3.fromRGB(170, 85, 255)
     pointLight.Parent = platformPart
     
-    platformPart.Parent = workspace
+    -- 精确计算平台位置 - 就在玩家脚下
+    local rayOrigin = humanoidRootPart.Position
+    local rayDirection = Vector3.new(0, -1000, 0)
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {character}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
     
+    local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+    
+    if raycastResult then
+        -- 如果检测到地面，平台就在地面上方0.1的位置
+        platformPart.Position = raycastResult.Position + Vector3.new(0, 0.5, 0)
+    else
+        -- 如果没有地面，就在玩家下方5个单位
+        platformPart.Position = humanoidRootPart.Position - Vector3.new(0, 5, 0)
+    end
+    
+    platformPart.Parent = workspace
     return platformPart
 end
 
 local function StartPlatform()
-    if platformLoop then 
-        platformLoop:Disconnect()
-        platformLoop = nil
-    end
-    
     CreatePlatform()
-    
-    platformLoop = RunService.Heartbeat:Connect(function()
-        local character = game.Players.LocalPlayer.Character
-        if not character then return end
-        
-        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-        if not humanoidRootPart then return end
-        
-        if not platformPart or not platformPart.Parent then
-            CreatePlatform()
-            return
-        end
-        
-        -- 简单粗暴：平台就在玩家正下方3个单位的位置
-        local targetPosition = Vector3.new(
-            humanoidRootPart.Position.X,
-            humanoidRootPart.Position.Y - 3,
-            humanoidRootPart.Position.Z
-        )
-        
-        platformPart.Position = targetPosition
-    end)
 end
 
 local function StopPlatform()
-    if platformLoop then
-        platformLoop:Disconnect()
-        platformLoop = nil
-    end
-    
     if platformPart then
         platformPart:Destroy()
         platformPart = nil

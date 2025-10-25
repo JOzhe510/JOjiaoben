@@ -5,7 +5,7 @@ local RunService = game:GetService("RunService")
 local platformPart = nil
 local platformLoop = nil
 local isPlatformActive = false
-local platformHeightOffset = 3.4 -- 平台在玩家下方的固定高度差
+local platformHeightOffset = 3.3 -- 平台在玩家下方的固定高度差
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "VoidTeleportUI"
@@ -136,7 +136,7 @@ local function StartPlatform()
         platformPart.Name = "FlightPlatform"
         platformPart.Size = Vector3.new(8, 0.2, 8) 
         platformPart.Anchored = true
-        platformPart.CanCollide = true
+        platformPart.CanCollide = true  -- 确保可碰撞
         platformPart.Material = Enum.Material.Neon
         platformPart.BrickColor = BrickColor.new("Bright violet")
         platformPart.Transparency = 0.2

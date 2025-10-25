@@ -7,7 +7,7 @@ local LocalPlayer = Players.LocalPlayer
 
 local Config = {
     Enabled = false,
-    Interval = 0.1,
+    Interval = 5,
     UsePlayerPosition = true,
     FixedVector = Vector3.new(-70000000, 60000000, -2800000),
     FixedCFrame = CFrame.new(-48950, 5500, -6800, 1100, -1000, -1000, -1000, 1100, -1000, 1000, 1110, -1000),

@@ -22,6 +22,7 @@ local Config = {
 local RagdollRemote = nil
 local LoopConnection = nil
 local StateListener = nil
+local ForceRagdollConnection = nil
 local LastTriggerTime = 0
 local TriggerCount = 0
 local LastState = nil
@@ -57,6 +58,7 @@ local StateNames = {
     [Enum.HumanoidStateType.Climbing] = "Climbing",
     [Enum.HumanoidStateType.Dead] = "Dead",
 }
+
 local function GetStateName(state)
     return StateNames[state] or "Unknown"
 end
@@ -160,6 +162,27 @@ local function ToggleSwimFly(isOn)
     end
 end
 
+-- 强化状态固定功能
+local function ForceRagdollState()
+    if not Config.Enabled then return end
+    
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    
+    local currentState = humanoid:GetState()
+    
+    -- 如果不在布偶状态，强制切换到布偶
+    if currentState ~= Enum.HumanoidStateType.Ragdoll then
+        pcall(function()
+            humanoid:ChangeState(Enum.HumanoidStateType.Ragdoll)
+            print(string.format("[%.2f] 🔄 强制切换到布偶状态 (原状态: %s)", tick(), GetStateName(currentState)))
+        end)
+    end
+end
+
 local function Start()
     if Config.Enabled then return end
     
@@ -181,18 +204,24 @@ local function Start()
     StateStartTime = tick()
     print(string.format("[%.2f] 📌 初始状态: %s", tick(), GetStateName(LastState)))
     
+    -- 初始触发布偶
     TriggerRagdoll("初始")
     
+    -- 禁用可能干扰布偶的状态
     local hookSuccess = pcall(function()
         humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
         humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, false)
-        print(string.format("[%.2f] 🚫 成功禁用 GettingUp & Running 状态", tick()))
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Landed, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+        print(string.format("[%.2f] 🚫 成功禁用干扰状态", tick()))
     end)
     
     if not hookSuccess then
         print(string.format("[%.2f] ⚠️ 无法禁用状态，将使用 Heartbeat 强制拦截", tick()))
     end
     
+    -- 监听状态变化
     StateListener = humanoid.StateChanged:Connect(function(oldState, newState)
         if not Config.Enabled then return end
         
@@ -205,45 +234,41 @@ local function Start()
             duration
         ))
         
+        -- 如果状态不是布偶，立即强制切换回布偶
+        if newState ~= Enum.HumanoidStateType.Ragdoll then
+            task.spawn(function()
+                task.wait(0.05) -- 短暂延迟确保状态稳定
+                ForceRagdollState()
+            end)
+        end
+        
         LastState = newState
         StateStartTime = tick()
     end)
     
+    -- 定时触发布偶事件
     LoopConnection = RunService.Heartbeat:Connect(function()
         if not Config.Enabled then return end
         
         local now = tick()
         local canTrigger = now - LastTriggerTime >= Config.Interval
-        local triggeredThisFrame = false
         
-        if canTrigger and not triggeredThisFrame then
+        if canTrigger then
             TriggerRagdoll("定时循环")
-            triggeredThisFrame = true
-        end
-        
-        local c = LocalPlayer.Character
-        if c then
-            local h = c:FindFirstChildOfClass("Humanoid")
-            if h then
-                local currentState = h:GetState()
-                if currentState == Enum.HumanoidStateType.GettingUp or
-                   currentState == Enum.HumanoidStateType.Running then
-                    pcall(function()
-                        h:ChangeState(Enum.HumanoidStateType.Ragdoll)
-                    end)
-                end
-            end
         end
     end)
+    
+    -- 每帧强制保持布偶状态
+    ForceRagdollConnection = RunService.Heartbeat:Connect(ForceRagdollState)
     
     -- 开启飞行
     ToggleSwimFly(true)
     
     print("━━━━━━━━━━━━━━━━━━━━━━━━")
     print("✅ 监控已启动")
-    print("  🚫 状态禁用: GettingUp & Running")
+    print("  🚫 状态禁用: 多个干扰状态")
     print("  🔄 定时触发: 每 " .. Config.Interval .. " 秒")
-    print("  🛡️ Heartbeat: 每帧强制检查")
+    print("  🛡️ Heartbeat: 每帧强制保持布偶状态")
     print("  ✈️ 飞行: 游泳飞行（WASD+视角控制）")
     print("━━━━━━━━━━━━━━━━━━━━━━━━")
 end
@@ -263,9 +288,15 @@ local function Stop()
         StateListener = nil
     end
     
+    if ForceRagdollConnection then
+        ForceRagdollConnection:Disconnect()
+        ForceRagdollConnection = nil
+    end
+    
     -- 关闭飞行
     ToggleSwimFly(false)
     
+    -- 恢复状态启用
     local character = LocalPlayer.Character
     if character then
         local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -273,6 +304,9 @@ local function Stop()
             pcall(function()
                 humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
                 humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, true)
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.Landed, true)
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
             end)
         end
     end
@@ -334,7 +368,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -50, 0, 40)
 Title.Position = UDim2.new(0, 10, 0, 5)
 Title.BackgroundTransparency = 1
-Title.Text = "🔄 犯罪飞行"
+Title.Text = "🔄 犯罪飞行 - 强化版"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 16
 Title.Font = Enum.Font.GothamBold
@@ -367,7 +401,7 @@ local Info = Instance.new("TextLabel")
 Info.Size = UDim2.new(1, -20, 0, 60)
 Info.Position = UDim2.new(0, 10, 0, 50)
 Info.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-Info.Text = "🚫 禁用 GettingUp & Running\n🔄 间隔: 0.7秒/次\n✈️ 飞行: 游泳飞行（WASD+视角控制）"
+Info.Text = "🚫 禁用多个干扰状态\n🔄 间隔: 0.1秒/次\n🛡️ 每帧强制保持布偶\n✈️ 飞行: 游泳飞行控制"
 Info.TextColor3 = Color3.fromRGB(200, 255, 200)
 Info.TextSize = 12
 Info.Font = Enum.Font.Code
@@ -418,36 +452,48 @@ end)
 MainGui.Parent = PlayerGui
 MiniGui.Enabled = false
 
+-- 角色重生处理
 LocalPlayer.CharacterAdded:Connect(function(newChar)
     LastCharacter = newChar
     if Config.Enabled then
-        task.wait(0.1)
+        task.wait(0.5) -- 等待角色完全加载
+        
         local humanoid = newChar:WaitForChild("Humanoid")
+        local rootPart = newChar:WaitForChild("HumanoidRootPart")
+        
+        -- 重新应用状态禁用
         pcall(function()
             humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
             humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Landed, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+            
+            -- 强制切换到布偶状态
             humanoid:ChangeState(Enum.HumanoidStateType.Ragdoll)
         end)
+        
         TriggerRagdoll("角色重生重新固定")
         
-        -- 重新开启飞行
+        -- 重新开启飞行设置
         if Config.Flight.SwimFly then
-            local rootPart = newChar:WaitForChild("HumanoidRootPart")
             rootPart.CanCollide = false
             Workspace.Gravity = 0
         end
+        
+        print("✅ 角色重生后重新应用布偶状态")
     end
 end)
 
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-print("🔄 犯罪飞行已加载")
+print("🔄 犯罪飞行 - 强化版 已加载")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 print("功能:")
-print("  🚫 状态禁用: 彻底禁用 GettingUp & Running")
-print("  🔄 布偶循环: 定时触发 RemoteEvent（0.7秒）")
-print("  🛡️ Heartbeat: 每帧强制维持布偶状态")
+print("  🚫 状态禁用: 彻底禁用多个干扰状态")
+print("  🔄 布偶循环: 定时触发 RemoteEvent（0.1秒）")
+print("  🛡️ Heartbeat: 每帧强制保持布偶状态")
 print("  ✈️ 飞行功能: 游泳飞行（WASD控制，视角控上下飞）")
-print("  🔗 联动: 开启飞行同时开启布偶循环，关闭同时关闭")
+print("  🔗 状态监听: 实时监控并强制维持布偶状态")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 task.spawn(function()

@@ -5,7 +5,6 @@ local RunService = game:GetService("RunService")
 local platformPart = nil
 local platformLoop = nil
 local isPlatformActive = false
-local platformHeightOffset = 3.5 -- 平台在玩家下方的固定高度差
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "VoidTeleportUI"
@@ -142,8 +141,6 @@ local function CreatePlatform()
     pointLight.Color = Color3.fromRGB(170, 85, 255)
     pointLight.Parent = platformPart
     
-    local position = humanoidRootPart.Position - Vector3.new(0, platformHeightOffset, 0)
-    platformPart.CFrame = CFrame.new(position)
     platformPart.Parent = workspace
     
     return platformPart
@@ -167,14 +164,23 @@ local function StartPlatform()
         -- 如果平台不存在，重新创建
         if not platformPart or not platformPart.Parent then
             CreatePlatform()
+            return
         end
         
-        -- 更新平台位置和旋转，使其跟随玩家并匹配朝向
-        local offset = Vector3.new(0, -platformHeightOffset, 0)
-        local targetPosition = humanoidRootPart.Position + offset
+        -- 计算平台应该在的精确位置（玩家脚下）
+        -- 平台高度的一半 + 玩家高度的一半 = 正好在玩家脚下
+        local platformHeight = platformPart.Size.Y / 2
+        local playerHeight = humanoidRootPart.Size.Y / 2
         
-        -- 使用玩家的朝向来旋转平台
-        platformPart.CFrame = CFrame.new(targetPosition) * CFrame.Angles(0, humanoidRootPart.Orientation.Y * math.pi / 180, 0)
+        -- 精确计算平台位置，完全在玩家脚下
+        local targetPosition = Vector3.new(
+            humanoidRootPart.Position.X,
+            humanoidRootPart.Position.Y - playerHeight - platformHeight,
+            humanoidRootPart.Position.Z
+        )
+        
+        -- 直接设置平台位置
+        platformPart.Position = targetPosition
     end)
 end
 

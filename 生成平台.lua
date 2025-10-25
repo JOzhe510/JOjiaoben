@@ -127,14 +127,13 @@ local function CreatePlatform()
     
     platformPart = Instance.new("Part")
     platformPart.Name = "FlightPlatform"
-    platformPart.Size = Vector3.new(8, 0.2, 8) 
+    platformPart.Size = Vector3.new(8, 1, 8) 
     platformPart.Anchored = true
     platformPart.CanCollide = true
     platformPart.Material = Enum.Material.Neon
     platformPart.BrickColor = BrickColor.new("Bright violet")
     platformPart.Transparency = 0.2
     
-    -- 创建平台时添加一个光效
     local pointLight = Instance.new("PointLight")
     pointLight.Brightness = 1
     pointLight.Range = 12
@@ -161,25 +160,18 @@ local function StartPlatform()
         local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
         if not humanoidRootPart then return end
         
-        -- 如果平台不存在，重新创建
         if not platformPart or not platformPart.Parent then
             CreatePlatform()
             return
         end
         
-        -- 计算平台应该在的精确位置（玩家脚下）
-        -- 平台高度的一半 + 玩家高度的一半 = 正好在玩家脚下
-        local platformHeight = platformPart.Size.Y / 2
-        local playerHeight = humanoidRootPart.Size.Y / 2
-        
-        -- 精确计算平台位置，完全在玩家脚下
+        -- 简单粗暴：平台就在玩家正下方3个单位的位置
         local targetPosition = Vector3.new(
             humanoidRootPart.Position.X,
-            humanoidRootPart.Position.Y - playerHeight - platformHeight,
+            humanoidRootPart.Position.Y - 3,
             humanoidRootPart.Position.Z
         )
         
-        -- 直接设置平台位置
         platformPart.Position = targetPosition
     end)
 end

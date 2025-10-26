@@ -554,6 +554,74 @@ local function CanShootFromPosition(shootPos, targetPart)
 end
 
 local function FindOptimalShootPosition(targetPart)
+-- 仅作逻辑示例
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+
+-- 可穿透材质表
+local penetrableMaterials = {
+    Enum.Material.Wood,
+    Enum.Material.Glass,
+    Enum.Material.Plastic,
+}
+
+-- 射线穿墙检测函数
+local function WallbangRaycast(origin, targetPos, maxDistance)
+    local direction = (targetPos - origin).Unit * maxDistance
+    local remainingDistance = maxDistance
+    local currentOrigin = origin
+
+    while remainingDistance > 0 do
+        local raycastResult = Workspace:Raycast(currentOrigin, direction, RaycastParams.new())
+        if raycastResult then
+            local hitPart = raycastResult.Instance
+            local hitMaterial = hitPart.Material
+
+            -- 判断是否可穿透
+            local penetrable = false
+            for _, mat in ipairs(penetrableMaterials) do
+                if hitMaterial == mat then
+                    penetrable = true
+                    break
+                end
+            end
+
+            if penetrable then
+                -- 穿透继续，缩短剩余距离
+                local traveled = (raycastResult.Position - currentOrigin).Magnitude
+                remainingDistance = remainingDistance - traveled
+                currentOrigin = raycastResult.Position + direction.Unit * 0.1 -- 轻微偏移避免撞墙
+            else
+                -- 不可穿透，射线停止
+                return hitPart, raycastResult.Position
+            end
+        else
+            -- 射线没碰到任何东西
+            return nil, currentOrigin + direction
+        end
+    end
+end
+
+-- 测试函数
+local function TestWallbang()
+    local player = Players.LocalPlayer
+    local character = player.Character
+    if not character then return end
+    local headPos = character:WaitForChild("Head").Position
+
+    -- 假设目标位置
+    local targetPos = Vector3.new(0, 10, 0)
+    local hitPart, hitPos = WallbangRaycast(headPos, targetPos, 100) -- 最大距离100
+
+    if hitPart then
+        print("射线命中:", hitPart.Name, "位置:", hitPos)
+    else
+        print("射线未命中，最终位置:", hitPos)
+    end
+end
+
+TestWallbang()
+
     if not targetPart then return nil end
     
     local basePos = GetHeadPosition()

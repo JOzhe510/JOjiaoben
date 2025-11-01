@@ -1,10 +1,15 @@
 --[[
-    OPAIHUB - 高级反作弊绕过套件
+    OPAIHUB - 手机优化版
     作者: OPAI团队
-    版本: 1.0.0
-    描述: 被遗弃游戏的综合反作弊绕过系统
+    版本: 2.0 Mobile
+    描述: 被遗弃游戏的综合反作弊绕过系统（手机优化）
     版权所有 - OPAI团队
+    QQ群: 154919631
 ]]
+
+-- 加载动画
+local Compkiller = loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/CompKiller/refs/heads/main/src/source.luau"))();
+Compkiller:Loader("rbxassetid://97914301936069", 2.5).yield();
 
 local OPAIHUB_REPO = 'https://raw.githubusercontent.com/deividcomsono/Obsidian/main/'
 
@@ -27,32 +32,94 @@ if not table.clone then
     end
 end
 
-OPAIHUB_Library.ShowToggleFrameInKeybinds = true 
-OPAIHUB_Library.ShowCustomCursor = true
+-- 自动检测设备类型
+local function OPAIHUB_IsMobile()
+    return OPAIHUB_UserInputService.TouchEnabled and not OPAIHUB_UserInputService.KeyboardEnabled
+end
+
+local OPAIHUB_IsMobileDevice = OPAIHUB_IsMobile()
+local OPAIHUB_DeviceType = OPAIHUB_IsMobileDevice and "手机" or "电脑"
+
+-- 根据设备自动配置UI
+OPAIHUB_Library.ShowToggleFrameInKeybinds = not OPAIHUB_IsMobileDevice
+OPAIHUB_Library.ShowCustomCursor = not OPAIHUB_IsMobileDevice
 OPAIHUB_Library.NotifySide = "Right"
 
+-- 自动适配窗口
 local OPAIHUB_Window = OPAIHUB_Library:CreateWindow({
-    Title = 'OPAIHUB | 反作弊绕过系统',
-    Footer = "OPAI团队",
+    Title = 'OPAI被遗弃 [' .. OPAIHUB_DeviceType .. ']',
+    Footer = "OPAI团队 | 智能适配",
     Icon = 106397684977541,
     Center = true,
     AutoShow = true,
     Resizable = true,
-    ShowCustomCursor = true,
+    ShowCustomCursor = not OPAIHUB_IsMobileDevice,
     NotifySide = "Right",
-    TabPadding = 8,
-    MenuFadeTime = 0
+    TabPadding = OPAIHUB_IsMobileDevice and 4 or 8,
+    MenuFadeTime = OPAIHUB_IsMobileDevice and 0.1 or 0.2,
+    Size = OPAIHUB_IsMobileDevice and UDim2.new(0, 480, 0, 580) or UDim2.new(0, 580, 0, 680)
 })
 
+-- 查找并保存窗口的ScreenGui引用
+task.spawn(function()
+    task.wait(0.5)
+    local coreGui = game:GetService("CoreGui")
+    -- 方法1: 查找最新的ScreenGui（通常是最后创建的）
+    local allGuis = {}
+    for _, gui in ipairs(coreGui:GetChildren()) do
+        if gui:IsA("ScreenGui") then
+            table.insert(allGuis, gui)
+        end
+    end
+    -- 使用最新的GUI（通常是我们的窗口）
+    if #allGuis > 0 then
+        _G.OPAIHUB_WindowGui = allGuis[#allGuis]
+    end
+    
+    -- 方法2: 通过内容查找
+    if not _G.OPAIHUB_WindowGui then
+        for _, gui in ipairs(coreGui:GetChildren()) do
+            if gui:IsA("ScreenGui") then
+                for _, desc in ipairs(gui:GetDescendants()) do
+                    if desc.Name:find("OPAI") or desc.Name:find("被遗弃") or desc.Name:find("Obsidian") or desc.Text == "OPAI被遗弃" then
+                        _G.OPAIHUB_WindowGui = gui
+                        break
+                    end
+                end
+                if _G.OPAIHUB_WindowGui then break end
+            end
+        end
+    end
+end)
+
+-- 精简分区（6个标签）
 local OPAIHUB_Tabs = {
-    Main = OPAIHUB_Window:AddTab('主要功能','house'),
-    Movement = OPAIHUB_Window:AddTab('移动功能','earth'),
-    Combat = OPAIHUB_Window:AddTab('战斗功能','moon'),
-    Aimbot = OPAIHUB_Window:AddTab('自瞄功能','earth'),
-    ESP = OPAIHUB_Window:AddTab('透视绘制','eye'),
-    Visual = OPAIHUB_Window:AddTab('视觉设置','eye'),
-    Auto = OPAIHUB_Window:AddTab('自动功能','file'),
-    AntiLoophole = OPAIHUB_Window:AddTab('反作弊效果','earth')
+    -- 核心（3个）
+    Main = OPAIHUB_Window:AddTab('主页','house'),
+    AntiLoophole = OPAIHUB_Window:AddTab('反作弊','shield'),
+    Teleport = OPAIHUB_Window:AddTab('传送','move'),
+    
+    -- 功能（1个）
+    Auto = OPAIHUB_Window:AddTab('自动功能','repeat'),
+    
+    -- 其他（2个）
+    ESP = OPAIHUB_Window:AddTab('透视','eye'),
+    Visual = OPAIHUB_Window:AddTab('辅助','settings'),
+    
+    -- 兼容性映射（全部删除的标签）
+    Survivor = nil,     -- 已删除
+    Killer = nil,       -- 已删除
+    Killing = nil,      -- 已删除
+    Aimbot = nil,
+    KillerAimbot = nil,
+    Action = nil,
+    Test = nil,
+    SurvivorESP = nil,
+    Movement = nil,
+    Combat = nil,
+    Notify = nil,
+    Pizza = nil,
+    Skin = nil
 }
 
 local OPAIHUB_Env = getgenv and getgenv() or {}
@@ -446,6 +513,23 @@ local OPAIHUB_MainGroup = OPAIHUB_Tabs.Main:AddLeftGroupbox("OPAIHUB 反作弊�
 OPAIHUB_MainGroup:AddLabel("OPAI团队 - 高级绕过系统")
 OPAIHUB_MainGroup:AddDivider()
 
+OPAIHUB_MainGroup:AddToggle("OPAIHUB_ShowChat", {
+    Text = "显示聊天框",
+    Default = false,
+    Tooltip = "显示聊天框（需要每局开一次）",
+    Callback = function(v)
+        if v then
+            game:GetService("TextChatService").ChatWindowConfiguration.Enabled = true
+            OPAIHUB_Library:Notify("聊天框已启用", "聊天框已显示", 3)
+        else
+            game:GetService("TextChatService").ChatWindowConfiguration.Enabled = false
+            OPAIHUB_Library:Notify("聊天框已关闭", "聊天框已隐藏", 3)
+        end
+    end
+})
+
+OPAIHUB_MainGroup:AddDivider()
+
 OPAIHUB_MainGroup:AddToggle("OPAIHUB_NoStun", {
     Text = "去除前后摇",
     Default = false,
@@ -513,7 +597,7 @@ OPAIHUB_MainGroup:AddButton("OPAIHUB_RestoreStamina", {
 })
 
 -- Movement Tab
-local OPAIHUB_MovementGroup = OPAIHUB_Tabs.Movement:AddLeftGroupbox("OPAIHUB 移动绕过")
+local OPAIHUB_MovementGroup = OPAIHUB_Tabs.AntiLoophole:AddLeftGroupbox("OPAIHUB 移动绕过")
 
 OPAIHUB_MovementGroup:AddSlider("OPAIHUB_SpeedBoostValue", {
     Text = "速度倍率",
@@ -580,7 +664,7 @@ OPAIHUB_MovementGroup:AddToggle("OPAIHUB_NoliVoidRushBypass", {
 })
 
 -- Combat Tab
-local OPAIHUB_CombatGroup = OPAIHUB_Tabs.Combat:AddLeftGroupbox("OPAIHUB 战斗绕过")
+local OPAIHUB_CombatGroup = OPAIHUB_Tabs.AntiLoophole:AddRightGroupbox("OPAIHUB 战斗绕过")
 
 OPAIHUB_CombatGroup:AddLabel("OPAIHUB 战斗绕过功能")
 OPAIHUB_CombatGroup:AddDivider()
@@ -618,6 +702,185 @@ OPAIHUB_CombatGroup:AddToggle("OPAIHUB_PopupBypass", {
         end
     end
 })
+
+OPAIHUB_CombatGroup:AddDivider()
+
+-- 吸附杀戮光环设置
+local OPAIHUB_HitboxDistance = 3  -- 吸附距离（米）
+local OPAIHUB_HitboxTrackingEnabled = false
+
+OPAIHUB_CombatGroup:AddSlider("OPAIHUB_HitboxDistanceSlider", {
+    Text = "吸附距离",
+    Min = 1,
+    Max = 10,
+    Default = 3,
+    Rounding = 1,
+    Compact = false,
+    Callback = function(value)
+        OPAIHUB_HitboxDistance = value
+    end
+})
+
+OPAIHUB_CombatGroup:AddDivider()
+
+-- 吸附杀戮光环（杀手攻击时自动吸附）
+if not _G.OPAIHUB_HitboxTracking then
+    _G.OPAIHUB_HitboxTracking = {
+        Connection = nil,
+        Active = false
+    }
+end
+
+local OPAIHUB_AttackAnimations = {
+    'rbxassetid://131430497821198', -- MassInfection, 1x1x1x1
+    'rbxassetid://83829782357897', -- Slash, 1x1x1x1
+    'rbxassetid://126830014841198', -- Slash, Jason
+    'rbxassetid://126355327951215', -- Behead, Jason
+    'rbxassetid://121086746534252', -- GashingWoundStart, Jason
+    'rbxassetid://105458270463374', -- Slash, JohnDoe
+    'rbxassetid://127172483138092', -- CorruptEnergy, JohnDoe
+    'rbxassetid://18885919947', -- CorruptNature, c00lkidd
+    'rbxassetid://18885909645', -- Attack, c00lkidd
+    'rbxassetid://87259391926321', -- ParryPunch, Guest1337
+    'rbxassetid://106014898528300', -- Charge, Guest1337
+    'rbxassetid://86545133269813', -- Stab, TwoTime
+    'rbxassetid://89448354637442', -- LungeStart, TwoTime
+    'rbxassetid://90499469533503', -- GunFire, Chance
+    'rbxassetid://116618003477002', -- Slash, Shedletsky
+    'rbxassetid://106086955212611', -- Stab, TwoTime, Skin: PhilosopherTwotime
+    'rbxassetid://107640065977686', -- LungeStart, TwoTime, Skin: PhilosopherTwotime
+    'rbxassetid://77124578197357', -- GunFire, Chance, Skin: OutlawChance
+    'rbxassetid://101771617803133', -- GunFire, Chance, Skin: #CassidyChance
+    'rbxassetid://134958187822107', -- GunFire, Chance, Skin: RetroChance
+    'rbxassetid://111313169447787', -- GunFire, Chance, Skin: MLGChance
+    'rbxassetid://71685573690338', -- GunFire, Chance, Skin: Milestone100Chance
+    'rbxassetid://129843313690921', -- ParryPunch, Guest1337, Skin: #NerfedDemomanGuest
+    'rbxassetid://97623143664485', -- Charge, Guest1337, Skin: #NerfedDemomanGuest
+    'rbxassetid://136007065400978', -- ParryPunch, Guest1337, Skin: LittleBrotherGuest
+    'rbxassetid://86096387000557', -- ParryPunch, Guest1337, Skin: Milestone100Guest
+    'rbxassetid://108807732150251', -- ParryPunch, Guest1337, Skin: GreenbeltGuest
+    'rbxassetid://138040001965654', -- Punch, Guest1337, Skin: GreenbeltGuest
+    'rbxassetid://73502073176819', -- Charge, Guest1337, Skin: GreenbeltGuest
+    'rbxassetid://86709774283672', -- ParryPunch, Guest1337, Skin: SorcererGuest
+    'rbxassetid://140703210927645', -- ParryPunch, Guest1337, Skin: DragonGuest
+    'rbxassetid://96173857867228', -- Charge, Guest1337, Skin: AllyGuest
+    'rbxassetid://121255898612475', -- Slash, Shedletsky, Skin: RetroShedletsky
+    'rbxassetid://98031287364865', -- Slash, Shedletsky, Skin: BrightEyesShedletsky
+    'rbxassetid://119462383658044', -- Slash, Shedletsky, Skin: NessShedletsky
+    'rbxassetid://77448521277146', -- Slash, Shedletsky, Skin: Milestone100Shedletsky
+    'rbxassetid://103741352379819', -- Slash, Shedletsky, Skin: #RolandShedletsky
+    'rbxassetid://131696603025265', -- Slash, Shedletsky, Skin: JamesSunderlandShedletsky
+    'rbxassetid://122503338277352', -- Slash, Shedletsky, Skin: SkiesShedletsky
+    'rbxassetid://97648548303678', -- Slash, Shedletsky, Skin: #JohnWardShedletsky
+    'rbxassetid://94162446513587', -- Slash, JohnDoe, Skin: !Joner
+    'rbxassetid://84426150435898' -- CorruptEnergy, JohnDoe, Skin: !Joner
+}
+
+OPAIHUB_CombatGroup:AddToggle("OPAIHUB_HitboxTracking", {
+    Text = "吸附杀戮光环",
+    Tooltip = "攻击时全图追踪幸存者碰撞箱，持续对准确保准星准确（杀手专用）",
+    Default = false,
+    Callback = function(state)
+        if not state then
+            if _G.OPAIHUB_HitboxTracking.Connection then
+                _G.OPAIHUB_HitboxTracking.Connection:Disconnect()
+                _G.OPAIHUB_HitboxTracking.Connection = nil
+            end
+            _G.OPAIHUB_HitboxTracking.Active = false
+            OPAIHUB_Library:Notify("吸附杀戮光环已关闭", "停止碰撞箱追踪", 3)
+            return
+        end
+
+        repeat task.wait() until game:IsLoaded()
+
+        local Character = OPAIHUB_LocalPlayer.Character or OPAIHUB_LocalPlayer.CharacterAdded:Wait()
+        local Humanoid = Character:WaitForChild("Humanoid")
+        local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+        OPAIHUB_LocalPlayer.CharacterAdded:Connect(function(NewCharacter)
+            Character = NewCharacter
+            Humanoid = Character:WaitForChild("Humanoid")
+            HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+        end)
+
+        local function OPAIHUB_IsAttackAnimation(animationId)
+            for _, attackAnim in ipairs(OPAIHUB_AttackAnimations) do
+                if animationId == attackAnim then
+                    return true
+                end
+            end
+            return false
+        end
+
+        local function OPAIHUB_GetNearestPlayer()
+            local nearestPlayer = nil
+            local shortestDistance = math.huge
+
+            local survivorsFolder = OPAIHUB_Workspace:FindFirstChild("Players") and OPAIHUB_Workspace.Players:FindFirstChild("Survivors")
+            if not survivorsFolder then return nil end
+
+            for _, survivor in ipairs(survivorsFolder:GetChildren()) do
+                if typeof(survivor) == "Instance" and survivor:IsA("Model") and survivor ~= Character then
+                    local targetHRP = survivor:FindFirstChild("HumanoidRootPart")
+                    local targetHumanoid = survivor:FindFirstChildOfClass("Humanoid")
+
+                    if targetHRP and targetHumanoid and targetHumanoid.Health > 0 then
+                        local distance = (HumanoidRootPart.Position - targetHRP.Position).Magnitude
+                        if distance < shortestDistance then
+                            shortestDistance = distance
+                            nearestPlayer = survivor
+                        end
+                    end
+                end
+            end
+
+            return nearestPlayer, shortestDistance
+        end
+
+        _G.OPAIHUB_HitboxTracking.Active = true
+        _G.OPAIHUB_HitboxTracking.Connection = OPAIHUB_RunService.Heartbeat:Connect(function()
+            if not _G.OPAIHUB_HitboxTracking.Active then return end
+            if not Humanoid or not HumanoidRootPart then return end
+
+            local isPlayingAttackAnim = false
+            for _, track in ipairs(Humanoid:GetPlayingAnimationTracks()) do
+                if OPAIHUB_IsAttackAnimation(track.Animation.AnimationId) then
+                    isPlayingAttackAnim = true
+                    break
+                end
+            end
+
+            if isPlayingAttackAnim then
+                local nearestPlayer, distance = OPAIHUB_GetNearestPlayer()
+                
+                -- 全图范围，无距离限制
+                if nearestPlayer then
+                    local targetHRP = nearestPlayer:FindFirstChild("HumanoidRootPart")
+                    if targetHRP then
+                        -- 吸附到幸存者身边（可调节距离）
+                        local direction = (targetHRP.Position - HumanoidRootPart.Position).Unit
+                        local targetPosition = targetHRP.Position - (direction * OPAIHUB_HitboxDistance)
+                        
+                        -- 持续追踪：位置和视角都对准幸存者
+                        HumanoidRootPart.CFrame = CFrame.new(targetPosition, targetHRP.Position)
+                        
+                        -- 同时调整相机视角对准幸存者（确保准星对准）
+                        if OPAIHUB_Workspace.CurrentCamera then
+                            OPAIHUB_Workspace.CurrentCamera.CFrame = CFrame.new(
+                                OPAIHUB_Workspace.CurrentCamera.CFrame.Position,
+                                targetHRP.Position
+                            )
+                        end
+                    end
+                end
+            end
+        end)
+
+        OPAIHUB_Library:Notify("吸附杀戮光环已启用", "攻击时全图追踪幸存者（持续对准）", 3)
+    end
+})
+
+OPAIHUB_CombatGroup:AddLabel("提示: 杀戮光环在攻击动画播放时生效，全图范围持续追踪")
 
 OPAIHUB_CombatGroup:AddDivider()
 
@@ -981,44 +1244,7 @@ OPAIHUB_ESPGroup:AddToggle("OPAIHUB_RealGeneratorESP", {
         local lastScanTime = 0
         local maxGenerators = 20
         
-        local function OPAIHUB_UpdateGeneratorESP(gen, data)
-            if not gen or not gen.Parent or not gen:FindFirstChild("Main") then
-                return false
-            end
-            
-            -- 检查ESP对象是否还存在，如果不存在则重新创建
-            if not data.Billboard or not data.Billboard.Parent or
-               not data.DistanceBillboard or not data.DistanceBillboard.Parent or
-               not data.Highlight or not data.Highlight.Parent then
-                -- ESP对象丢失，重新创建
-                _G.OPAIHUB_RealGeneratorESP.Data[gen] = nil
-                OPAIHUB_CreateGeneratorESP(gen)
-                return true
-            end
-            
-            if gen:FindFirstChild("Progress") then
-                local progress = gen.Progress.Value
-                -- 只有完成度达到100%才移除
-                if progress >= 100 then
-                    return false
-                end
-                
-                if data.TextLabel and data.TextLabel.Parent then
-                    data.TextLabel.Text = string.format("真电机: %d%%", progress)
-                end
-                
-                local character = OPAIHUB_LocalPlayer.Character
-                local humanoidRootPart = character and character:FindFirstChild("HumanoidRootPart")
-                
-                if humanoidRootPart and data.DistanceLabel and data.DistanceLabel.Parent then
-                    local distance = (gen.Main.Position - humanoidRootPart.Position).Magnitude
-                    data.DistanceLabel.Text = string.format("距离: %d米", math.floor(distance))
-                end
-            end
-            
-            return true
-        end
-        
+        -- 先定义创建函数（被更新函数引用）
         local function OPAIHUB_CreateGeneratorESP(gen)
             if not gen or not gen.Parent or not gen:FindFirstChild("Main") then 
                 return 
@@ -1119,6 +1345,45 @@ OPAIHUB_ESPGroup:AddToggle("OPAIHUB_RealGeneratorESP", {
             end)
             
             table.insert(_G.OPAIHUB_RealGeneratorESP.Connections, destroyConnection)
+        end
+        
+        -- 定义更新函数（更新进度和距离）
+        local function OPAIHUB_UpdateGeneratorESP(gen, data)
+            if not gen or not gen.Parent or not gen:FindFirstChild("Main") then
+                return false
+            end
+            
+            -- 检查ESP对象是否还存在，如果不存在则重新创建
+            if not data.Billboard or not data.Billboard.Parent or
+               not data.DistanceBillboard or not data.DistanceBillboard.Parent or
+               not data.Highlight or not data.Highlight.Parent then
+                -- ESP对象丢失，重新创建
+                _G.OPAIHUB_RealGeneratorESP.Data[gen] = nil
+                OPAIHUB_CreateGeneratorESP(gen)
+                return true
+            end
+            
+            if gen:FindFirstChild("Progress") then
+                local progress = gen.Progress.Value
+                -- 只有完成度达到100%才移除
+                if progress >= 100 then
+                    return false
+                end
+                
+                if data.TextLabel and data.TextLabel.Parent then
+                    data.TextLabel.Text = string.format("真电机: %d%%", progress)
+                end
+                
+                local character = OPAIHUB_LocalPlayer.Character
+                local humanoidRootPart = character and character:FindFirstChild("HumanoidRootPart")
+                
+                if humanoidRootPart and data.DistanceLabel and data.DistanceLabel.Parent then
+                    local distance = (gen.Main.Position - humanoidRootPart.Position).Magnitude
+                    data.DistanceLabel.Text = string.format("距离: %d米", math.floor(distance))
+                end
+            end
+            
+            return true
         end
         
         local function OPAIHUB_ScanGenerators()
@@ -1634,9 +1899,10 @@ OPAIHUB_AutoGroup:AddToggle("OPAIHUB_AutoBlock", {
             end
             
             local function OPAIHUB_PerformBlock()
-                if os.clock() - OPAIHUB_LastBlockTime >= OPAIHUB_BlockCooldown then
+                local currentTime = tick()
+                if currentTime - OPAIHUB_LastBlockTime >= OPAIHUB_BlockCooldown then
                     OPAIHUB_RemoteEvent:FireServer("UseActorAbility", "Block")
-                    OPAIHUB_LastBlockTime = os.clock()
+                    OPAIHUB_LastBlockTime = currentTime
                 end
             end
             
@@ -1843,908 +2109,2101 @@ OPAIHUB_AutoGroup:AddToggle("OPAIHUB_AutoFlipCoins", {
 })
 
 -- Aimbot Tab - Survivor Aimbots
-local OPAIHUB_SurvivorAimbotGroup = OPAIHUB_Tabs.Aimbot:AddLeftGroupbox("OPAIHUB 幸存者自瞄")
+-- ============================================
+-- OPAIHUB 高级ESP功能
+-- ============================================
 
--- Distance Sliders
-local OPAIHUB_ChanceMaxDistance = 50
-local OPAIHUB_TwoTimeMaxDistance = 50
-local OPAIHUB_ShedletskyMaxDistance = 50
+-- 2D方框ESP
+local OPAIHUB_ESP2DBoxGroup = OPAIHUB_Tabs.ESP:AddRightGroupbox("OPAIHUB 2D方框ESP")
 
-OPAIHUB_SurvivorAimbotGroup:AddSlider("OPAIHUB_ChanceDistance", {
-    Text = "机会自瞄距离",
-    Default = 50,
-    Min = 10,
-    Max = 150,
-    Rounding = 1,
-    Compact = false,
-    Callback = function(value)
-        OPAIHUB_ChanceMaxDistance = value
-    end
-})
+local OPAIHUB_SurvivorESPConnection = nil
+local OPAIHUB_SurvivorAddedConnection = nil
+local OPAIHUB_KillerESPConnection = nil
+local OPAIHUB_KillerAddedConnection = nil
 
-OPAIHUB_SurvivorAimbotGroup:AddSlider("OPAIHUB_TwoTimeDistance", {
-    Text = "TwoTime自瞄距离",
-    Default = 50,
-    Min = 10,
-    Max = 150,
-    Rounding = 1,
-    Compact = false,
-    Callback = function(value)
-        OPAIHUB_TwoTimeMaxDistance = value
-    end
-})
-
-OPAIHUB_SurvivorAimbotGroup:AddSlider("OPAIHUB_ShedletskyDistance", {
-    Text = "Shedletsky自瞄距离",
-    Default = 50,
-    Min = 10,
-    Max = 150,
-    Rounding = 1,
-    Compact = false,
-    Callback = function(value)
-        OPAIHUB_ShedletskyMaxDistance = value
-    end
-})
-
--- Chance Aimbot
-local OPAIHUB_ChanceAimbotEnabled = false
-local OPAIHUB_ChanceAimbotConnection = nil
-
-OPAIHUB_SurvivorAimbotGroup:AddDivider()
-OPAIHUB_SurvivorAimbotGroup:AddToggle("OPAIHUB_ChanceAimbot", {
-    Text = "机会自瞄",
+OPAIHUB_ESP2DBoxGroup:AddToggle("OPAIHUB_Survivor2DBox", {
+    Text = "绘制幸存者方框",
     Default = false,
-    Callback = function(state)
-        OPAIHUB_ChanceAimbotEnabled = state
-        if state then
-            if OPAIHUB_LocalPlayer.Character and OPAIHUB_LocalPlayer.Character.Name ~= "Chance" then
-                OPAIHUB_Library:Notify("错误", "你用的角色不是Chance，无法生效", 3)
-                return
-            end
-            
-            local OPAIHUB_RemoteEvent = OPAIHUB_ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Network"):WaitForChild("RemoteEvent")
-            
-            OPAIHUB_ChanceAimbotConnection = OPAIHUB_RemoteEvent.OnClientEvent:Connect(function(...)
-                local args = {...}
-                if args[1] == "UseActorAbility" and args[2] == "Shoot" then 
-                    local killerContainer = OPAIHUB_Workspace.Players:FindFirstChild("Killers")
-                    if killerContainer then 
-                        local killer = killerContainer:FindFirstChildOfClass("Model")
-                        if killer and killer:FindFirstChild("HumanoidRootPart") then 
-                            local killerHRP = killer.HumanoidRootPart
-                            local playerHRP = OPAIHUB_LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                            if playerHRP then 
-                                local distance = (killerHRP.Position - playerHRP.Position).Magnitude
-                                if distance <= OPAIHUB_ChanceMaxDistance then
-                                    local TMP = 0.35
-                                    local AMD = 2
-                                    local endTime = tick() + AMD
-                                    while tick() < endTime do
-                                        OPAIHUB_RunService.RenderStepped:Wait()
-                                        OPAIHUB_LocalPlayer.Character.HumanoidRootPart.CFrame = killerHRP.CFrame + Vector3.new(0, 0, -2)
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end)
-            OPAIHUB_Library:Notify("机会自瞄已启用", "机会自瞄已激活", 3)
-        else
-            if OPAIHUB_ChanceAimbotConnection then
-                OPAIHUB_ChanceAimbotConnection:Disconnect()
-                OPAIHUB_ChanceAimbotConnection = nil
-            end
-            OPAIHUB_Library:Notify("机会自瞄已关闭", "机会自瞄已停用", 3)
-        end
-    end
-})
-
--- TwoTime Aimbot
-local OPAIHUB_TwoTimeAimbotEnabled = false
-local OPAIHUB_TwoTimeAimbotConnection = nil
-
-OPAIHUB_SurvivorAimbotGroup:AddToggle("OPAIHUB_TwoTimeAimbot", {
-    Text = "TwoTime自瞄",
-    Default = false,
-    Callback = function(state)
-        OPAIHUB_TwoTimeAimbotEnabled = state
-        if state then
-            if OPAIHUB_LocalPlayer.Character and OPAIHUB_LocalPlayer.Character.Name ~= "TwoTime" then
-                OPAIHUB_Library:Notify("错误", "你的角色不是TwoTime，无法生效", 3)
-                return 
-            end
-            
-            local OPAIHUB_TWOsounds = {
-                "rbxassetid://86710781315432",
-                "rbxassetid://99820161736138"
-            }
-            
-            OPAIHUB_TwoTimeAimbotConnection = OPAIHUB_LocalPlayer.Character.HumanoidRootPart.ChildAdded:Connect(function(child)
-                if not OPAIHUB_TwoTimeAimbotEnabled then return end
-                for _, v in pairs(OPAIHUB_TWOsounds) do
-                    if child.Name == v then
-                        local survivors = {}
-                        for _, player in pairs(OPAIHUB_Players:GetPlayers()) do
-                            if player ~= OPAIHUB_LocalPlayer then
-                                local character = player.Character
-                                if character and character:FindFirstChild("HumanoidRootPart") then
-                                    table.insert(survivors, character)
-                                end
-                            end
-                        end
-                        
-                        local nearestSurvivor = nil
-                        local shortestDistance = math.huge
-                        
-                        for _, survivor in pairs(survivors) do
-                            local survivorHRP = survivor.HumanoidRootPart
-                            local playerHRP = OPAIHUB_LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                            
-                            if playerHRP then
-                                local distance = (survivorHRP.Position - playerHRP.Position).Magnitude
-                                if distance < shortestDistance and distance <= OPAIHUB_TwoTimeMaxDistance then
-                                    shortestDistance = distance
-                                    nearestSurvivor = survivor
-                                end
-                            end
-                        end
-                        
-                        if nearestSurvivor then
-                            local nearestHRP = nearestSurvivor.HumanoidRootPart
-                            local playerHRP = OPAIHUB_LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                            
-                            if playerHRP then
-                                local num = 1
-                                local maxIterations = 100
-                                
-                                if child.Name == "rbxassetid://79782181585087" then
-                                    maxIterations = 220
-                                end
-                                
-                                while num <= maxIterations do
-                                    task.wait(0.01)
-                                    num = num + 1
-                                    OPAIHUB_Workspace.CurrentCamera.CFrame = CFrame.new(OPAIHUB_Workspace.CurrentCamera.CFrame.Position, nearestHRP.Position)
-                                    playerHRP.CFrame = CFrame.lookAt(playerHRP.Position, Vector3.new(nearestHRP.Position.X, nearestHRP.Position.Y, nearestHRP.Position.Z))
-                                end
-                            end
-                        end
-                    end
-                end
-            end)
-            OPAIHUB_Library:Notify("TwoTime自瞄已启用", "TwoTime自瞄已激活", 3)
-        else
-            if OPAIHUB_TwoTimeAimbotConnection then
-                OPAIHUB_TwoTimeAimbotConnection:Disconnect()
-                OPAIHUB_TwoTimeAimbotConnection = nil
-            end
-            OPAIHUB_Library:Notify("TwoTime自瞄已关闭", "TwoTime自瞄已停用", 3)
-        end
-    end
-})
-
--- Shedletsky Aimbot
-local OPAIHUB_ShedletskyAimbotEnabled = false
-local OPAIHUB_ShedletskyAimbotConnection = nil
-
-OPAIHUB_SurvivorAimbotGroup:AddToggle("OPAIHUB_ShedletskyAimbot", {
-    Text = "Shedletsky自瞄",
-    Default = false,
-    Callback = function(state)
-        OPAIHUB_ShedletskyAimbotEnabled = state
-        if state then
-            if OPAIHUB_LocalPlayer.Character and OPAIHUB_LocalPlayer.Character.Name ~= "Shedletsky" then
-                OPAIHUB_Library:Notify("错误", "你的角色不是Shedletsky，无法生效", 3)
-                return
-            end
-            
-            OPAIHUB_ShedletskyAimbotConnection = OPAIHUB_LocalPlayer.Character.Sword.ChildAdded:Connect(function(child)
-                if not OPAIHUB_ShedletskyAimbotEnabled then return end
-                if child:IsA("Sound") then 
-                    local FAN = child.Name
-                    if FAN == "rbxassetid://12222225" or FAN == "83851356262523" then 
-                        local killersFolder = OPAIHUB_Workspace.Players:FindFirstChild("Killers")
-                        if killersFolder then 
-                            local killer = killersFolder:FindFirstChildOfClass("Model")
-                            if killer and killer:FindFirstChild("HumanoidRootPart") then 
-                                local killerHRP = killer.HumanoidRootPart
-                                local playerHRP = OPAIHUB_LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                                if playerHRP then 
-                                    local distance = (killerHRP.Position - playerHRP.Position).Magnitude
-                                    if distance <= OPAIHUB_ShedletskyMaxDistance then
-                                        local num = 1
-                                        local maxIterations = 100
-                                        while num <= maxIterations do
-                                            task.wait(0.01)
-                                            num = num + 1
-                                            OPAIHUB_Workspace.CurrentCamera.CFrame = CFrame.new(OPAIHUB_Workspace.CurrentCamera.CFrame.Position, killerHRP.Position)
-                                            playerHRP.CFrame = CFrame.lookAt(playerHRP.Position, killerHRP.Position)
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end)
-            OPAIHUB_Library:Notify("Shedletsky自瞄已启用", "Shedletsky自瞄已激活", 3)
-        else
-            if OPAIHUB_ShedletskyAimbotConnection then
-                OPAIHUB_ShedletskyAimbotConnection:Disconnect()
-                OPAIHUB_ShedletskyAimbotConnection = nil
-            end
-            OPAIHUB_Library:Notify("Shedletsky自瞄已关闭", "Shedletsky自瞄已停用", 3)
-        end
-    end
-})
-
--- Killer Aimbot Group
-local OPAIHUB_KillerAimbotGroup = OPAIHUB_Tabs.Aimbot:AddRightGroupbox("OPAIHUB 杀手自瞄")
-
-local OPAIHUB_X1X4MaxDistance = 50
-local OPAIHUB_CoolMaxDistance = 50
-local OPAIHUB_JohnMaxDistance = 50
-local OPAIHUB_JasonMaxDistance = 50
-
-OPAIHUB_KillerAimbotGroup:AddSlider("OPAIHUB_X1X4Distance", {
-    Text = "1x4自瞄距离",
-    Default = 50,
-    Min = 10,
-    Max = 150,
-    Rounding = 1,
-    Compact = false,
-    Callback = function(value)
-        OPAIHUB_X1X4MaxDistance = value
-    end
-})
-
-OPAIHUB_KillerAimbotGroup:AddSlider("OPAIHUB_CoolDistance", {
-    Text = "酷小孩自瞄距离",
-    Default = 50,
-    Min = 10,
-    Max = 150,
-    Rounding = 1,
-    Compact = false,
-    Callback = function(value)
-        OPAIHUB_CoolMaxDistance = value
-    end
-})
-
-OPAIHUB_KillerAimbotGroup:AddSlider("OPAIHUB_JohnDistance", {
-    Text = "John自瞄距离",
-    Default = 50,
-    Min = 10,
-    Max = 150,
-    Rounding = 1,
-    Compact = false,
-    Callback = function(value)
-        OPAIHUB_JohnMaxDistance = value
-    end
-})
-
-OPAIHUB_KillerAimbotGroup:AddSlider("OPAIHUB_JasonDistance", {
-    Text = "Jason自瞄距离",
-    Default = 50,
-    Min = 10,
-    Max = 150,
-    Rounding = 1,
-    Compact = false,
-    Callback = function(value)
-        OPAIHUB_JasonMaxDistance = value
-    end
-})
-
--- 1x4 Aimbot
-local OPAIHUB_X1X4AimbotEnabled = false
-local OPAIHUB_X1X4AimbotConnection = nil
-
-OPAIHUB_KillerAimbotGroup:AddDivider()
-OPAIHUB_KillerAimbotGroup:AddToggle("OPAIHUB_X1X4Aimbot", {
-    Text = "1x4自瞄",
-    Default = false,
-    Callback = function(state)
-        OPAIHUB_X1X4AimbotEnabled = state
-        if state then
-            if OPAIHUB_LocalPlayer.Character and OPAIHUB_LocalPlayer.Character.Name ~= "1x1x1x1" then
-                OPAIHUB_Library:Notify("错误", "你的角色不是1x1x1x1，无法生效", 3)
-                return
-            end
-            
-            local OPAIHUB_X1X4Sounds = {
-                "rbxassetid://86710781315432",
-                "rbxassetid://99820161736138"
-            }
-            
-            OPAIHUB_X1X4AimbotConnection = OPAIHUB_LocalPlayer.Character.HumanoidRootPart.ChildAdded:Connect(function(child)
-                if not OPAIHUB_X1X4AimbotEnabled then return end
-                for _, v in pairs(OPAIHUB_X1X4Sounds) do
-                    if child.Name == v then
-                        local survivors = {}
-                        for _, player in pairs(OPAIHUB_Players:GetPlayers()) do
-                            if player ~= OPAIHUB_LocalPlayer then
-                                local character = player.Character
-                                if character and character:FindFirstChild("HumanoidRootPart") then
-                                    table.insert(survivors, character)
-                                end
-                            end
-                        end
-                        
-                        local nearestSurvivor = nil
-                        local shortestDistance = math.huge
-                        
-                        for _, survivor in pairs(survivors) do
-                            local survivorHRP = survivor.HumanoidRootPart
-                            local playerHRP = OPAIHUB_LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                            
-                            if playerHRP then
-                                local distance = (survivorHRP.Position - playerHRP.Position).Magnitude
-                                if distance < shortestDistance and distance <= OPAIHUB_X1X4MaxDistance then
-                                    shortestDistance = distance
-                                    nearestSurvivor = survivor
-                                end
-                            end
-                        end
-                        
-                        if nearestSurvivor then
-                            local nearestHRP = nearestSurvivor.HumanoidRootPart
-                            local playerHRP = OPAIHUB_LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                            
-                            if playerHRP then
-                                local num = 1
-                                local maxIterations = 100
-                                
-                                while num <= maxIterations do
-                                    task.wait(0.01)
-                                    num = num + 1
-                                    OPAIHUB_Workspace.CurrentCamera.CFrame = CFrame.new(OPAIHUB_Workspace.CurrentCamera.CFrame.Position, nearestHRP.Position)
-                                    playerHRP.CFrame = CFrame.lookAt(playerHRP.Position, Vector3.new(nearestHRP.Position.X, nearestHRP.Position.Y, nearestHRP.Position.Z))
-                                end
-                            end
-                        end
-                    end
-                end
-            end)
-            OPAIHUB_Library:Notify("1x4自瞄已启用", "1x4自瞄已激活", 3)
-        else
-            if OPAIHUB_X1X4AimbotConnection then
-                OPAIHUB_X1X4AimbotConnection:Disconnect()
-                OPAIHUB_X1X4AimbotConnection = nil
-            end
-            OPAIHUB_Library:Notify("1x4自瞄已关闭", "1x4自瞄已停用", 3)
-        end
-    end
-})
-
--- Cool Aimbot
-local OPAIHUB_CoolAimbotEnabled = false
-local OPAIHUB_CoolAimbotConnection = nil
-
-OPAIHUB_KillerAimbotGroup:AddToggle("OPAIHUB_CoolAimbot", {
-    Text = "酷小孩自瞄",
-    Default = false,
-    Callback = function(state)
-        OPAIHUB_CoolAimbotEnabled = state
-        if state then
-            if OPAIHUB_LocalPlayer.Character and OPAIHUB_LocalPlayer.Character.Name ~= "c00lkidd" then
-                OPAIHUB_Library:Notify("错误", "你的角色不是c00lkidd，无法生效", 3)
-                return
-            end
-            
-            local OPAIHUB_CoolSounds = {
-                "rbxassetid://86710781315432",
-                "rbxassetid://99820161736138"
-            }
-            
-            OPAIHUB_CoolAimbotConnection = OPAIHUB_LocalPlayer.Character.HumanoidRootPart.ChildAdded:Connect(function(child)
-                if not OPAIHUB_CoolAimbotEnabled then return end
-                for _, v in pairs(OPAIHUB_CoolSounds) do
-                    if child.Name == v then
-                        local survivors = {}
-                        for _, player in pairs(OPAIHUB_Players:GetPlayers()) do
-                            if player ~= OPAIHUB_LocalPlayer then
-                                local character = player.Character
-                                if character and character:FindFirstChild("HumanoidRootPart") then
-                                    table.insert(survivors, character)
-                                end
-                            end
-                        end
-                        
-                        local nearestSurvivor = nil
-                        local shortestDistance = math.huge
-                        
-                        for _, survivor in pairs(survivors) do
-                            local survivorHRP = survivor.HumanoidRootPart
-                            local playerHRP = OPAIHUB_LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                            
-                            if playerHRP then
-                                local distance = (survivorHRP.Position - playerHRP.Position).Magnitude
-                                if distance < shortestDistance and distance <= OPAIHUB_CoolMaxDistance then
-                                    shortestDistance = distance
-                                    nearestSurvivor = survivor
-                                end
-                            end
-                        end
-                        
-                        if nearestSurvivor then
-                            local nearestHRP = nearestSurvivor.HumanoidRootPart
-                            local playerHRP = OPAIHUB_LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                            
-                            if playerHRP then
-                                local num = 1
-                                local maxIterations = 100
-                                
-                                while num <= maxIterations do
-                                    task.wait(0.01)
-                                    num = num + 1
-                                    OPAIHUB_Workspace.CurrentCamera.CFrame = CFrame.new(OPAIHUB_Workspace.CurrentCamera.CFrame.Position, nearestHRP.Position)
-                                    playerHRP.CFrame = CFrame.lookAt(playerHRP.Position, Vector3.new(nearestHRP.Position.X, nearestHRP.Position.Y, nearestHRP.Position.Z))
-                                end
-                            end
-                        end
-                    end
-                end
-            end)
-            OPAIHUB_Library:Notify("酷小孩自瞄已启用", "酷小孩自瞄已激活", 3)
-        else
-            if OPAIHUB_CoolAimbotConnection then
-                OPAIHUB_CoolAimbotConnection:Disconnect()
-                OPAIHUB_CoolAimbotConnection = nil
-            end
-            OPAIHUB_Library:Notify("酷小孩自瞄已关闭", "酷小孩自瞄已停用", 3)
-        end
-    end
-})
-
--- John Aimbot
-local OPAIHUB_JohnAimbotEnabled = false
-local OPAIHUB_JohnAimbotConnection = nil
-
-OPAIHUB_KillerAimbotGroup:AddToggle("OPAIHUB_JohnAimbot", {
-    Text = "John自瞄",
-    Default = false,
-    Callback = function(state)
-        OPAIHUB_JohnAimbotEnabled = state
-        if state then
-            if OPAIHUB_LocalPlayer.Character and OPAIHUB_LocalPlayer.Character.Name ~= "JohnDoe" then
-                OPAIHUB_Library:Notify("错误", "你的角色不是JohnDoe，无法生效", 3)
-                return
-            end
-            
-            local OPAIHUB_JohnSounds = {
-                "rbxassetid://86710781315432",
-                "rbxassetid://99820161736138"
-            }
-            
-            OPAIHUB_JohnAimbotConnection = OPAIHUB_LocalPlayer.Character.HumanoidRootPart.ChildAdded:Connect(function(child)
-                if not OPAIHUB_JohnAimbotEnabled then return end
-                for _, v in pairs(OPAIHUB_JohnSounds) do
-                    if child.Name == v then
-                        local survivors = {}
-                        for _, player in pairs(OPAIHUB_Players:GetPlayers()) do
-                            if player ~= OPAIHUB_LocalPlayer then
-                                local character = player.Character
-                                if character and character:FindFirstChild("HumanoidRootPart") then
-                                    table.insert(survivors, character)
-                                end
-                            end
-                        end
-                        
-                        local nearestSurvivor = nil
-                        local shortestDistance = math.huge
-                        
-                        for _, survivor in pairs(survivors) do
-                            local survivorHRP = survivor.HumanoidRootPart
-                            local playerHRP = OPAIHUB_LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                            
-                            if playerHRP then
-                                local distance = (survivorHRP.Position - playerHRP.Position).Magnitude
-                                if distance < shortestDistance and distance <= OPAIHUB_JohnMaxDistance then
-                                    shortestDistance = distance
-                                    nearestSurvivor = survivor
-                                end
-                            end
-                        end
-                        
-                        if nearestSurvivor then
-                            local nearestHRP = nearestSurvivor.HumanoidRootPart
-                            local playerHRP = OPAIHUB_LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                            
-                            if playerHRP then
-                                local num = 1
-                                local maxIterations = 100
-                                
-                                while num <= maxIterations do
-                                    task.wait(0.01)
-                                    num = num + 1
-                                    OPAIHUB_Workspace.CurrentCamera.CFrame = CFrame.new(OPAIHUB_Workspace.CurrentCamera.CFrame.Position, nearestHRP.Position)
-                                    playerHRP.CFrame = CFrame.lookAt(playerHRP.Position, Vector3.new(nearestHRP.Position.X, nearestHRP.Position.Y, nearestHRP.Position.Z))
-                                end
-                            end
-                        end
-                    end
-                end
-            end)
-            OPAIHUB_Library:Notify("John自瞄已启用", "John自瞄已激活", 3)
-        else
-            if OPAIHUB_JohnAimbotConnection then
-                OPAIHUB_JohnAimbotConnection:Disconnect()
-                OPAIHUB_JohnAimbotConnection = nil
-            end
-            OPAIHUB_Library:Notify("John自瞄已关闭", "John自瞄已停用", 3)
-        end
-    end
-})
-
--- Jason Aimbot
-local OPAIHUB_JasonAimbotEnabled = false
-local OPAIHUB_JasonAimbotConnection = nil
-
-OPAIHUB_KillerAimbotGroup:AddToggle("OPAIHUB_JasonAimbot", {
-    Text = "Jason自瞄",
-    Default = false,
-    Callback = function(state)
-        OPAIHUB_JasonAimbotEnabled = state
-        if state then
-            if OPAIHUB_LocalPlayer.Character and OPAIHUB_LocalPlayer.Character.Name ~= "Jason" then
-                OPAIHUB_Library:Notify("错误", "你的角色不是Jason，无法生效", 3)
-                return
-            end
-            
-            local OPAIHUB_JasonSounds = {
-                "rbxassetid://86710781315432",
-                "rbxassetid://99820161736138"
-            }
-            
-            OPAIHUB_JasonAimbotConnection = OPAIHUB_LocalPlayer.Character.HumanoidRootPart.ChildAdded:Connect(function(child)
-                if not OPAIHUB_JasonAimbotEnabled then return end
-                for _, v in pairs(OPAIHUB_JasonSounds) do
-                    if child.Name == v then
-                        local survivors = {}
-                        for _, player in pairs(OPAIHUB_Players:GetPlayers()) do
-                            if player ~= OPAIHUB_LocalPlayer then
-                                local character = player.Character
-                                if character and character:FindFirstChild("HumanoidRootPart") then
-                                    table.insert(survivors, character)
-                                end
-                            end
-                        end
-                        
-                        local nearestSurvivor = nil
-                        local shortestDistance = math.huge
-                        
-                        for _, survivor in pairs(survivors) do
-                            local survivorHRP = survivor.HumanoidRootPart
-                            local playerHRP = OPAIHUB_LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                            
-                            if playerHRP then
-                                local distance = (survivorHRP.Position - playerHRP.Position).Magnitude
-                                if distance < shortestDistance and distance <= OPAIHUB_JasonMaxDistance then
-                                    shortestDistance = distance
-                                    nearestSurvivor = survivor
-                                end
-                            end
-                        end
-                        
-                        if nearestSurvivor then
-                            local nearestHRP = nearestSurvivor.HumanoidRootPart
-                            local playerHRP = OPAIHUB_LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                            
-                            if playerHRP then
-                                local num = 1
-                                local maxIterations = 100
-                                
-                                while num <= maxIterations do
-                                    task.wait(0.01)
-                                    num = num + 1
-                                    OPAIHUB_Workspace.CurrentCamera.CFrame = CFrame.new(OPAIHUB_Workspace.CurrentCamera.CFrame.Position, nearestHRP.Position)
-                                    playerHRP.CFrame = CFrame.lookAt(playerHRP.Position, Vector3.new(nearestHRP.Position.X, nearestHRP.Position.Y, nearestHRP.Position.Z))
-                                end
-                            end
-                        end
-                    end
-                end
-            end)
-            OPAIHUB_Library:Notify("Jason自瞄已启用", "Jason自瞄已激活", 3)
-        else
-            if OPAIHUB_JasonAimbotConnection then
-                OPAIHUB_JasonAimbotConnection:Disconnect()
-                OPAIHUB_JasonAimbotConnection = nil
-            end
-            OPAIHUB_Library:Notify("Jason自瞄已关闭", "Jason自瞄已停用", 3)
-        end
-    end
-})
-
--- John Doe Auto 404
-local OPAIHUB_JohnDoeAuto404Enabled = false
-local OPAIHUB_JohnDoeAuto404Connection = nil
-
-OPAIHUB_CombatGroup:AddDivider()
-OPAIHUB_CombatGroup:AddToggle("OPAIHUB_JohnDoeAuto404", {
-    Text = "John自动404",
-    Default = false,
-    Tooltip = "检测动画自动触发404错误技能",
     Callback = function(v)
-        OPAIHUB_JohnDoeAuto404Enabled = v
         if v then
-            local OPAIHUB_RANGE = 19
-            local OPAIHUB_SPAM_DURATION = 3
-            local OPAIHUB_COOLDOWN_TIME = 5
-            local OPAIHUB_ActiveCooldowns = {}
+            local survivorsFolder = OPAIHUB_Workspace:WaitForChild("Players"):WaitForChild("Survivors")
             
-            local OPAIHUB_AnimsToDetect = {
-                ["116618003477002"] = true,
-                ["119462383658044"] = true,
-                ["131696603025265"] = true,
-                ["121255898612475"] = true,
-                ["133491532453922"] = true,
-                ["103601716322988"] = true,
-                ["86371356500204"] = true,
-                ["72722244508749"] = false,
-                ["87259391926321"] = true,
-                ["96959123077498"] = false,
-                ["86709774283672"] = true,
-                ["77448521277146"] = true,
-            }
-            
-            local function OPAIHUB_Fire404Error()
-                local args = { "UseActorAbility", "404Error" }
-                OPAIHUB_ReplicatedStorage:WaitForChild("Modules")
-                    :WaitForChild("Network")
-                    :WaitForChild("RemoteEvent")
-                    :FireServer(unpack(args))
+            local function OPAIHUB_CreateSurvivorESP(model, color)
+                if not model:IsA("Model") then return end
+                if model == OPAIHUB_LocalPlayer.Character then return end
+                local hrp = model:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+                if hrp:FindFirstChild("OPAIHUB_playeresp") then return end
+                
+                local billboard = Instance.new("BillboardGui")
+                billboard.Name = "OPAIHUB_playeresp"
+                billboard.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+                billboard.Active = true
+                billboard.AlwaysOnTop = true
+                billboard.LightInfluence = 1.000
+                billboard.Size = UDim2.new(3, 0, 5, 0)
+                billboard.Adornee = hrp
+                billboard.Parent = hrp
+                
+                local frame = Instance.new("Frame")
+                frame.Name = "playershow"
+                frame.BackgroundColor3 = Color3.fromRGB(255, 25, 25)
+                frame.BackgroundTransparency = 1
+                frame.Size = UDim2.new(1, 0, 1, 0)
+                frame.Parent = billboard
+                
+                local stroke = Instance.new("UIStroke")
+                stroke.Color = color
+                stroke.Thickness = 2
+                stroke.Transparency = 0.2
+                stroke.Parent = frame
             end
             
-            local function OPAIHUB_IsAnimationMatching(anim)
-                local id = tostring(anim.Animation and anim.Animation.AnimationId or "")
-                local numId = id:match("%d+")
-                return OPAIHUB_AnimsToDetect[numId] or false
-            end
-            
-            OPAIHUB_JohnDoeAuto404Connection = OPAIHUB_RunService.Heartbeat:Connect(function()
-                for _, player in ipairs(OPAIHUB_Players:GetPlayers()) do
-                    if player ~= OPAIHUB_LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                        local targetHRP = player.Character.HumanoidRootPart
-                        local myChar = OPAIHUB_LocalPlayer.Character
-                        if myChar and myChar:FindFirstChild("HumanoidRootPart") then
-                            local dist = (targetHRP.Position - myChar.HumanoidRootPart.Position).Magnitude
-                            if dist <= OPAIHUB_RANGE and (not OPAIHUB_ActiveCooldowns[player] or tick() - OPAIHUB_ActiveCooldowns[player] >= OPAIHUB_COOLDOWN_TIME) then
-                                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-                                if humanoid then
-                                    for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
-                                        if OPAIHUB_IsAnimationMatching(track) then
-                                            OPAIHUB_ActiveCooldowns[player] = tick()
-                                            task.spawn(function()
-                                                local startTime = tick()
-                                                while tick() - startTime < OPAIHUB_SPAM_DURATION do
-                                                    OPAIHUB_Fire404Error()
-                                                    task.wait(0.05)
-                                                end
-                                            end)
-                                            break
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
+            OPAIHUB_SurvivorESPConnection = OPAIHUB_RunService.RenderStepped:Connect(function()
+                for _, survivor in ipairs(survivorsFolder:GetChildren()) do
+                    OPAIHUB_CreateSurvivorESP(survivor, Color3.fromRGB(0, 255, 0))
                 end
             end)
-            OPAIHUB_Library:Notify("John自动404已启用", "自动404系统已激活", 3)
+            
+            OPAIHUB_SurvivorAddedConnection = survivorsFolder.ChildAdded:Connect(function(survivor)
+                OPAIHUB_CreateSurvivorESP(survivor, Color3.fromRGB(0, 255, 0))
+            end)
         else
-            if OPAIHUB_JohnDoeAuto404Connection then
-                OPAIHUB_JohnDoeAuto404Connection:Disconnect()
-                OPAIHUB_JohnDoeAuto404Connection = nil
+            if OPAIHUB_SurvivorESPConnection then
+                OPAIHUB_SurvivorESPConnection:Disconnect()
+                OPAIHUB_SurvivorESPConnection = nil
             end
-            OPAIHUB_Library:Notify("John自动404已关闭", "自动404系统已停用", 3)
+            if OPAIHUB_SurvivorAddedConnection then
+                OPAIHUB_SurvivorAddedConnection:Disconnect()
+                OPAIHUB_SurvivorAddedConnection = nil
+            end
+            
+            local survivorsFolder = OPAIHUB_Workspace:WaitForChild("Players"):WaitForChild("Survivors")
+            for _, survivor in ipairs(survivorsFolder:GetChildren()) do
+                if survivor:IsA("Model") then
+                    local hrp = survivor:FindFirstChild("HumanoidRootPart")
+                    if hrp and hrp:FindFirstChild("OPAIHUB_playeresp") then
+                        hrp.OPAIHUB_playeresp:Destroy()
+                    end
+                end
+            end
         end
     end
 })
 
--- FOV Settings
-local OPAIHUB_FOVGroup = OPAIHUB_Tabs.Visual:AddRightGroupbox("OPAIHUB 视野设置")
-
-local OPAIHUB_FOVValue = 70
-local OPAIHUB_FOVEnabled = false
-
-OPAIHUB_FOVGroup:AddSlider("OPAIHUB_FOVValue", {
-    Text = "视野范围",
-    Min = 70,
-    Default = 70,
-    Max = 120,
-    Rounding = 1,
-    Compact = true,
-    Callback = function(v)
-        OPAIHUB_FOVValue = v
-    end
-})
-
-OPAIHUB_FOVGroup:AddToggle("OPAIHUB_FOV", {
-    Text = "应用视野范围",
+OPAIHUB_ESP2DBoxGroup:AddToggle("OPAIHUB_Killer2DBox", {
+    Text = "绘制杀手方框",
     Default = false,
     Callback = function(v)
-        OPAIHUB_FOVEnabled = v
         if v then
-            OPAIHUB_RunService.RenderStepped:Connect(function()
-                if OPAIHUB_FOVEnabled then
-                    OPAIHUB_Workspace.Camera.FieldOfView = OPAIHUB_FOVValue
+            local killersFolder = OPAIHUB_Workspace:WaitForChild("Players"):WaitForChild("Killers")
+            
+            local function OPAIHUB_CreateKillerESP(model, color)
+                if not model:IsA("Model") then return end
+                if model == OPAIHUB_LocalPlayer.Character then return end
+                local hrp = model:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+                if hrp:FindFirstChild("OPAIHUB_playeresp") then return end
+                
+                local billboard = Instance.new("BillboardGui")
+                billboard.Name = "OPAIHUB_playeresp"
+                billboard.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+                billboard.Active = true
+                billboard.AlwaysOnTop = true
+                billboard.LightInfluence = 1.000
+                billboard.Size = UDim2.new(3, 0, 5, 0)
+                billboard.Adornee = hrp
+                billboard.Parent = hrp
+                
+                local frame = Instance.new("Frame")
+                frame.Name = "playershow"
+                frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                frame.BackgroundTransparency = 1
+                frame.Size = UDim2.new(1, 0, 1, 0)
+                frame.Parent = billboard
+                
+                local stroke = Instance.new("UIStroke")
+                stroke.Color = color
+                stroke.Thickness = 2
+                stroke.Transparency = 0.2
+                stroke.Parent = frame
+            end
+            
+            OPAIHUB_KillerESPConnection = OPAIHUB_RunService.RenderStepped:Connect(function()
+                for _, killer in ipairs(killersFolder:GetChildren()) do
+                    OPAIHUB_CreateKillerESP(killer, Color3.fromRGB(255, 0, 0))
                 end
             end)
-        end
-    end
-})
-
--- Anti-Loophole Tab
-local OPAIHUB_AntiLoopholeGroup = OPAIHUB_Tabs.AntiLoophole:AddLeftGroupbox("OPAIHUB 反作弊效果")
-
-OPAIHUB_AntiLoopholeGroup:AddLabel("OPAIHUB 反作弊效果功能")
-OPAIHUB_AntiLoopholeGroup:AddDivider()
-
-OPAIHUB_AntiLoopholeGroup:AddLabel("这些功能帮助绕过游戏漏洞")
-OPAIHUB_AntiLoopholeGroup:AddLabel("并防止不必要的效果")
-
--- 调试功能组
-local OPAIHUB_DebugGroup = OPAIHUB_Tabs.Aimbot:AddRightGroupbox("OPAIHUB 自瞄调试")
-
-local OPAIHUB_DebugModeEnabled = false
-local OPAIHUB_DebugConnection = nil
-
-OPAIHUB_DebugGroup:AddToggle("OPAIHUB_DebugMode", {
-    Text = "调试模式",
-    Default = false,
-    Tooltip = "显示自瞄触发信息和检测到的声音ID",
-    Callback = function(v)
-        OPAIHUB_DebugModeEnabled = v
-        if v then
-            if OPAIHUB_LocalPlayer.Character and OPAIHUB_LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                OPAIHUB_DebugConnection = OPAIHUB_LocalPlayer.Character.HumanoidRootPart.ChildAdded:Connect(function(child)
-                    if typeof(child) == "Instance" then
-                        local childType = child.ClassName
-                        local childName = child.Name
-                        local childId = ""
-                        
-                        if child:IsA("Sound") then
-                            childId = child.SoundId
-                        end
-                        
-                        OPAIHUB_Library:Notify("调试", string.format("检测到: %s | 名称: %s | ID: %s", childType, childName, childId ~= "" and childId or "无"), 5)
-                        print(string.format("[OPAIHUB调试] 类型: %s | 名称: %s | ID: %s", childType, childName, childId ~= "" and childId or "无"))
-                    end
-                end)
-                OPAIHUB_Library:Notify("调试模式已启用", "开始监听角色身上的对象", 3)
-            else
-                OPAIHUB_Library:Notify("错误", "角色不存在，等待角色生成", 3)
-                OPAIHUB_LocalPlayer.CharacterAdded:Connect(function()
-                    task.wait(1)
-                    if OPAIHUB_DebugModeEnabled then
-                        if OPAIHUB_LocalPlayer.Character and OPAIHUB_LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                            OPAIHUB_DebugConnection = OPAIHUB_LocalPlayer.Character.HumanoidRootPart.ChildAdded:Connect(function(child)
-                                if typeof(child) == "Instance" then
-                                    local childType = child.ClassName
-                                    local childName = child.Name
-                                    local childId = ""
-                                    
-                                    if child:IsA("Sound") then
-                                        childId = child.SoundId
-                                    end
-                                    
-                                    OPAIHUB_Library:Notify("调试", string.format("检测到: %s | 名称: %s | ID: %s", childType, childName, childId ~= "" and childId or "无"), 5)
-                                    print(string.format("[OPAIHUB调试] 类型: %s | 名称: %s | ID: %s", childType, childName, childId ~= "" and childId or "无"))
-                                end
-                            end)
-                        end
-                    end
-                end)
-            end
+            
+            OPAIHUB_KillerAddedConnection = killersFolder.ChildAdded:Connect(function(killer)
+                OPAIHUB_CreateKillerESP(killer, Color3.fromRGB(255, 0, 0))
+            end)
         else
-            if OPAIHUB_DebugConnection then
-                OPAIHUB_DebugConnection:Disconnect()
-                OPAIHUB_DebugConnection = nil
+            if OPAIHUB_KillerESPConnection then
+                OPAIHUB_KillerESPConnection:Disconnect()
+                OPAIHUB_KillerESPConnection = nil
             end
-            OPAIHUB_Library:Notify("调试模式已关闭", "停止监听", 3)
-        end
-    end
-})
-
-OPAIHUB_DebugGroup:AddDivider()
-
-OPAIHUB_DebugGroup:AddButton("OPAIHUB_TestAimbot", {
-    Text = "测试自瞄功能",
-    Func = function()
-        local character = OPAIHUB_LocalPlayer.Character
-        if not character then
-            OPAIHUB_Library:Notify("错误", "角色不存在", 3)
-            return
-        end
-        
-        local hrp = character:FindFirstChild("HumanoidRootPart")
-        if not hrp then
-            OPAIHUB_Library:Notify("错误", "找不到HumanoidRootPart", 3)
-            return
-        end
-        
-        -- 检查HRP上的所有子对象
-        local children = hrp:GetChildren()
-        OPAIHUB_Library:Notify("调试", string.format("HRP子对象数量: %d", #children), 3)
-        print(string.format("[OPAIHUB调试] HRP子对象数量: %d", #children))
-        
-        for _, child in pairs(children) do
-            if typeof(child) == "Instance" then
-                local info = string.format("类型: %s | 名称: %s", child.ClassName, child.Name)
-                if child:IsA("Sound") then
-                    info = info .. string.format(" | SoundId: %s", child.SoundId)
-                end
-                print("[OPAIHUB调试] " .. info)
+            if OPAIHUB_KillerAddedConnection then
+                OPAIHUB_KillerAddedConnection:Disconnect()
+                OPAIHUB_KillerAddedConnection = nil
             end
-        end
-        
-        -- 检查是否有自瞄相关的声音
-        local aimbotSounds = {
-            "rbxassetid://86710781315432",
-            "rbxassetid://99820161736138",
-            "rbxassetid://79782181585087"
-        }
-        
-        local foundSounds = {}
-        for _, child in pairs(children) do
-            if typeof(child) == "Instance" and child:IsA("Sound") then
-                for _, soundId in pairs(aimbotSounds) do
-                    if child.SoundId == soundId or child.Name == soundId then
-                        table.insert(foundSounds, soundId)
+            
+            local killersFolder = OPAIHUB_Workspace:WaitForChild("Players"):WaitForChild("Killers")
+            for _, killer in ipairs(killersFolder:GetChildren()) do
+                if killer:IsA("Model") then
+                    local hrp = killer:FindFirstChild("HumanoidRootPart")
+                    if hrp and hrp:FindFirstChild("OPAIHUB_playeresp") then
+                        hrp.OPAIHUB_playeresp:Destroy()
                     end
                 end
-            end
-        end
-        
-        if #foundSounds > 0 then
-            OPAIHUB_Library:Notify("成功", string.format("找到 %d 个自瞄相关声音", #foundSounds), 5)
-            print(string.format("[OPAIHUB调试] 找到自瞄声音: %s", table.concat(foundSounds, ", ")))
-        else
-            OPAIHUB_Library:Notify("警告", "未找到自瞄相关声音，可能需要更新ID", 5)
-            print("[OPAIHUB调试] 未找到自瞄相关声音")
-        end
-    end
-})
-
-OPAIHUB_DebugGroup:AddDivider()
-
-OPAIHUB_DebugGroup:AddButton("OPAIHUB_CheckSword", {
-    Text = "检查Shedletsky的剑",
-    Func = function()
-        local character = OPAIHUB_LocalPlayer.Character
-        if not character then
-            OPAIHUB_Library:Notify("错误", "角色不存在", 3)
-            return
-        end
-        
-        if character.Name ~= "Shedletsky" then
-            OPAIHUB_Library:Notify("警告", "当前角色不是Shedletsky", 3)
-        end
-        
-        local sword = character:FindFirstChild("Sword")
-        if not sword then
-            OPAIHUB_Library:Notify("错误", "找不到Sword对象", 3)
-            return
-        end
-        
-        local children = sword:GetChildren()
-        OPAIHUB_Library:Notify("调试", string.format("Sword子对象数量: %d", #children), 3)
-        print(string.format("[OPAIHUB调试] Sword子对象数量: %d", #children))
-        
-        for _, child in pairs(children) do
-            if typeof(child) == "Instance" then
-                local info = string.format("类型: %s | 名称: %s", child.ClassName, child.Name)
-                if child:IsA("Sound") then
-                    info = info .. string.format(" | SoundId: %s", child.SoundId)
-                end
-                print("[OPAIHUB调试] " .. info)
             end
         end
     end
 })
 
 -- ============================================
+-- OPAIHUB 披萨功能
+-- ============================================
+
+local OPAIHUB_PizzaGroup = OPAIHUB_Tabs.Visual:AddLeftGroupbox("OPAIHUB 自动吃披萨")
+
+local OPAIHUB_PizzaConnection = nil
+local OPAIHUB_PizzaTPConnection = nil
+local OPAIHUB_PizzaEffects = {}
+local OPAIHUB_HealthEatPizza = 50
+
+local function OPAIHUB_CreatePizzaEffect(pizza, effectName)
+    if not pizza:FindFirstChild(effectName) then
+        local effect = Instance.new("ParticleEmitter")
+        effect.Name = effectName
+        effect.Texture = "rbxassetid://242487987"
+        effect.LightEmission = 0.8
+        effect.Size = NumberSequence.new(0.5)
+        if effectName == "TeleportEffect" then
+            effect.Lifetime = NumberRange.new(0.5)
+        end
+        effect.Parent = pizza
+        OPAIHUB_PizzaEffects[pizza] = effect
+        return effect
+    end
+    return OPAIHUB_PizzaEffects[pizza]
+end
+
+local function OPAIHUB_CleanUpPizzaEffects()
+    for pizza, effect in pairs(OPAIHUB_PizzaEffects) do
+        if not pizza or not pizza.Parent then
+            effect:Destroy()
+            OPAIHUB_PizzaEffects[pizza] = nil
+        end
+    end
+end
+
+local function OPAIHUB_FindClosestPizza(rootPart)
+    local pizzaFolder = OPAIHUB_Workspace:FindFirstChild("Pizzas") or OPAIHUB_Workspace:FindFirstChild("Map")
+    if not pizzaFolder then return nil end
+    
+    local closestPizza, closestDistance = nil, math.huge
+    for _, pizza in ipairs(pizzaFolder:GetDescendants()) do
+        if typeof(pizza) == "Instance" and pizza:IsA("BasePart") and pizza.Name == "Pizza" then
+            local distance = (rootPart.Position - pizza.Position).Magnitude
+            if distance < closestDistance then
+                closestPizza = pizza
+                closestDistance = distance
+            end
+        end
+    end
+    return closestPizza
+end
+
+OPAIHUB_PizzaGroup:AddToggle("OPAIHUB_AutoEatPizza", {
+    Text = "自动吃披萨(追踪传送)",
+    Default = false,
+    Tooltip = "当生命值低于设定值时自动吸引附近的披萨",
+    Callback = function(enabled)
+        if OPAIHUB_PizzaConnection then
+            OPAIHUB_PizzaConnection:Disconnect()
+            OPAIHUB_PizzaConnection = nil
+        end
+        
+        if enabled then
+            OPAIHUB_PizzaConnection = OPAIHUB_RunService.Heartbeat:Connect(function()
+                local character = OPAIHUB_LocalPlayer.Character
+                if not character or not character:FindFirstChild("Humanoid") or not character:FindFirstChild("HumanoidRootPart") then
+                    return
+                end
+                
+                local humanoid = character.Humanoid
+                local rootPart = character.HumanoidRootPart
+                
+                if OPAIHUB_HealthEatPizza and humanoid.Health >= OPAIHUB_HealthEatPizza then
+                    return
+                end
+                
+                local closestPizza = OPAIHUB_FindClosestPizza(rootPart)
+                if closestPizza then
+                    closestPizza.CFrame = closestPizza.CFrame:Lerp(
+                        rootPart.CFrame * CFrame.new(0, 0, -2),
+                        0.5
+                    )
+                    OPAIHUB_CreatePizzaEffect(closestPizza, "AttractEffect")
+                end
+                OPAIHUB_CleanUpPizzaEffects()
+            end)
+        end
+    end
+})
+
+OPAIHUB_PizzaGroup:AddToggle("OPAIHUB_AutoTeleportPizza", {
+    Text = "自动吃披萨(TP)",
+    Default = false,
+    Tooltip = "当生命值低于设定值时自动将最近的披萨传送到玩家",
+    Callback = function(enabled)
+        if OPAIHUB_PizzaTPConnection then
+            OPAIHUB_PizzaTPConnection:Disconnect()
+            OPAIHUB_PizzaTPConnection = nil
+        end
+        
+        if enabled then
+            OPAIHUB_PizzaTPConnection = OPAIHUB_RunService.Heartbeat:Connect(function()
+                local character = OPAIHUB_LocalPlayer.Character
+                if not character or not character:FindFirstChild("Humanoid") or not character:FindFirstChild("HumanoidRootPart") then
+                    return
+                end
+                
+                local humanoid = character.Humanoid
+                local rootPart = character.HumanoidRootPart
+                
+                if OPAIHUB_HealthEatPizza and humanoid.Health >= OPAIHUB_HealthEatPizza then
+                    return
+                end
+                
+                local closestPizza = OPAIHUB_FindClosestPizza(rootPart)
+                if closestPizza then
+                    closestPizza.CFrame = rootPart.CFrame * CFrame.new(0, 0, -2)
+                    local effect = OPAIHUB_CreatePizzaEffect(closestPizza, "TeleportEffect")
+                    task.delay(1, function()
+                        if effect and effect.Parent then
+                            effect:Destroy()
+                            OPAIHUB_PizzaEffects[closestPizza] = nil
+                        end
+                    end)
+                end
+                OPAIHUB_CleanUpPizzaEffects()
+            end)
+        end
+    end
+})
+
+OPAIHUB_PizzaGroup:AddDivider()
+
+OPAIHUB_PizzaGroup:AddSlider("OPAIHUB_HealthEatPizza", {
+    Text = "生命阈值",
+    Default = 50,
+    Min = 10,
+    Max = 130,
+    Rounding = 0,
+    Tooltip = "当生命值低于设置生命值吃披萨",
+    Callback = function(value)
+        OPAIHUB_HealthEatPizza = value
+    end
+})
+
+OPAIHUB_PizzaGroup:AddDivider()
+
+OPAIHUB_PizzaGroup:AddButton("OPAIHUB_TPPizzaToFeet", {
+    Text = "TP Pizza到脚下",
+    Func = function()
+        local character = OPAIHUB_LocalPlayer.Character
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            local rootPart = character.HumanoidRootPart
+            for _, pizza in ipairs(OPAIHUB_Workspace:GetDescendants()) do
+                if typeof(pizza) == "Instance" and pizza:IsA("BasePart") and pizza.Name == "Pizza" then
+                    pizza.CFrame = rootPart.CFrame
+                    break
+                end
+            end
+            OPAIHUB_Library:Notify("传送成功", "已将披萨传送到脚下", 3)
+        end
+    end
+})
+
+-- ============================================
+-- OPAIHUB 高级ESP功能（续）
+-- ============================================
+
+-- 血量条绘制
+local OPAIHUB_HealthBarGroup = OPAIHUB_Tabs.ESP:AddLeftGroupbox("OPAIHUB 血量条绘制")
+
+local OPAIHUB_HealthBarSettings = {
+    ShowSurvivorBars = true,
+    ShowKillerBars = true,
+    BarWidth = 100,
+    BarHeight = 5,
+    TextSize = 14,
+    BarOffset = Vector2.new(0, -50),
+    TextOffset = Vector2.new(0, -60),
+    connection = nil,
+    removedConnection = nil
+}
+
+local OPAIHUB_HealthBarColorPresets = {
+    Survivor = {
+        FullHealth = Color3.fromRGB(0, 255, 255),
+        HalfHealth = Color3.fromRGB(0, 255, 0),
+        LowHealth = Color3.fromRGB(255, 165, 0)
+    },
+    Killer = {
+        FullHealth = Color3.fromRGB(255, 0, 0),
+        HalfHealth = Color3.fromRGB(255, 165, 0),
+        LowHealth = Color3.fromRGB(255, 255, 0)
+    },
+    Common = {
+        Background = Color3.fromRGB(50, 50, 50),
+        Outline = Color3.fromRGB(0, 0, 0),
+        Text = Color3.fromRGB(255, 255, 255)
+    }
+}
+
+local OPAIHUB_HealthBarDrawings = {}
+
+local function OPAIHUB_CreateHealthBarDrawing()
+    local drawing = {
+        background = Drawing.new("Square"),
+        bar = Drawing.new("Square"),
+        outline = Drawing.new("Square"),
+        text = Drawing.new("Text")
+    }
+    
+    drawing.background.Thickness = 1
+    drawing.background.Filled = true
+    drawing.background.Color = OPAIHUB_HealthBarColorPresets.Common.Background
+    
+    drawing.bar.Thickness = 1
+    drawing.bar.Filled = true
+    
+    drawing.outline.Thickness = 2
+    drawing.outline.Filled = false
+    drawing.outline.Color = OPAIHUB_HealthBarColorPresets.Common.Outline
+    
+    drawing.text.Center = true
+    drawing.text.Outline = true
+    drawing.text.Font = 2
+    drawing.text.Color = OPAIHUB_HealthBarColorPresets.Common.Text
+    
+    return drawing
+end
+
+local function OPAIHUB_GetHealthColor(humanoid, isKiller)
+    local healthPercent = (humanoid.Health / humanoid.MaxHealth) * 100
+    
+    if isKiller then
+        if healthPercent > 50 then
+            return OPAIHUB_HealthBarColorPresets.Killer.FullHealth
+        elseif healthPercent > 25 then
+            return OPAIHUB_HealthBarColorPresets.Killer.HalfHealth
+        else
+            return OPAIHUB_HealthBarColorPresets.Killer.LowHealth
+        end
+    else
+        if healthPercent > 75 then
+            return OPAIHUB_HealthBarColorPresets.Survivor.FullHealth
+        elseif healthPercent > 35 then
+            return OPAIHUB_HealthBarColorPresets.Survivor.HalfHealth
+        else
+            return OPAIHUB_HealthBarColorPresets.Survivor.LowHealth
+        end
+    end
+end
+
+local function OPAIHUB_GetHeadPosition(character)
+    local head = character:FindFirstChild("Head")
+    if head then
+        return head.Position + Vector3.new(0, 1.5, 0)
+    end
+    return character:GetPivot().Position
+end
+
+local function OPAIHUB_UpdateHealthBars()
+    local camera = OPAIHUB_Workspace.CurrentCamera
+    
+    if OPAIHUB_HealthBarSettings.ShowSurvivorBars then
+        local survivors = OPAIHUB_Workspace.Players:FindFirstChild("Survivors")
+        if survivors then
+            for _, survivor in ipairs(survivors:GetChildren()) do
+                if typeof(survivor) == "Instance" and survivor:IsA("Model") and survivor ~= OPAIHUB_LocalPlayer.Character then
+                    local humanoid = survivor:FindFirstChildOfClass("Humanoid")
+                    
+                    if humanoid then
+                        if not OPAIHUB_HealthBarDrawings[survivor] then
+                            OPAIHUB_HealthBarDrawings[survivor] = OPAIHUB_CreateHealthBarDrawing()
+                        end
+                        
+                        local drawing = OPAIHUB_HealthBarDrawings[survivor]
+                        local headPos = OPAIHUB_GetHeadPosition(survivor)
+                        local screenPos, onScreen = camera:WorldToViewportPoint(headPos)
+                        
+                        if onScreen then
+                            local healthPercent = math.floor((humanoid.Health / humanoid.MaxHealth) * 100)
+                            local healthBarWidth = OPAIHUB_HealthBarSettings.BarWidth * (healthPercent / 100)
+                            
+                            local barPos = Vector2.new(
+                                screenPos.X + OPAIHUB_HealthBarSettings.BarOffset.X - (OPAIHUB_HealthBarSettings.BarWidth / 2),
+                                screenPos.Y + OPAIHUB_HealthBarSettings.BarOffset.Y
+                            )
+                            
+                            drawing.background.Size = Vector2.new(OPAIHUB_HealthBarSettings.BarWidth, OPAIHUB_HealthBarSettings.BarHeight)
+                            drawing.background.Position = barPos
+                            drawing.background.Visible = true
+                            
+                            drawing.outline.Size = Vector2.new(OPAIHUB_HealthBarSettings.BarWidth, OPAIHUB_HealthBarSettings.BarHeight)
+                            drawing.outline.Position = barPos
+                            drawing.outline.Visible = true
+                            
+                            drawing.bar.Color = OPAIHUB_GetHealthColor(humanoid, false)
+                            drawing.bar.Size = Vector2.new(healthBarWidth, OPAIHUB_HealthBarSettings.BarHeight)
+                            drawing.bar.Position = barPos
+                            drawing.bar.Visible = true
+                            
+                            drawing.text.Text = tostring(healthPercent) .. "%"
+                            drawing.text.Size = OPAIHUB_HealthBarSettings.TextSize
+                            drawing.text.Position = Vector2.new(
+                                screenPos.X + OPAIHUB_HealthBarSettings.TextOffset.X,
+                                screenPos.Y + OPAIHUB_HealthBarSettings.TextOffset.Y
+                            )
+                            drawing.text.Visible = true
+                        else
+                            for _, obj in pairs(drawing) do
+                                obj.Visible = false
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    if OPAIHUB_HealthBarSettings.ShowKillerBars then
+        local killers = OPAIHUB_Workspace.Players:FindFirstChild("Killers")
+        if killers then
+            for _, killer in ipairs(killers:GetChildren()) do
+                if typeof(killer) == "Instance" and killer:IsA("Model") and killer ~= OPAIHUB_LocalPlayer.Character then
+                    local humanoid = killer:FindFirstChildOfClass("Humanoid")
+                    
+                    if humanoid then
+                        if not OPAIHUB_HealthBarDrawings[killer] then
+                            OPAIHUB_HealthBarDrawings[killer] = OPAIHUB_CreateHealthBarDrawing()
+                        end
+                        
+                        local drawing = OPAIHUB_HealthBarDrawings[killer]
+                        local headPos = OPAIHUB_GetHeadPosition(killer)
+                        local screenPos, onScreen = camera:WorldToViewportPoint(headPos)
+                        
+                        if onScreen then
+                            local healthPercent = math.floor((humanoid.Health / humanoid.MaxHealth) * 100)
+                            local healthBarWidth = OPAIHUB_HealthBarSettings.BarWidth * (healthPercent / 100)
+                            
+                            local barPos = Vector2.new(
+                                screenPos.X + OPAIHUB_HealthBarSettings.BarOffset.X - (OPAIHUB_HealthBarSettings.BarWidth / 2),
+                                screenPos.Y + OPAIHUB_HealthBarSettings.BarOffset.Y
+                            )
+                            
+                            drawing.background.Size = Vector2.new(OPAIHUB_HealthBarSettings.BarWidth, OPAIHUB_HealthBarSettings.BarHeight)
+                            drawing.background.Position = barPos
+                            drawing.background.Visible = true
+                            
+                            drawing.outline.Size = Vector2.new(OPAIHUB_HealthBarSettings.BarWidth, OPAIHUB_HealthBarSettings.BarHeight)
+                            drawing.outline.Position = barPos
+                            drawing.outline.Visible = true
+                            
+                            drawing.bar.Color = OPAIHUB_GetHealthColor(humanoid, true)
+                            drawing.bar.Size = Vector2.new(healthBarWidth, OPAIHUB_HealthBarSettings.BarHeight)
+                            drawing.bar.Position = barPos
+                            drawing.bar.Visible = true
+                            
+                            drawing.text.Text = tostring(healthPercent) .. "%"
+                            drawing.text.Size = OPAIHUB_HealthBarSettings.TextSize
+                            drawing.text.Position = Vector2.new(
+                                screenPos.X + OPAIHUB_HealthBarSettings.TextOffset.X,
+                                screenPos.Y + OPAIHUB_HealthBarSettings.TextOffset.Y
+                            )
+                            drawing.text.Visible = true
+                        else
+                            for _, obj in pairs(drawing) do
+                                obj.Visible = false
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function OPAIHUB_CleanupHealthBars()
+    for _, drawing in pairs(OPAIHUB_HealthBarDrawings) do
+        for _, obj in pairs(drawing) do
+            if obj then
+                obj:Remove()
+            end
+        end
+    end
+    OPAIHUB_HealthBarDrawings = {}
+end
+
+OPAIHUB_HealthBarGroup:AddToggle("OPAIHUB_HealthBars", {
+    Text = "启用血量条",
+    Default = false,
+    Callback = function(enabled)
+        if enabled then
+            if not OPAIHUB_HealthBarSettings.connection then
+                OPAIHUB_HealthBarSettings.connection = OPAIHUB_RunService.RenderStepped:Connect(OPAIHUB_UpdateHealthBars)
+            end
+            
+            if not OPAIHUB_HealthBarSettings.removedConnection then
+                OPAIHUB_HealthBarSettings.removedConnection = OPAIHUB_Workspace.DescendantRemoving:Connect(function(descendant)
+                    if OPAIHUB_HealthBarDrawings[descendant] then
+                        for _, obj in pairs(OPAIHUB_HealthBarDrawings[descendant]) do
+                            obj:Remove()
+                        end
+                        OPAIHUB_HealthBarDrawings[descendant] = nil
+                    end
+                end)
+            end
+        else
+            if OPAIHUB_HealthBarSettings.connection then
+                OPAIHUB_HealthBarSettings.connection:Disconnect()
+                OPAIHUB_HealthBarSettings.connection = nil
+            end
+            
+            if OPAIHUB_HealthBarSettings.removedConnection then
+                OPAIHUB_HealthBarSettings.removedConnection:Disconnect()
+                OPAIHUB_HealthBarSettings.removedConnection = nil
+            end
+            
+            OPAIHUB_CleanupHealthBars()
+        end
+    end
+})
+
+OPAIHUB_HealthBarGroup:AddToggle("OPAIHUB_ShowSurvivorBars", {
+    Text = "显示幸存者血量条",
+    Default = true,
+    Callback = function(enabled)
+        OPAIHUB_HealthBarSettings.ShowSurvivorBars = enabled
+    end
+})
+
+OPAIHUB_HealthBarGroup:AddToggle("OPAIHUB_ShowKillerBars", {
+    Text = "显示杀手血量条",
+    Default = true,
+    Callback = function(enabled)
+        OPAIHUB_HealthBarSettings.ShowKillerBars = enabled
+    end
+})
+
+-- 角色名称绘制
+local OPAIHUB_NameTagGroup = OPAIHUB_Tabs.ESP:AddRightGroupbox("OPAIHUB 角色名称绘制")
+
+local OPAIHUB_NameTagSettings = {
+    ShowSurvivorNames = true,
+    ShowKillerNames = true,
+    BaseTextSize = 14,
+    MinTextSize = 10,
+    MaxTextSize = 20,
+    TextOffset = Vector3.new(0, 3, 0),
+    DistanceScale = {
+        MinDistance = 10,
+        MaxDistance = 50
+    },
+    SurvivorColor = Color3.fromRGB(0, 191, 255),
+    KillerColor = Color3.fromRGB(255, 0, 0),
+    OutlineColor = Color3.fromRGB(0, 0, 0),
+    ShowDistance = true,
+    connection = nil,
+    removedConnection = nil
+}
+
+local OPAIHUB_NameTagDrawings = {}
+
+local function OPAIHUB_CreateNameTagDrawing()
+    local drawing = Drawing.new("Text")
+    drawing.Size = OPAIHUB_NameTagSettings.BaseTextSize
+    drawing.Center = true
+    drawing.Outline = true
+    drawing.OutlineColor = OPAIHUB_NameTagSettings.OutlineColor
+    drawing.Font = 2
+    return drawing
+end
+
+local function OPAIHUB_GetHeadPositionForNameTag(character)
+    local head = character:FindFirstChild("Head")
+    if head then
+        local headHeight = head.Size.Y
+        return head.Position + Vector3.new(0, headHeight + 0.5, 0)
+    end
+    return character:GetPivot().Position
+end
+
+local function OPAIHUB_CleanupInvalidNameTags()
+    local survivors = OPAIHUB_Workspace.Players:FindFirstChild("Survivors")
+    local killers = OPAIHUB_Workspace.Players:FindFirstChild("Killers")
+    
+    local validCharacters = {}
+    if survivors then
+        for _, survivor in ipairs(survivors:GetChildren()) do
+            if typeof(survivor) == "Instance" and survivor:IsA("Model") then
+                validCharacters[survivor] = true
+            end
+        end
+    end
+    if killers then
+        for _, killer in ipairs(killers:GetChildren()) do
+            if typeof(killer) == "Instance" and killer:IsA("Model") then
+                validCharacters[killer] = true
+            end
+        end
+    end
+    
+    for model, drawing in pairs(OPAIHUB_NameTagDrawings) do
+        if not validCharacters[model] then
+            drawing:Remove()
+            OPAIHUB_NameTagDrawings[model] = nil
+        end
+    end
+end
+
+local function OPAIHUB_UpdateNameTags()
+    local camera = OPAIHUB_Workspace.CurrentCamera
+    local localCharacter = OPAIHUB_LocalPlayer.Character
+    local localRoot = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
+
+    if not localRoot then return end
+    
+    OPAIHUB_CleanupInvalidNameTags()
+
+    if OPAIHUB_NameTagSettings.ShowSurvivorNames then
+        local survivors = OPAIHUB_Workspace.Players:FindFirstChild("Survivors")
+        if survivors then
+            for _, survivor in ipairs(survivors:GetChildren()) do
+                if typeof(survivor) == "Instance" and survivor:IsA("Model") and survivor ~= localCharacter then
+                    local humanoid = survivor:FindFirstChildOfClass("Humanoid")
+                    
+                    if not OPAIHUB_NameTagDrawings[survivor] then
+                        OPAIHUB_NameTagDrawings[survivor] = OPAIHUB_CreateNameTagDrawing()
+                    end
+                    
+                    local drawing = OPAIHUB_NameTagDrawings[survivor]
+                    
+                    if not humanoid or humanoid.Health <= 0 then
+                        drawing.Visible = false
+                    else
+                        local headPos = OPAIHUB_GetHeadPositionForNameTag(survivor)
+                        local screenPos, onScreen = camera:WorldToViewportPoint(headPos + OPAIHUB_NameTagSettings.TextOffset)
+                        
+                        if onScreen then
+                            local distance = (headPos - localRoot.Position).Magnitude
+                            local scale = math.clamp(
+                                1 - (distance - OPAIHUB_NameTagSettings.DistanceScale.MinDistance) / 
+                                (OPAIHUB_NameTagSettings.DistanceScale.MaxDistance - OPAIHUB_NameTagSettings.DistanceScale.MinDistance), 
+                                0.3, 1
+                            )
+                            
+                            local textSize = math.floor(OPAIHUB_NameTagSettings.BaseTextSize * scale)
+                            textSize = math.clamp(textSize, OPAIHUB_NameTagSettings.MinTextSize, OPAIHUB_NameTagSettings.MaxTextSize)
+                            
+                            local displayText = survivor.Name
+                            if OPAIHUB_NameTagSettings.ShowDistance then
+                                displayText = string.format("%s [%d]", survivor.Name, math.floor(distance))
+                            end
+                            
+                            drawing.Text = displayText
+                            drawing.Color = OPAIHUB_NameTagSettings.SurvivorColor
+                            drawing.Size = textSize
+                            drawing.Position = Vector2.new(screenPos.X, screenPos.Y)
+                            drawing.Visible = true
+                        else
+                            drawing.Visible = false
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if OPAIHUB_NameTagSettings.ShowKillerNames then
+        local killers = OPAIHUB_Workspace.Players:FindFirstChild("Killers")
+        if killers then
+            for _, killer in ipairs(killers:GetChildren()) do
+                if typeof(killer) == "Instance" and killer:IsA("Model") then
+                    local humanoid = killer:FindFirstChildOfClass("Humanoid")
+                    
+                    if not OPAIHUB_NameTagDrawings[killer] then
+                        OPAIHUB_NameTagDrawings[killer] = OPAIHUB_CreateNameTagDrawing()
+                    end
+                    
+                    local drawing = OPAIHUB_NameTagDrawings[killer]
+                    
+                    if not humanoid or humanoid.Health <= 0 then
+                        drawing.Visible = false
+                    else
+                        local headPos = OPAIHUB_GetHeadPositionForNameTag(killer)
+                        local screenPos, onScreen = camera:WorldToViewportPoint(headPos + OPAIHUB_NameTagSettings.TextOffset)
+                        
+                        if onScreen then
+                            local distance = (headPos - localRoot.Position).Magnitude
+                            local scale = math.clamp(
+                                1 - (distance - OPAIHUB_NameTagSettings.DistanceScale.MinDistance) / 
+                                (OPAIHUB_NameTagSettings.DistanceScale.MaxDistance - OPAIHUB_NameTagSettings.DistanceScale.MinDistance), 
+                                0.3, 1
+                            )
+                            
+                            local textSize = math.floor(OPAIHUB_NameTagSettings.BaseTextSize * scale)
+                            textSize = math.clamp(textSize, OPAIHUB_NameTagSettings.MinTextSize, OPAIHUB_NameTagSettings.MaxTextSize)
+                            
+                            local displayText = killer.Name
+                            if OPAIHUB_NameTagSettings.ShowDistance then
+                                displayText = string.format("%s [%dm]", killer.Name, math.floor(distance))
+                            end
+                            
+                            drawing.Text = displayText
+                            drawing.Color = OPAIHUB_NameTagSettings.KillerColor
+                            drawing.Size = textSize
+                            drawing.Position = Vector2.new(screenPos.X, screenPos.Y)
+                            drawing.Visible = true
+                        else
+                            drawing.Visible = false
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function OPAIHUB_CleanupNameTags()
+    for _, drawing in pairs(OPAIHUB_NameTagDrawings) do
+        if drawing then
+            drawing:Remove()
+        end
+    end
+    OPAIHUB_NameTagDrawings = {}
+end
+
+OPAIHUB_NameTagGroup:AddToggle("OPAIHUB_NameTags", {
+    Text = "启用名称绘制",
+    Default = false,
+    Callback = function(enabled)
+        if enabled then
+            if not OPAIHUB_NameTagSettings.connection then
+                OPAIHUB_NameTagSettings.connection = OPAIHUB_RunService.RenderStepped:Connect(OPAIHUB_UpdateNameTags)
+            end
+            
+            if not OPAIHUB_NameTagSettings.removedConnection then
+                OPAIHUB_NameTagSettings.removedConnection = OPAIHUB_Players.PlayerRemoving:Connect(function(player)
+                    for model, drawing in pairs(OPAIHUB_NameTagDrawings) do
+                        if model.Name == player.Name then
+                            drawing:Remove()
+                            OPAIHUB_NameTagDrawings[model] = nil
+                        end
+                    end
+                end)
+            end
+        else
+            if OPAIHUB_NameTagSettings.connection then
+                OPAIHUB_NameTagSettings.connection:Disconnect()
+                OPAIHUB_NameTagSettings.connection = nil
+            end
+            
+            if OPAIHUB_NameTagSettings.removedConnection then
+                OPAIHUB_NameTagSettings.removedConnection:Disconnect()
+                OPAIHUB_NameTagSettings.removedConnection = nil
+            end
+            
+            OPAIHUB_CleanupNameTags()
+        end
+    end
+})
+
+OPAIHUB_NameTagGroup:AddToggle("OPAIHUB_ShowSurvivorNames", {
+    Text = "显示幸存者名称",
+    Default = true,
+    Callback = function(enabled)
+        OPAIHUB_NameTagSettings.ShowSurvivorNames = enabled
+    end
+})
+
+OPAIHUB_NameTagGroup:AddToggle("OPAIHUB_ShowKillerNames", {
+    Text = "显示杀手名称",
+    Default = true,
+    Callback = function(enabled)
+        OPAIHUB_NameTagSettings.ShowKillerNames = enabled
+    end
+})
+
+OPAIHUB_NameTagGroup:AddToggle("OPAIHUB_ShowDistance", {
+    Text = "显示距离",
+    Default = true,
+    Callback = function(enabled)
+        OPAIHUB_NameTagSettings.ShowDistance = enabled
+    end
+})
+
+-- 高亮绘制
+local OPAIHUB_HighlightGroup = OPAIHUB_Tabs.ESP:AddLeftGroupbox("OPAIHUB 高亮绘制")
+
+local OPAIHUB_HighlightSettings = {
+    ShowSurvivorHighlights = true,
+    ShowKillerHighlights = true,
+    FillTransparency = 0.5,
+    OutlineTransparency = 0,
+    connection = nil,
+    highlights = {}
+}
+
+OPAIHUB_HighlightSettings.SurvivorColors = {
+    ["绿色"] = Color3.fromRGB(0, 255, 0),
+    ["白色"] = Color3.fromRGB(255, 255, 255),
+    ["紫色"] = Color3.fromRGB(128, 0, 128),
+    ["青色"] = Color3.fromRGB(0, 255, 255),
+    ["橙色"] = Color3.fromRGB(255, 165, 0),
+    ["柠檬绿"] = Color3.fromRGB(173, 255, 47)
+}
+
+OPAIHUB_HighlightSettings.KillerColors = {
+    ["红色"] = Color3.fromRGB(255, 0, 0),
+    ["粉色"] = Color3.fromRGB(255, 105, 180),
+    ["黑色"] = Color3.fromRGB(0, 0, 0),
+    ["蓝色"] = Color3.fromRGB(0, 0, 255),
+    ["猩红色"] = Color3.fromRGB(220, 20, 60),
+    ["杏色"] = Color3.fromRGB(251, 206, 177)
+}
+
+OPAIHUB_HighlightSettings.SurvivorOutlineColors = table.clone(OPAIHUB_HighlightSettings.SurvivorColors)
+OPAIHUB_HighlightSettings.KillerOutlineColors = table.clone(OPAIHUB_HighlightSettings.KillerColors)
+
+OPAIHUB_HighlightSettings.SelectedSurvivorColor = "青色"
+OPAIHUB_HighlightSettings.SelectedKillerColor = "红色"
+OPAIHUB_HighlightSettings.SelectedSurvivorOutlineColor = "青色"
+OPAIHUB_HighlightSettings.SelectedKillerOutlineColor = "红色"
+
+local function OPAIHUB_CleanupHighlights()
+    for _, highlight in pairs(OPAIHUB_HighlightSettings.highlights) do
+        if highlight and highlight.Parent then
+            highlight:Destroy()
+        end
+    end
+    OPAIHUB_HighlightSettings.highlights = {}
+end
+
+local function OPAIHUB_UpdateHighlights()
+    local survivorsFolder = OPAIHUB_Workspace:FindFirstChild("Players") and OPAIHUB_Workspace.Players:FindFirstChild("Survivors")
+    local killersFolder = OPAIHUB_Workspace:FindFirstChild("Players") and OPAIHUB_Workspace.Players:FindFirstChild("Killers")
+    
+    local function OPAIHUB_ProcessFolder(folder, isKiller)
+        if not folder then return end
+        
+        for _, model in ipairs(folder:GetChildren()) do
+            if typeof(model) == "Instance" and model:IsA("Model") then
+                local fillColor = isKiller and OPAIHUB_HighlightSettings.KillerColors[OPAIHUB_HighlightSettings.SelectedKillerColor] 
+                                          or OPAIHUB_HighlightSettings.SurvivorColors[OPAIHUB_HighlightSettings.SelectedSurvivorColor]
+                
+                local outlineColor = isKiller and OPAIHUB_HighlightSettings.KillerOutlineColors[OPAIHUB_HighlightSettings.SelectedKillerOutlineColor] 
+                                              or OPAIHUB_HighlightSettings.SurvivorOutlineColors[OPAIHUB_HighlightSettings.SelectedSurvivorOutlineColor]
+                
+                if (isKiller and OPAIHUB_HighlightSettings.ShowKillerHighlights) or 
+                   (not isKiller and OPAIHUB_HighlightSettings.ShowSurvivorHighlights) then
+                    
+                    if not OPAIHUB_HighlightSettings.highlights[model] then
+                        local highlight = Instance.new("Highlight")
+                        highlight.Parent = game:GetService("CoreGui")
+                        OPAIHUB_HighlightSettings.highlights[model] = highlight
+                    end
+                    
+                    local highlight = OPAIHUB_HighlightSettings.highlights[model]
+                    highlight.Adornee = model
+                    highlight.FillColor = fillColor
+                    highlight.OutlineColor = outlineColor
+                    highlight.FillTransparency = OPAIHUB_HighlightSettings.FillTransparency
+                    highlight.OutlineTransparency = OPAIHUB_HighlightSettings.OutlineTransparency
+                elseif OPAIHUB_HighlightSettings.highlights[model] then
+                    OPAIHUB_HighlightSettings.highlights[model].Adornee = nil
+                end
+            end
+        end
+    end
+    
+    OPAIHUB_ProcessFolder(survivorsFolder, false)
+    OPAIHUB_ProcessFolder(killersFolder, true)
+    
+    for model, highlight in pairs(OPAIHUB_HighlightSettings.highlights) do
+        if not model or not model.Parent then
+            highlight:Destroy()
+            OPAIHUB_HighlightSettings.highlights[model] = nil
+        end
+    end
+end
+
+OPAIHUB_HighlightGroup:AddToggle("OPAIHUB_Highlight", {
+    Text = "启用高亮绘制",
+    Default = false,
+    Callback = function(enabled)
+        if enabled then
+            if not OPAIHUB_HighlightSettings.connection then
+                OPAIHUB_HighlightSettings.connection = OPAIHUB_RunService.RenderStepped:Connect(OPAIHUB_UpdateHighlights)
+            end
+        else
+            if OPAIHUB_HighlightSettings.connection then
+                OPAIHUB_HighlightSettings.connection:Disconnect()
+                OPAIHUB_HighlightSettings.connection = nil
+            end
+            OPAIHUB_CleanupHighlights()
+        end
+    end
+})
+
+OPAIHUB_HighlightGroup:AddToggle("OPAIHUB_ShowSurvivorHighlights", {
+    Text = "绘制幸存者高亮",
+    Default = true,
+    Callback = function(enabled)
+        OPAIHUB_HighlightSettings.ShowSurvivorHighlights = enabled
+    end
+})
+
+OPAIHUB_HighlightGroup:AddToggle("OPAIHUB_ShowKillerHighlights", {
+    Text = "绘制杀手高亮",
+    Default = true,
+    Callback = function(enabled)
+        OPAIHUB_HighlightSettings.ShowKillerHighlights = enabled
+    end
+})
+
+OPAIHUB_HighlightGroup:AddDropdown("OPAIHUB_SurvivorFillColor", {
+    Values = {"绿色", "白色", "紫色", "青色", "橙色", "柠檬绿"},
+    Default = "青色",
+    Text = "幸存者填充颜色",
+    Callback = function(value)
+        OPAIHUB_HighlightSettings.SelectedSurvivorColor = value
+    end
+})
+
+OPAIHUB_HighlightGroup:AddDropdown("OPAIHUB_KillerFillColor", {
+    Values = {"红色", "粉色", "黑色", "蓝色", "猩红色", "杏色"},
+    Default = "红色",
+    Text = "杀手填充颜色",
+    Callback = function(value)
+        OPAIHUB_HighlightSettings.SelectedKillerColor = value
+    end
+})
+
+OPAIHUB_HighlightGroup:AddSlider("OPAIHUB_FillTransparency", {
+    Text = "填充透明度",
+    Min = 0,
+    Max = 1,
+    Default = 0.5,
+    Rounding = 1,
+    Compact = false,
+    Callback = function(value)
+        OPAIHUB_HighlightSettings.FillTransparency = value
+    end
+})
+
+OPAIHUB_HighlightGroup:AddSlider("OPAIHUB_OutlineTransparency", {
+    Text = "边缘透明度",
+    Min = 0,
+    Max = 1,
+    Default = 0,
+    Rounding = 1,
+    Compact = false,
+    Callback = function(value)
+        OPAIHUB_HighlightSettings.OutlineTransparency = value
+    end
+})
+
+-- 物品绘制（使用LibESP库）
+local OPAIHUB_ItemESPGroup = OPAIHUB_Tabs.ESP:AddRightGroupbox("OPAIHUB 物品绘制")
+
+local OPAIHUB_LibESP = nil
+local OPAIHUB_OtherESPConnection = nil
+local OPAIHUB_TripWireESPConnection = nil
+local OPAIHUB_SubspaceTripmineESPConnection = nil
+local OPAIHUB_MedkitESPConnection = nil
+local OPAIHUB_ColaESPConnection = nil
+
+-- 加载LibESP库
+task.spawn(function()
+    local success, result = pcall(function()
+        OPAIHUB_LibESP = loadstring(game:HttpGet("https://raw.githubusercontent.com/ImamGV/Script/main/ESP"))()
+    end)
+    if not success then
+        warn("[OPAIHUB] 无法加载LibESP库: " .. tostring(result))
+    end
+end)
+
+OPAIHUB_ItemESPGroup:AddToggle("OPAIHUB_RobotESP", {
+    Text = "杀手机器人绘制",
+    Default = false,
+    Callback = function(v)
+        if not OPAIHUB_LibESP then
+            OPAIHUB_Library:Notify("错误", "LibESP库未加载", 3)
+            return
+        end
+        
+        if v then
+            for _, obj in ipairs(OPAIHUB_Workspace:GetDescendants()) do
+                if typeof(obj) == "Instance" and obj:IsA("Model") then
+                    if obj.Name == "PizzaDeliveryRig" or obj.Name == "Bunny" or obj.Name == "Mafiaso1" or obj.Name == "Mafiaso2" or obj.Name == "Mafiaso3" then
+                        OPAIHUB_LibESP:AddESP(obj, "披萨送货员", Color3.fromRGB(255, 52, 179), 14, "OPAIHUB_Other_ESP")
+                    elseif obj.Name == "1x1x1x1Zombie" then
+                        OPAIHUB_LibESP:AddESP(obj, "1x1x1x1 (僵尸)", Color3.fromRGB(224, 102, 255), 14, "OPAIHUB_Other_ESP")
+                    end
+                end
+            end
+            OPAIHUB_OtherESPConnection = OPAIHUB_Workspace.DescendantAdded:Connect(function(obj)
+                if typeof(obj) == "Instance" and obj:IsA("Model") then
+                    if obj.Name == "PizzaDeliveryRig" or obj.Name == "Bunny" or obj.Name == "Mafiaso1" or obj.Name == "Mafiaso2" or obj.Name == "Mafiaso3" then
+                        OPAIHUB_LibESP:AddESP(obj, "披萨送货员", Color3.fromRGB(255, 52, 179), 14, "OPAIHUB_Other_ESP")
+                    elseif obj.Name == "1x1x1x1Zombie" then
+                        OPAIHUB_LibESP:AddESP(obj, "1x1x1x1 (僵尸)", Color3.fromRGB(224, 102, 255), 14, "OPAIHUB_Other_ESP")
+                    end
+                end
+            end)
+        else
+            if OPAIHUB_OtherESPConnection then
+                OPAIHUB_OtherESPConnection:Disconnect()
+                OPAIHUB_OtherESPConnection = nil
+            end
+            if OPAIHUB_LibESP then
+                OPAIHUB_LibESP:Delete("OPAIHUB_Other_ESP")
+            end
+        end
+    end
+})
+
+OPAIHUB_ItemESPGroup:AddToggle("OPAIHUB_TripWireESP", {
+    Text = "塔夫绊线绘制",
+    Default = false,
+    Callback = function(v)
+        if not OPAIHUB_LibESP then
+            OPAIHUB_Library:Notify("错误", "LibESP库未加载", 3)
+            return
+        end
+        
+        if v then
+            local mapFolder = OPAIHUB_Workspace:FindFirstChild("Map")
+            if mapFolder then
+                local ingameFolder = mapFolder:FindFirstChild("Ingame")
+                if ingameFolder then
+                    for _, obj in ipairs(ingameFolder:GetDescendants()) do
+                        if typeof(obj) == "Instance" and string.find(obj.Name, "TaphTripwire") and not obj:FindFirstChild("OPAIHUB_TripWire_ESP") then
+                            OPAIHUB_LibESP:AddESP(obj, "Trip Wire", Color3.new(0,1,0), 14, "OPAIHUB_TripWire_ESP")
+                        end
+                    end
+                    OPAIHUB_TripWireESPConnection = ingameFolder.DescendantAdded:Connect(function(obj)
+                        task.wait(1)
+                        if typeof(obj) == "Instance" and string.find(obj.Name, "TaphTripwire") and not obj:FindFirstChild("OPAIHUB_TripWire_ESP") then
+                            OPAIHUB_LibESP:AddESP(obj, "Trip Wire", Color3.new(0,1,0), 14, "OPAIHUB_TripWire_ESP")
+                        end
+                    end)
+                end
+            end
+        else
+            if OPAIHUB_TripWireESPConnection then
+                OPAIHUB_TripWireESPConnection:Disconnect()
+                OPAIHUB_TripWireESPConnection = nil
+            end
+            if OPAIHUB_LibESP then
+                OPAIHUB_LibESP:Delete("OPAIHUB_TripWire_ESP")
+            end
+        end
+    end
+})
+
+OPAIHUB_ItemESPGroup:AddToggle("OPAIHUB_SubspaceTripmineESP", {
+    Text = "空间炸弹绘制",
+    Default = false,
+    Callback = function(v)
+        if not OPAIHUB_LibESP then
+            OPAIHUB_Library:Notify("错误", "LibESP库未加载", 3)
+            return
+        end
+        
+        if v then
+            for _, obj in ipairs(OPAIHUB_Workspace:GetDescendants()) do
+                if typeof(obj) == "Instance" and obj:IsA("Model") and obj.Name == "SubspaceTripmine" and not obj:FindFirstChild("OPAIHUB_SubspaceTripmine_ESP") then
+                    OPAIHUB_LibESP:AddESP(obj, "", Color3.fromRGB(255, 0, 255), 14, "OPAIHUB_SubspaceTripmine_ESP")
+                end
+            end
+            OPAIHUB_SubspaceTripmineESPConnection = OPAIHUB_Workspace.DescendantAdded:Connect(function(obj)
+                if typeof(obj) == "Instance" and obj:IsA("Model") and obj.Name == "SubspaceTripmine" and not obj:FindFirstChild("OPAIHUB_SubspaceTripmine_ESP") then
+                    OPAIHUB_LibESP:AddESP(obj, "", Color3.fromRGB(255, 0, 255), 14, "OPAIHUB_SubspaceTripmine_ESP")
+                end
+            end)
+        else
+            if OPAIHUB_SubspaceTripmineESPConnection then
+                OPAIHUB_SubspaceTripmineESPConnection:Disconnect()
+                OPAIHUB_SubspaceTripmineESPConnection = nil
+            end
+            if OPAIHUB_LibESP then
+                OPAIHUB_LibESP:Delete("OPAIHUB_SubspaceTripmine_ESP")
+            end
+        end
+    end
+})
+
+OPAIHUB_ItemESPGroup:AddToggle("OPAIHUB_MedkitESP", {
+    Text = "医疗箱绘制",
+    Default = false,
+    Callback = function(v)
+        if not OPAIHUB_LibESP then
+            OPAIHUB_Library:Notify("错误", "LibESP库未加载", 3)
+            return
+        end
+        
+        if v then
+            for _, obj in ipairs(OPAIHUB_Workspace:GetDescendants()) do
+                if typeof(obj) == "Instance" and obj:IsA("Model") and obj.Name == "Medkit" and not obj:FindFirstChild("OPAIHUB_Medkit_ESP") then
+                    OPAIHUB_LibESP:AddESP(obj, "Medkit", Color3.fromRGB(187, 255, 255), 14, "OPAIHUB_Medkit_ESP")
+                end
+            end
+            OPAIHUB_MedkitESPConnection = OPAIHUB_Workspace.DescendantAdded:Connect(function(obj)
+                if typeof(obj) == "Instance" and obj:IsA("Model") and obj.Name == "Medkit" and not obj:FindFirstChild("OPAIHUB_Medkit_ESP") then
+                    OPAIHUB_LibESP:AddESP(obj, "Medkit", Color3.fromRGB(187, 255, 255), 14, "OPAIHUB_Medkit_ESP")
+                end
+            end)
+        else
+            if OPAIHUB_MedkitESPConnection then
+                OPAIHUB_MedkitESPConnection:Disconnect()
+                OPAIHUB_MedkitESPConnection = nil
+            end
+            if OPAIHUB_LibESP then
+                OPAIHUB_LibESP:Delete("OPAIHUB_Medkit_ESP")
+            end
+        end
+    end
+})
+
+OPAIHUB_ItemESPGroup:AddToggle("OPAIHUB_ColaESP", {
+    Text = "可乐绘制",
+    Default = false,
+    Callback = function(v)
+        if not OPAIHUB_LibESP then
+            OPAIHUB_Library:Notify("错误", "LibESP库未加载", 3)
+            return
+        end
+        
+        if v then
+            for _, obj in ipairs(OPAIHUB_Workspace:GetDescendants()) do
+                if typeof(obj) == "Instance" and obj:IsA("Model") and obj.Name == "BloxyCola" and not obj:FindFirstChild("OPAIHUB_BloxyCola_ESP") then
+                    OPAIHUB_LibESP:AddESP(obj, "Bloxy Cola", Color3.fromRGB(131, 111, 255), 14, "OPAIHUB_BloxyCola_ESP")
+                end
+            end
+            OPAIHUB_ColaESPConnection = OPAIHUB_Workspace.DescendantAdded:Connect(function(obj)
+                if typeof(obj) == "Instance" and obj:IsA("Model") and obj.Name == "BloxyCola" and not obj:FindFirstChild("OPAIHUB_BloxyCola_ESP") then
+                    OPAIHUB_LibESP:AddESP(obj, "Bloxy Cola", Color3.fromRGB(131, 111, 255), 14, "OPAIHUB_BloxyCola_ESP")
+                end
+            end)
+        else
+            if OPAIHUB_ColaESPConnection then
+                OPAIHUB_ColaESPConnection:Disconnect()
+                OPAIHUB_ColaESPConnection = nil
+            end
+            if OPAIHUB_LibESP then
+                OPAIHUB_LibESP:Delete("OPAIHUB_BloxyCola_ESP")
+            end
+        end
+    end
+})
+
+-- 陷阱绘制
+local OPAIHUB_TrapESPGroup = OPAIHUB_Tabs.ESP:AddLeftGroupbox("OPAIHUB 陷阱绘制")
+
+local OPAIHUB_JohnDoeTrapConnection = nil
+local OPAIHUB_TaphTripwireConnection = nil
+local OPAIHUB_NoliVoidstarConnection = nil
+
+OPAIHUB_TrapESPGroup:AddToggle("OPAIHUB_JohnDoeTrap", {
+    Text = "John Doe陷阱绘制",
+    Default = false,
+    Callback = function(v)
+        if v then
+            local function OPAIHUB_FindShadowInFolder(folder)
+                for _, child in ipairs(folder:GetChildren()) do
+                    if child.Name == "Shadow" then
+                        return child
+                    elseif child:IsA("Folder") or child:IsA("Model") then
+                        local found = OPAIHUB_FindShadowInFolder(child)
+                        if found then return found end
+                    end
+                end
+                return nil
+            end
+            
+            local function OPAIHUB_SetupJohnDoeTrap(shadow)
+                if not shadow or not shadow.Parent then return end
+                
+                local character = OPAIHUB_LocalPlayer.Character
+                if not character then return end
+                local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                if not humanoidRootPart then return end
+                
+                local function OPAIHUB_GetObjectSize(obj)
+                    if obj:IsA("BasePart") then
+                        return obj.Size
+                    elseif obj:IsA("Model") and obj.PrimaryPart then
+                        local cf = obj:GetBoundingBox()
+                        return (cf[2] - cf[1]).Magnitude
+                    else
+                        return Vector3.new(5, 5, 5)
+                    end
+                end
+                
+                local objectSize = OPAIHUB_GetObjectSize(shadow)
+                
+                if not shadow:FindFirstChild("OPAIHUB_ShadowRangeIndicator") then
+                    local highlight = Instance.new("Highlight")
+                    highlight.Name = "OPAIHUB_ShadowRangeIndicator"
+                    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+                    highlight.FillTransparency = 0.8
+                    highlight.OutlineColor = Color3.fromRGB(255, 100, 100)
+                    highlight.OutlineTransparency = 0.5
+                    highlight.Parent = shadow
+                    
+                    local billboard = Instance.new("BillboardGui")
+                    billboard.Name = "OPAIHUB_ShadowNameDisplay"
+                    billboard.AlwaysOnTop = true
+                    billboard.Size = UDim2.new(0, 180, 0, 60)
+                    billboard.StudsOffset = Vector3.new(0, objectSize.Y/2 + 2, 0)
+                    billboard.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+                    
+                    local textLabel = Instance.new("TextLabel")
+                    textLabel.Name = "OPAIHUB_TrapLabel"
+                    textLabel.Text = "TRAP"
+                    textLabel.Size = UDim2.new(1, 0, 0.5, 0)
+                    textLabel.Position = UDim2.new(0, 0, 0, 0)
+                    textLabel.Font = Enum.Font.Arcade
+                    textLabel.TextSize = 18
+                    textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+                    textLabel.BackgroundTransparency = 1
+                    textLabel.TextStrokeTransparency = 0
+                    textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                    textLabel.TextXAlignment = Enum.TextXAlignment.Center
+                    textLabel.TextYAlignment = Enum.TextYAlignment.Center
+                    textLabel.Parent = billboard
+                    
+                    local distanceLabel = Instance.new("TextLabel")
+                    distanceLabel.Name = "OPAIHUB_DistanceLabel"
+                    distanceLabel.Text = "Distance: Calculating..."
+                    distanceLabel.Size = UDim2.new(1, 0, 0.5, 0)
+                    distanceLabel.Position = UDim2.new(0, 0, 0.5, 0)
+                    distanceLabel.Font = Enum.Font.Arcade
+                    distanceLabel.TextSize = 14
+                    distanceLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
+                    distanceLabel.BackgroundTransparency = 1
+                    distanceLabel.TextStrokeTransparency = 0
+                    distanceLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                    distanceLabel.TextXAlignment = Enum.TextXAlignment.Center
+                    distanceLabel.TextYAlignment = Enum.TextYAlignment.Center
+                    distanceLabel.Parent = billboard
+                    
+                    textLabel.Parent = billboard
+                    distanceLabel.Parent = billboard
+                    billboard.Parent = shadow
+                    
+                    if shadow:IsA("BasePart") then
+                        local boxHandleAdornment = Instance.new("BoxHandleAdornment")
+                        boxHandleAdornment.Name = "OPAIHUB_SizeIndicator"
+                        boxHandleAdornment.Adornee = shadow
+                        boxHandleAdornment.AlwaysOnTop = true
+                        boxHandleAdornment.Size = shadow.Size
+                        boxHandleAdornment.Transparency = 0.7
+                        boxHandleAdornment.Color3 = Color3.fromRGB(255, 50, 50)
+                        boxHandleAdornment.ZIndex = 10
+                        boxHandleAdornment.Parent = shadow
+                    end
+                    
+                    OPAIHUB_JohnDoeTrapConnection = OPAIHUB_RunService.Heartbeat:Connect(function()
+                        if not shadow or not shadow.Parent then return end
+                        if not humanoidRootPart or not humanoidRootPart.Parent then return end
+                        
+                        local distance = (humanoidRootPart.Position - shadow.Position).Magnitude
+                        if distanceLabel and distanceLabel.Parent then
+                            distanceLabel.Text = string.format("Distance: %.1f m", distance)
+                        end
+                        
+                        local baseScale = math.clamp(40 / math.max(1, distance), 0.4, 1.8)
+                        if textLabel and textLabel.Parent then
+                            textLabel.TextSize = 18 * baseScale
+                        end
+                        if distanceLabel and distanceLabel.Parent then
+                            distanceLabel.TextSize = 14 * baseScale
+                        end
+                        
+                        local overallTransparency = math.clamp(distance / 80, 0.1, 0.4)
+                        local strokeTransparency = overallTransparency * 0.1
+                        if textLabel and textLabel.Parent then
+                            textLabel.TextStrokeTransparency = strokeTransparency
+                        end
+                        if distanceLabel and distanceLabel.Parent then
+                            distanceLabel.TextStrokeTransparency = strokeTransparency
+                        end
+                        
+                        if highlight and highlight.Parent then
+                            highlight.FillTransparency = math.clamp(distance/70, 0.3, 0.8)
+                        end
+                    end)
+                end
+            end
+            
+            local mapFolder = OPAIHUB_Workspace:FindFirstChild("Map")
+            if mapFolder then
+                local ingameFolder = mapFolder:FindFirstChild("Ingame")
+                if ingameFolder then
+                    local shadow = OPAIHUB_FindShadowInFolder(ingameFolder)
+                    if shadow then
+                        OPAIHUB_SetupJohnDoeTrap(shadow)
+                    end
+                end
+            end
+        else
+            if OPAIHUB_JohnDoeTrapConnection then
+                OPAIHUB_JohnDoeTrapConnection:Disconnect()
+                OPAIHUB_JohnDoeTrapConnection = nil
+            end
+        end
+    end
+})
+
+OPAIHUB_TrapESPGroup:AddToggle("OPAIHUB_TaphTripwire", {
+    Text = "Taph绊线绘制",
+    Default = false,
+    Callback = function(v)
+        if v then
+            local DEEP_PURPLE = Color3.fromRGB(102, 0, 153)
+            
+            local HIGHLIGHT_SETTINGS = {
+                FillColor = DEEP_PURPLE,
+                OutlineColor = DEEP_PURPLE,
+                FillTransparency = 0.2,
+                OutlineTransparency = 0,
+                DepthMode = Enum.HighlightDepthMode.AlwaysOnTop,
+                OutlineThickness = 2,
+            }
+            
+            local function OPAIHUB_ClearExistingHighlights()
+                for _, obj in pairs(OPAIHUB_Workspace:GetDescendants()) do
+                    if typeof(obj) == "Instance" and obj:IsA("Highlight") and obj.Name == "OPAIHUB_TaphTripwire_DeepPurpleHighlight" then
+                        obj:Destroy()
+                    end
+                end
+            end
+            
+            local function OPAIHUB_GetTargetFolder()
+                local map = OPAIHUB_Workspace:FindFirstChild("Map")
+                if not map then return nil end
+                local ingame = map:FindFirstChild("Ingame")
+                if not ingame then return nil end
+                return ingame
+            end
+            
+            local function OPAIHUB_ApplyDeepPurpleHighlight(obj)
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "OPAIHUB_TaphTripwire_DeepPurpleHighlight"
+                highlight.Parent = obj
+                for setting, value in pairs(HIGHLIGHT_SETTINGS) do
+                    highlight[setting] = value
+                end
+                
+                if obj:IsA("BasePart") then
+                    local glow = Instance.new("SurfaceAppearance")
+                    glow.ColorMap = DEEP_PURPLE
+                    glow.Parent = obj
+                end
+            end
+            
+            local function OPAIHUB_HighlightTaphTripwireObjects()
+                OPAIHUB_ClearExistingHighlights()
+                local targetFolder = OPAIHUB_GetTargetFolder()
+                if not targetFolder then return end
+                
+                local count = 0
+                for _, obj in pairs(targetFolder:GetDescendants()) do
+                    if typeof(obj) == "Instance" and string.find(obj.Name, "TaphTripwire") then
+                        OPAIHUB_ApplyDeepPurpleHighlight(obj)
+                        count = count + 1
+                    end
+                end
+                
+                print("[OPAIHUB] 高亮完成 数量: " .. count)
+                
+                OPAIHUB_TaphTripwireConnection = targetFolder.DescendantAdded:Connect(function(newObj)
+                    if typeof(newObj) == "Instance" and string.find(newObj.Name, "TaphTripwire") then
+                        OPAIHUB_ApplyDeepPurpleHighlight(newObj)
+                    end
+                end)
+            end
+            
+            OPAIHUB_HighlightTaphTripwireObjects()
+            
+            game:GetService("StarterGui"):SetCore("ChatMakeSystemMessage", {
+                Text = "输入 /highlighttaph 重新执行高亮",
+                Color = DEEP_PURPLE,
+                Font = Enum.Font.SourceSansBold
+            })
+            
+            OPAIHUB_Players.PlayerAdded:Connect(function(player)
+                player.Chatted:Connect(function(msg)
+                    if msg:lower() == "/highlighttaph" then
+                        OPAIHUB_HighlightTaphTripwireObjects()
+                    end
+                end)
+            end)
+        else
+            if OPAIHUB_TaphTripwireConnection then
+                OPAIHUB_TaphTripwireConnection:Disconnect()
+                OPAIHUB_TaphTripwireConnection = nil
+            end
+        end
+    end
+})
+
+OPAIHUB_TrapESPGroup:AddToggle("OPAIHUB_NoliVoidstar", {
+    Text = "Noli星星绘制",
+    Default = false,
+    Callback = function(v)
+        if v then
+            local HIGHLIGHT_COLOR = Color3.fromRGB(255, 0, 255)
+            local voidstar = OPAIHUB_Workspace:FindFirstChild("Voidstar", true)
+            
+            if voidstar then
+                if not voidstar:FindFirstChild("OPAIHUB_VoidstarHighlight") then
+                    local highlight = Instance.new("Highlight")
+                    highlight.Name = "OPAIHUB_VoidstarHighlight"
+                    highlight.FillColor = HIGHLIGHT_COLOR
+                    highlight.OutlineColor = HIGHLIGHT_COLOR
+                    highlight.FillTransparency = 0.3
+                    highlight.OutlineTransparency = 0
+                    highlight.Parent = voidstar
+                end
+            end
+        else
+            local voidstar = OPAIHUB_Workspace:FindFirstChild("Voidstar", true)
+            if voidstar then
+                local highlight = voidstar:FindFirstChild("OPAIHUB_VoidstarHighlight")
+                if highlight then
+                    highlight:Destroy()
+                end
+            end
+        end
+    end
+})
+
+-- ============================================
+-- ============================================
+-- ============================================
+-- OPAIHUB 传送功能页面（新版）
+-- ============================================
+
+-- 悬浮窗控制
+local OPAIHUB_FloatingButton = nil
+local OPAIHUB_FloatingButtonVisible = true
+local OPAIHUB_WindowOpenState = true -- 跟踪窗口状态
+
+local function OPAIHUB_CreateFloatingButton()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "OPAIHUB_FloatingControl"
+    screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.DisplayOrder = 999 -- 确保在最上层
+    
+    local button = Instance.new("ImageButton")
+    button.Name = "FloatingButton"
+    button.Size = UDim2.new(0, 60, 0, 60)
+    button.Position = UDim2.new(1, -80, 0.5, -30)
+    button.BackgroundTransparency = 0.3
+    button.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    button.Image = "rbxassetid://97914301936069"
+    button.ImageTransparency = 0
+    button.Visible = true
+    button.Active = true
+    button.Parent = screenGui
+    
+    -- 圆角
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0.5, 0)
+    corner.Parent = button
+    
+    -- 边框
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(0, 170, 255)
+    stroke.Thickness = 2
+    stroke.Parent = button
+    
+    -- 拖拽功能
+    local dragging = false
+    local dragInput, mousePos, framePos
+    
+    button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            mousePos = input.Position
+            framePos = button.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                                end
+                            end)
+                        end
+                    end)
+                    
+    button.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+                    end
+                end)
+    
+    OPAIHUB_UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - mousePos
+            button.Position = UDim2.new(
+                framePos.X.Scale,
+                framePos.X.Offset + delta.X,
+                framePos.Y.Scale,
+                framePos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    
+    -- 点击切换窗口
+    button.MouseButton1Click:Connect(function()
+        OPAIHUB_WindowOpenState = not OPAIHUB_WindowOpenState
+        
+        -- 尝试多种方法隐藏/显示窗口
+        pcall(function()
+            -- 方法1: 使用SetOpen（如果存在）
+            if OPAIHUB_Window and OPAIHUB_Window.SetOpen then
+                OPAIHUB_Window:SetOpen(OPAIHUB_WindowOpenState)
+            end
+            
+            -- 方法2: 使用全局存储的窗口GUI引用
+            if _G.OPAIHUB_WindowGui and _G.OPAIHUB_WindowGui.Parent then
+                _G.OPAIHUB_WindowGui.Enabled = OPAIHUB_WindowOpenState
+            else
+                -- 重新查找窗口GUI
+                local coreGui = game:GetService("CoreGui")
+                for _, gui in ipairs(coreGui:GetChildren()) do
+                    if gui:IsA("ScreenGui") then
+                        for _, desc in ipairs(gui:GetDescendants()) do
+                            if desc.Name:find("OPAI") or desc.Name:find("被遗弃") or desc.Name:find("Obsidian") then
+                                _G.OPAIHUB_WindowGui = gui
+                                gui.Enabled = OPAIHUB_WindowOpenState
+                    break
+                end
+            end
+                        if _G.OPAIHUB_WindowGui then break end
+                    end
+                end
+            end
+        end)
+    end)
+    
+    screenGui.Parent = game:GetService("CoreGui")
+    
+    -- 确保按钮可见
+                task.spawn(function()
+        task.wait(0.1)
+        if button and button.Parent then
+            button.Visible = true
+        end
+        if screenGui and screenGui.Parent then
+            screenGui.Enabled = true
+                        end
+                    end)
+                    
+    return screenGui
+end
+
+-- 主页添加悬浮窗控制
+local OPAIHUB_MainWindowGroup = OPAIHUB_Tabs.Main:AddRightGroupbox("OPAIHUB 窗口控制")
+
+OPAIHUB_MainWindowGroup:AddToggle("OPAIHUB_FloatingButton", {
+    Text = "悬浮窗按钮",
+    Default = true,
+    Tooltip = "显示/隐藏悬浮窗按钮，用于快速打开/关闭主界面",
+    Callback = function(v)
+        OPAIHUB_FloatingButtonVisible = v
+        if v then
+            if not OPAIHUB_FloatingButton or not OPAIHUB_FloatingButton.Parent then
+                if OPAIHUB_FloatingButton then
+                    OPAIHUB_FloatingButton:Destroy()
+                end
+                OPAIHUB_FloatingButton = OPAIHUB_CreateFloatingButton()
+            end
+            -- 确保按钮可见
+            if OPAIHUB_FloatingButton then
+                local button = OPAIHUB_FloatingButton:FindFirstChild("FloatingButton")
+                if button then
+                    button.Visible = true
+                end
+            end
+        else
+            if OPAIHUB_FloatingButton then
+                local button = OPAIHUB_FloatingButton:FindFirstChild("FloatingButton")
+                if button then
+                    button.Visible = false
+                            end
+                        end
+        end
+    end
+})
+
+OPAIHUB_MainWindowGroup:AddButton({
+    Text = "关闭主界面",
+    Func = function()
+        OPAIHUB_WindowOpenState = false
+        
+        -- 尝试多种方法隐藏窗口
+        pcall(function()
+            -- 方法1: 使用SetOpen（如果存在）
+            if OPAIHUB_Window and OPAIHUB_Window.SetOpen then
+                OPAIHUB_Window:SetOpen(false)
+            end
+            
+            -- 方法2: 使用全局存储的窗口GUI引用
+            if _G.OPAIHUB_WindowGui and _G.OPAIHUB_WindowGui.Parent then
+                _G.OPAIHUB_WindowGui.Enabled = false
+            else
+                -- 重新查找窗口GUI
+                local coreGui = game:GetService("CoreGui")
+                for _, gui in ipairs(coreGui:GetChildren()) do
+                    if gui:IsA("ScreenGui") then
+                        for _, desc in ipairs(gui:GetDescendants()) do
+                            if desc.Name:find("OPAI") or desc.Name:find("被遗弃") or desc.Name:find("Obsidian") then
+                                _G.OPAIHUB_WindowGui = gui
+                                gui.Enabled = false
+                    break
+                end
+            end
+                        if _G.OPAIHUB_WindowGui then break end
+        end
+            end
+        end
+        end)
+        
+        OPAIHUB_Library:Notify("提示", "使用悬浮窗按钮或按 RightShift 重新打开", 5)
+    end,
+    DoubleClick = false,
+    Tooltip = "关闭主界面，使用悬浮窗按钮或快捷键重新打开"
+})
+
+-- 创建传送功能组
+local OPAIHUB_TeleportKillerGroup = OPAIHUB_Tabs.Teleport:AddLeftGroupbox("OPAIHUB 传送到杀手")
+
+OPAIHUB_TeleportKillerGroup:AddButton({
+    Text = "传送到最近的杀手（全图）",
+    Func = function()
+        local character = OPAIHUB_LocalPlayer.Character
+        if not character or not character:FindFirstChild("HumanoidRootPart") then
+            OPAIHUB_Library:Notify("错误", "找不到你的角色", 3)
+            return
+        end
+        
+        local myPosition = character.HumanoidRootPart.Position
+        local killersFolder = OPAIHUB_Workspace.Players:FindFirstChild("Killers")
+        
+        if not killersFolder then
+            OPAIHUB_Library:Notify("错误", "找不到杀手文件夹", 3)
+            return
+        end
+        
+        local closestKiller = nil
+        local shortestDistance = math.huge
+        
+        -- 搜索全图所有杀手（无距离限制）
+        for _, killer in ipairs(killersFolder:GetChildren()) do
+            if typeof(killer) == "Instance" and killer:IsA("Model") and killer ~= character then
+                local killerHRP = killer:FindFirstChild("HumanoidRootPart")
+                if killerHRP then
+                    local distance = (killerHRP.Position - myPosition).Magnitude
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        closestKiller = killer
+                    end
+                end
+            end
+        end
+
+        if closestKiller then
+            local killerHRP = closestKiller:FindFirstChild("HumanoidRootPart")
+            if killerHRP then
+                -- 传送到杀手前面3米，面向杀手
+                local killerPos = killerHRP.Position
+                local newPos = killerHRP.CFrame * CFrame.new(0, 0, -3)
+                
+                -- 先设置角色位置
+                character.HumanoidRootPart.CFrame = CFrame.new(newPos.Position, killerPos)
+                
+                -- 立即调整相机视角对准杀手（确保准星准确）
+                if OPAIHUB_Workspace.CurrentCamera then
+                    local camera = OPAIHUB_Workspace.CurrentCamera
+                    local cameraPos = camera.CFrame.Position
+                    camera.CFrame = CFrame.new(cameraPos, killerPos)
+                end
+                
+                -- 延迟多次更新确保视角锁定（后台执行）
+                task.spawn(function()
+                    local targetKiller = closestKiller -- 保存引用
+                    local targetPos = killerPos -- 保存位置
+                    for i = 1, 5 do
+                        task.wait(0.02)
+                        if OPAIHUB_Workspace.CurrentCamera and targetKiller and targetKiller.Parent then
+                            local camera = OPAIHUB_Workspace.CurrentCamera
+                            local killerHRP = targetKiller:FindFirstChild("HumanoidRootPart")
+                            if killerHRP then
+                                local cameraPos = camera.CFrame.Position
+                                camera.CFrame = CFrame.new(cameraPos, killerHRP.Position)
+            end
+        end
+                    end
+                end)
+                
+                -- 显示距离信息
+                local distanceText = math.floor(shortestDistance) .. "米"
+                OPAIHUB_Library:Notify("传送成功", "已传送到 " .. closestKiller.Name .. " 附近 (原距离: " .. distanceText .. ")", 3)
+            end
+        else
+            OPAIHUB_Library:Notify("提示", "没有找到杀手", 3)
+        end
+    end,
+    DoubleClick = false,
+    Tooltip = "搜索全图范围，传送到最近的杀手前面3米处（无距离限制）"
+})
+
+-- 循环绕圈飞行（在杀手附近20米绕圈）
+local OPAIHUB_CircleTeleportEnabled = false
+local OPAIHUB_CircleTeleportConnection = nil
+local OPAIHUB_CircleTeleportAngle = 0
+local OPAIHUB_CircleTeleportRadius = 20
+
+OPAIHUB_TeleportKillerGroup:AddSlider("OPAIHUB_CircleRadius", {
+    Text = "绕圈半径",
+    Min = 5,
+    Max = 50,
+    Default = 20,
+    Rounding = 1,
+    Compact = false,
+    Callback = function(value)
+        OPAIHUB_CircleTeleportRadius = value
+    end
+})
+
+OPAIHUB_TeleportKillerGroup:AddToggle("OPAIHUB_CircleTeleport", {
+    Text = "循环绕圈飞行（杀手附近）",
+    Default = false,
+    Tooltip = "在最近的杀手附近平滑飞行绕圈（隐蔽模式）",
+    Callback = function(state)
+        OPAIHUB_CircleTeleportEnabled = state
+        if state then
+            if OPAIHUB_CircleTeleportConnection then
+                OPAIHUB_CircleTeleportConnection:Disconnect()
+                OPAIHUB_CircleTeleportConnection = nil
+            end
+            
+            OPAIHUB_CircleTeleportAngle = 0
+            local lastTime = tick()
+            
+            OPAIHUB_CircleTeleportConnection = OPAIHUB_RunService.Heartbeat:Connect(function()
+                if not OPAIHUB_CircleTeleportEnabled then return end
+                
+                local character = OPAIHUB_LocalPlayer.Character
+                if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+                
+                local hrp = character.HumanoidRootPart
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                
+                -- 计算deltaTime
+                local currentTime = tick()
+                local deltaTime = math.min(currentTime - lastTime, 0.02) -- 限制最大deltaTime
+                lastTime = currentTime
+                
+        local killersFolder = OPAIHUB_Workspace.Players:FindFirstChild("Killers")
+                if not killersFolder then return end
+                
+                -- 找到最近的杀手
+                local closestKiller = nil
+                local shortestDistance = math.huge
+                local myPos = hrp.Position
+        
+        for _, killer in ipairs(killersFolder:GetChildren()) do
+            if typeof(killer) == "Instance" and killer:IsA("Model") and killer ~= character then
+                local killerHRP = killer:FindFirstChild("HumanoidRootPart")
+                if killerHRP then
+                            local distance = (killerHRP.Position - myPos).Magnitude
+                            if distance < shortestDistance then
+                                shortestDistance = distance
+                                closestKiller = killer
+                end
+            end
+        end
+                end
+                
+                if closestKiller then
+                    local killerHRP = closestKiller:FindFirstChild("HumanoidRootPart")
+                    if killerHRP then
+                        -- 计算目标位置（绕圈）
+                        local offsetX = math.cos(OPAIHUB_CircleTeleportAngle) * OPAIHUB_CircleTeleportRadius
+                        local offsetZ = math.sin(OPAIHUB_CircleTeleportAngle) * OPAIHUB_CircleTeleportRadius
+                        local targetPosition = killerHRP.Position + Vector3.new(offsetX, 0, offsetZ)
+                        
+                        -- 计算飞行方向（平滑移动）
+                        local direction = (targetPosition - hrp.Position)
+                        local distance = direction.Magnitude
+                        
+                        if distance > 0.3 then
+                            -- 使用平滑插值移动（更隐蔽）
+                            local moveSpeed = math.min(distance * 6, 35) -- 降低最大速度，更自然
+                            local lerpAlpha = math.min((moveSpeed * deltaTime) / distance, 0.3) -- 限制lerp速度，避免跳跃
+                            
+                            -- 手动实现位置插值（避免使用可能不存在的Lerp方法）
+                            local newPosition = hrp.Position + (direction.Unit * moveSpeed * deltaTime)
+                            local newCFrame = CFrame.new(newPosition, killerHRP.Position)
+                            
+                            -- 使用CFrame方式移动（模拟正常移动）
+                            hrp.CFrame = newCFrame
+                            
+                            -- 调整相机视角对准杀手（确保准星准确，持续更新）
+                            if OPAIHUB_Workspace.CurrentCamera then
+                                local camera = OPAIHUB_Workspace.CurrentCamera
+                                local cameraPos = camera.CFrame.Position
+                                -- 平滑更新相机视角
+                                camera.CFrame = CFrame.new(cameraPos, killerHRP.Position)
+                            end
+                            
+                            -- 保持正常物理状态（不使用PlatformStand，避免检测）
+                            if humanoid then
+                                humanoid.PlatformStand = false
+                                -- 模拟正常移动速度，避免被检测
+                                if humanoid.WalkSpeed < 20 then
+                                    humanoid.WalkSpeed = 20
+            end
+        end
+        
+                            -- 轻微抵消重力，但不完全禁用（更隐蔽）
+                            local currentVelocity = hrp.AssemblyLinearVelocity
+                            local targetVelocity = Vector3.new(0, math.min(currentVelocity.Y + 0.5, 5), 0) -- 轻微上浮，限制最大速度
+                            hrp.AssemblyLinearVelocity = Vector3.new(
+                                currentVelocity.X * 0.9 + targetVelocity.X * 0.1,
+                                currentVelocity.Y * 0.9 + targetVelocity.Y * 0.1,
+                                currentVelocity.Z * 0.9 + targetVelocity.Z * 0.1
+                            )
+                        else
+                            -- 接近目标，直接设置位置
+                            hrp.CFrame = CFrame.new(targetPosition, killerHRP.Position)
+                        end
+                        
+                        -- 增加角度（每帧增加，控制绕圈速度）
+                        OPAIHUB_CircleTeleportAngle = OPAIHUB_CircleTeleportAngle + (0.015 * math.min(deltaTime / (1/60), 2))
+                        if OPAIHUB_CircleTeleportAngle > math.pi * 2 then
+                            OPAIHUB_CircleTeleportAngle = 0
+                        end
+                    end
+                end
+            end)
+            
+            OPAIHUB_Library:Notify("循环绕圈飞行已启用", "在杀手附近" .. OPAIHUB_CircleTeleportRadius .. "米平滑飞行绕圈（隐蔽模式）", 3)
+        else
+            if OPAIHUB_CircleTeleportConnection then
+                OPAIHUB_CircleTeleportConnection:Disconnect()
+                OPAIHUB_CircleTeleportConnection = nil
+            end
+            
+            -- 恢复正常状态
+            local character = OPAIHUB_LocalPlayer.Character
+            if character and character:FindFirstChild("HumanoidRootPart") then
+                local hrp = character.HumanoidRootPart
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                
+                -- 恢复重力
+                hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                
+                -- 恢复Humanoid状态
+                if humanoid then
+                    humanoid.PlatformStand = false
+            end
+        end
+        
+            OPAIHUB_Library:Notify("循环绕圈飞行已关闭", "停止飞行绕圈", 3)
+        end
+    end
+})
+
+local OPAIHUB_TeleportSurvivorGroup = OPAIHUB_Tabs.Teleport:AddRightGroupbox("OPAIHUB 传送到幸存者")
+
+OPAIHUB_TeleportSurvivorGroup:AddButton({
+    Text = "传送到最近的幸存者（全图）",
+    Func = function()
+        local character = OPAIHUB_LocalPlayer.Character
+        if not character or not character:FindFirstChild("HumanoidRootPart") then
+            OPAIHUB_Library:Notify("错误", "找不到你的角色", 3)
+            return
+        end
+        
+        local myPosition = character.HumanoidRootPart.Position
+        local survivorsFolder = OPAIHUB_Workspace.Players:FindFirstChild("Survivors")
+        
+        if not survivorsFolder then
+            OPAIHUB_Library:Notify("错误", "找不到幸存者文件夹", 3)
+            return
+        end
+        
+        local closestSurvivor = nil
+        local shortestDistance = math.huge
+        
+        -- 搜索全图所有幸存者（无距离限制）
+        for _, survivor in ipairs(survivorsFolder:GetChildren()) do
+            if typeof(survivor) == "Instance" and survivor:IsA("Model") and survivor ~= character then
+                local survivorHRP = survivor:FindFirstChild("HumanoidRootPart")
+                if survivorHRP then
+                    local distance = (survivorHRP.Position - myPosition).Magnitude
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        closestSurvivor = survivor
+                    end
+                end
+            end
+        end
+        
+        if closestSurvivor then
+            local survivorHRP = closestSurvivor:FindFirstChild("HumanoidRootPart")
+            if survivorHRP then
+                -- 传送到幸存者前面3米，面向幸存者
+                local survivorPos = survivorHRP.Position
+                local newPos = survivorHRP.CFrame * CFrame.new(0, 0, -3)
+                
+                -- 先设置角色位置
+                character.HumanoidRootPart.CFrame = CFrame.new(newPos.Position, survivorPos)
+                
+                -- 立即调整相机视角对准幸存者（确保准星准确）
+                if OPAIHUB_Workspace.CurrentCamera then
+                    local camera = OPAIHUB_Workspace.CurrentCamera
+                    local cameraPos = camera.CFrame.Position
+                    camera.CFrame = CFrame.new(cameraPos, survivorPos)
+                end
+                
+                -- 延迟多次更新确保视角锁定（后台执行）
+                task.spawn(function()
+                    local targetSurvivor = closestSurvivor -- 保存引用
+                    local targetPos = survivorPos -- 保存位置
+                    for i = 1, 5 do
+                        task.wait(0.02)
+                        if OPAIHUB_Workspace.CurrentCamera and targetSurvivor and targetSurvivor.Parent then
+                            local camera = OPAIHUB_Workspace.CurrentCamera
+                            local survivorHRP = targetSurvivor:FindFirstChild("HumanoidRootPart")
+                            if survivorHRP then
+                                local cameraPos = camera.CFrame.Position
+                                camera.CFrame = CFrame.new(cameraPos, survivorHRP.Position)
+                            end
+                        end
+                    end
+                end)
+                
+                -- 显示距离信息
+                local distanceText = math.floor(shortestDistance) .. "米"
+                OPAIHUB_Library:Notify("传送成功", "已传送到 " .. closestSurvivor.Name .. " 附近 (原距离: " .. distanceText .. ")", 3)
+            end
+        else
+            OPAIHUB_Library:Notify("提示", "没有找到其他幸存者", 3)
+        end
+    end,
+    DoubleClick = false,
+    Tooltip = "搜索全图范围，传送到最近的幸存者前面3米处（无距离限制）"
+})
+
+local OPAIHUB_TeleportInfoGroup = OPAIHUB_Tabs.Teleport:AddLeftGroupbox("OPAIHUB 信息查询")
+
+OPAIHUB_TeleportInfoGroup:AddButton({
+    Text = "获取我的团队信息",
+    Func = function()
+        local character = OPAIHUB_LocalPlayer.Character
+        if not character then
+            OPAIHUB_Library:Notify("错误", "找不到你的角色", 3)
+            return
+        end
+        
+        local killersFolder = OPAIHUB_Workspace.Players:FindFirstChild("Killers")
+        local survivorsFolder = OPAIHUB_Workspace.Players:FindFirstChild("Survivors")
+        
+        local isKiller = killersFolder and table.find(killersFolder:GetChildren(), character)
+        local isSurvivor = survivorsFolder and table.find(survivorsFolder:GetChildren(), character)
+        
+        if isKiller then
+            OPAIHUB_Library:Notify("团队信息", "你是杀手！", 5)
+        elseif isSurvivor then
+            OPAIHUB_Library:Notify("团队信息", "你是幸存者！", 5)
+        else
+            OPAIHUB_Library:Notify("团队信息", "无法确定你的团队", 3)
+        end
+    end,
+    DoubleClick = false,
+    Tooltip = "显示你当前是杀手还是幸存者"
+})
+
+OPAIHUB_TeleportInfoGroup:AddButton({
+    Text = "显示所有玩家列表",
+    Func = function()
+        local killersFolder = OPAIHUB_Workspace.Players:FindFirstChild("Killers")
+        local survivorsFolder = OPAIHUB_Workspace.Players:FindFirstChild("Survivors")
+        
+        local killersList = "杀手: "
+        local survivorsList = "幸存者: "
+        
+        if killersFolder then
+            local killerCount = 0
+            for _, killer in ipairs(killersFolder:GetChildren()) do
+                if typeof(killer) == "Instance" and killer:IsA("Model") then
+                    killersList = killersList .. killer.Name .. ", "
+                    killerCount = killerCount + 1
+                end
+            end
+            killersList = killersList .. " (共" .. killerCount .. "个)"
+        else
+            killersList = killersList .. "无"
+        end
+        
+        if survivorsFolder then
+            local survivorCount = 0
+            for _, survivor in ipairs(survivorsFolder:GetChildren()) do
+                if typeof(survivor) == "Instance" and survivor:IsA("Model") then
+                    survivorsList = survivorsList .. survivor.Name .. ", "
+                    survivorCount = survivorCount + 1
+                end
+            end
+            survivorsList = survivorsList .. " (共" .. survivorCount .. "个)"
+        else
+            survivorsList = survivorsList .. "无"
+        end
+        
+        OPAIHUB_Library:Notify("玩家列表", killersList .. "\n" .. survivorsList, 7)
+    end,
+    DoubleClick = false,
+    Tooltip = "显示当前游戏中所有的杀手和幸存者"
+})
+
+-- 初始化悬浮窗按钮
+task.spawn(function()
+    task.wait(1) -- 等待UI完全加载
+    if OPAIHUB_FloatingButtonVisible then
+        OPAIHUB_FloatingButton = OPAIHUB_CreateFloatingButton()
+        if OPAIHUB_FloatingButton then
+            local button = OPAIHUB_FloatingButton:FindFirstChild("FloatingButton")
+            if button then
+                button.Visible = true
+            end
+        end
+    end
+end)
+
+
 -- OPAIHUB 清理和初始化
 -- ============================================
 
@@ -2818,7 +4277,8 @@ OPAIHUB_LocalPlayer.CharacterAdded:Connect(function()
         end
         local OPAIHUB_TWOsounds = {
             "rbxassetid://86710781315432",
-            "rbxassetid://99820161736138"
+            "rbxassetid://99820161736138",
+            "rbxassetid://72457886454761"
         }
         OPAIHUB_TwoTimeAimbotConnection = OPAIHUB_LocalPlayer.Character.HumanoidRootPart.ChildAdded:Connect(function(child)
             if not OPAIHUB_TwoTimeAimbotEnabled then return end
@@ -2918,7 +4378,8 @@ OPAIHUB_LocalPlayer.CharacterAdded:Connect(function()
         end
         local OPAIHUB_X1X4Sounds = {
             "rbxassetid://86710781315432",
-            "rbxassetid://99820161736138"
+            "rbxassetid://99820161736138",
+            "rbxassetid://72457886454761"
         }
         OPAIHUB_X1X4AimbotConnection = OPAIHUB_LocalPlayer.Character.HumanoidRootPart.ChildAdded:Connect(function(child)
             if not OPAIHUB_X1X4AimbotEnabled then return end
@@ -2977,7 +4438,8 @@ OPAIHUB_LocalPlayer.CharacterAdded:Connect(function()
         end
         local OPAIHUB_CoolSounds = {
             "rbxassetid://86710781315432",
-            "rbxassetid://99820161736138"
+            "rbxassetid://99820161736138",
+            "rbxassetid://72457886454761"
         }
         OPAIHUB_CoolAimbotConnection = OPAIHUB_LocalPlayer.Character.HumanoidRootPart.ChildAdded:Connect(function(child)
             if not OPAIHUB_CoolAimbotEnabled then return end
@@ -3036,7 +4498,8 @@ OPAIHUB_LocalPlayer.CharacterAdded:Connect(function()
         end
         local OPAIHUB_JohnSounds = {
             "rbxassetid://86710781315432",
-            "rbxassetid://99820161736138"
+            "rbxassetid://99820161736138",
+            "rbxassetid://72457886454761"
         }
         OPAIHUB_JohnAimbotConnection = OPAIHUB_LocalPlayer.Character.HumanoidRootPart.ChildAdded:Connect(function(child)
             if not OPAIHUB_JohnAimbotEnabled then return end
@@ -3095,7 +4558,8 @@ OPAIHUB_LocalPlayer.CharacterAdded:Connect(function()
         end
         local OPAIHUB_JasonSounds = {
             "rbxassetid://86710781315432",
-            "rbxassetid://99820161736138"
+            "rbxassetid://99820161736138",
+            "rbxassetid://72457886454761"
         }
         OPAIHUB_JasonAimbotConnection = OPAIHUB_LocalPlayer.Character.HumanoidRootPart.ChildAdded:Connect(function(child)
             if not OPAIHUB_JasonAimbotEnabled then return end
@@ -3162,6 +4626,17 @@ OPAIHUB_LocalPlayer:GetPropertyChangedSignal("Parent"):Connect(function()
         if OPAIHUB_AutoBlockConnection then
             OPAIHUB_AutoBlockConnection:Disconnect()
             OPAIHUB_AutoBlockConnection = nil
+        end
+        
+        if OPAIHUB_CircleTeleportConnection then
+            OPAIHUB_CircleTeleportConnection:Disconnect()
+            OPAIHUB_CircleTeleportConnection = nil
+        end
+        
+        if _G.OPAIHUB_HitboxTracking and _G.OPAIHUB_HitboxTracking.Connection then
+            _G.OPAIHUB_HitboxTracking.Connection:Disconnect()
+            _G.OPAIHUB_HitboxTracking.Connection = nil
+            _G.OPAIHUB_HitboxTracking.Active = false
         end
         
         if OPAIHUB_AutoRepairTask then

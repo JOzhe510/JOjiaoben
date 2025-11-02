@@ -2,25 +2,21 @@ local repo = 'https://raw.githubusercontent.com/deividcomsono/Obsidian/main/'
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 
 local Window = Library:CreateWindow({
-    Title = '被遗弃访客自动格挡',
+    Title = '被遗弃自动防御',
     Center = true,
     AutoShow = true,
     Resizable = true
 })
 
-local SpeedGroup = Window:AddTab('通用加速'):AddLeftGroupbox('高速')
-
-local SpeedMultiplier = {
-    default = 1,
-    boosted = 20 
-}
+local SpeedGroup = Window:AddTab('通用加速'):AddLeftGroupbox('高速设置')
+local SpeedMultiplier = { default = 1, boosted = 20 }
 local isBoostEnabled = false
 local moveConnection = nil
 local jumpConnection = nil
 local LocalPlayer = game:GetService("Players").LocalPlayer
 
 SpeedGroup:AddSlider("SpeedMulti", {
-    Text = "加速速度",
+    Text = "加速倍率",
     Min = 0,
     Max = 50,
     Default = SpeedMultiplier.boosted,
@@ -31,21 +27,19 @@ SpeedGroup:AddSlider("SpeedMulti", {
 })
 
 SpeedGroup:AddToggle("SpeedBoostToggle", {
-    Text = "开启通用高速加速",
+    Text = "开启通用加速",
     Default = false,
     Callback = function(enabled)
         isBoostEnabled = enabled
         local RunService = game:GetService("RunService")
-
         if moveConnection then moveConnection:Disconnect() end
         if jumpConnection then jumpConnection:Disconnect() end
 
         if enabled then
-     
             moveConnection = RunService.RenderStepped:Connect(function(deltaTime)
                 local Character = LocalPlayer.Character
                 if not Character then return end
-                local Humanoid = Character:FindFirstChild("Humanoid")
+                local Humanoid = Character:FindFirstChildOfClass("Humanoid")
                 local RootPart = Character:FindFirstChild("HumanoidRootPart")
                 if not Humanoid or not RootPart then return end
 
@@ -69,15 +63,8 @@ SpeedGroup:AddToggle("SpeedBoostToggle", {
                 end)
             end
 
-            if LocalPlayer.Character then
-                onCharacterAdded(LocalPlayer.Character)
-            end
+            if LocalPlayer.Character then onCharacterAdded(LocalPlayer.Character) end
             LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
-
-        else
-        
-            if moveConnection then moveConnection:Disconnect() end
-            if jumpConnection then jumpConnection:Disconnect() end
         end
     end
 })
@@ -92,15 +79,22 @@ SpeedGroup:AddButton("EmergencyStop", {
     end
 })
 
-local BlockConfig = {
-    Enabled = false,
-    BaseDistance = 16,         
-    ScanInterval = 0.001,      
-    BlockCooldown = 0.08,      
-    TargetAngle = 50,          
-    ShowVisualization = false,  
-    EnablePrediction = false,   
-    
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RemoteEvent = ReplicatedStorage:FindFirstChild("Modules") 
+    and ReplicatedStorage.Modules:FindFirstChild("Network") 
+    and ReplicatedStorage.Modules.Network:FindFirstChildOfClass("RemoteEvent") or nil
+
+local CombatConfig = {
+    EnableCombat = false,
+    EnableBlock = true,
+    EnableSlash = true,
+    BaseDistance = 20,
+    TargetAngle = 90,
+    ScanInterval = 0.01,
+    BlockCooldown = 0.1,
+    SlashCooldown = 0.2,
+    ShowVisualization = true,
+    EnablePrediction = true,
     TargetSoundIds = {
         "102228729296384", "140242176732868", "112809109188560", "136323728355613",
         "115026634746636", "84116622032112", "108907358619313", "127793641088496",
@@ -111,16 +105,18 @@ local BlockConfig = {
     }
 }
 
-local combatConnection = nil    
-local lastBlockTime = 0         
-local lastScanTime = 0          
-local visualizationParts = {}   
-local soundCache = {}           
-local lastSoundCheck = 0        
-local lastPingCheck = 0         
-local currentPing = 0           
-local soundLookup = {}          
-for _, id in ipairs(BlockConfig.TargetSoundIds) do
+local combatConnection = nil
+local lastBlockTime = 0
+local lastSlashTime = 0
+local lastScanTime = 0
+local visualizationParts = {}
+local soundCache = {}
+local lastSoundCheck = 0
+local lastPingCheck = 0
+local currentPing = 0
+local soundLookup = {}
+
+for _, id in ipairs(CombatConfig.TargetSoundIds) do
     soundLookup[id] = true
     soundLookup["rbxassetid://" .. id] = true
 end
@@ -139,7 +135,8 @@ local function GetPing()
 end
 
 local function GetPingCompensation()
-    return math.min(0.3, GetPing() / 1000 * 0.1 * 10)
+    local ping = GetPing()
+    return math.min(0.5, ping / 1000 * 0.2 * 10)
 end
 
 local function CreateVisualization()
@@ -149,6 +146,7 @@ local function CreateVisualization()
 
     for _, part in ipairs(visualizationParts) do part:Destroy() end
     visualizationParts = {}
+
     local center = RootPart.Position + Vector3.new(0, 0.1, 0)
     local segments = 36
 
@@ -163,10 +161,10 @@ local function CreateVisualization()
 
     for i = 1, segments do
         local part = Instance.new("Part")
-        part.Size = Vector3.new(0.5, 0.1, 0.5)
+        part.Size = Vector3.new(0.8, 0.2, 0.8)
         part.BrickColor = BrickColor.new("Bright green")
         part.Material = Enum.Material.Neon
-        part.Transparency = 0.7
+        part.Transparency = 0.5
         part.Anchored = true
         part.CanCollide = false
         part.Parent = workspace
@@ -175,7 +173,7 @@ local function CreateVisualization()
 
     local RunService = game:GetService("RunService")
     local visConnection = RunService.Heartbeat:Connect(function()
-        if not BlockConfig.ShowVisualization then
+        if not CombatConfig.ShowVisualization then
             for _, part in ipairs(visualizationParts) do part:Destroy() end
             visualizationParts = {}
             visConnection:Disconnect()
@@ -184,135 +182,120 @@ local function CreateVisualization()
         if not LocalPlayer.Character then return end
         local Root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if not Root then return end
+
         center = Root.Position + Vector3.new(0, 0.1, 0)
         centerPart.Position = center
         local lookVector = Root.CFrame.LookVector
-        local angle = math.rad(BlockConfig.TargetAngle)
+        local angle = math.rad(CombatConfig.TargetAngle)
+
         for i = 1, #visualizationParts - 1 do
             local part = visualizationParts[i + 1]
             local segAngle = (i - 1) * (2 * angle) / (#visualizationParts - 2) - angle
             local rotCFrame = CFrame.fromAxisAngle(Vector3.new(0, 1, 0), segAngle)
             local dir = rotCFrame:VectorToWorldSpace(lookVector)
-            part.Position = center + dir * BlockConfig.BaseDistance
+            part.Position = center + dir * CombatConfig.BaseDistance
         end
     end)
 end
 
-local function HasTargetSound(character)
-    if not character then return false end
-    local RootPart = character:FindFirstChild("HumanoidRootPart")
-    if not RootPart then return false end
-    local currentTime = os.clock()
-    if currentTime - lastSoundCheck < 0.0005 then return soundCache[character] or false end
-    lastSoundCheck = currentTime
-    local found = false
-    for _, child in ipairs(RootPart:GetChildren()) do
-        if child:IsA("Sound") then
-            local numericId = string.match(tostring(child.SoundId), "(%d+)$")
-            if numericId and soundLookup[numericId] then
-                found = true
-                break
-            end
-        end
-    end
-    soundCache[character] = found
-    return found
-end
-
-local function GetMoveCompensation()
-    if not LocalPlayer.Character then return 0 end
-    local RootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not RootPart then return 0 end
-    local vel = RootPart.Velocity
-    local speed = math.sqrt(vel.X^2 + vel.Y^2 + vel.Z^2)
-    return 1.5 + (speed * 0.25)
-end
-
-local function GetTotalDetectionRange(killer)
-    local base = BlockConfig.BaseDistance
-    local moveBonus = GetMoveCompensation()
-    local predictBonus = 0
-    local pingBonus = GetPingCompensation() * 5
-
-    if BlockConfig.EnablePrediction and killer and killer:FindFirstChild("HumanoidRootPart") then
-        local vel = killer.HumanoidRootPart.Velocity
-        local speed = math.sqrt(vel.X^2 + vel.Y^2 + vel.Z^2)
-        if speed > 8 then
-            predictBonus = math.min(12, 4 + (speed * 0.35))
-            if speed > 12 then predictBonus = predictBonus * 1.3 end
-        end
-    end
-    return base + moveBonus + predictBonus + pingBonus
-end
-
-local function IsTargetingMe(killer)
-    if not LocalPlayer.Character or not killer then return false end
-    local myRoot = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    local killerRoot = killer:FindFirstChild("HumanoidRootPart")
-    if not myRoot or not killerRoot then return false end
-    local dirToMe = (myRoot.Position - killerRoot.Position).Unit
-    local killerLook = killerRoot.CFrame.LookVector
-    local dot = dirToMe:Dot(killerLook)
-    local angle = math.deg(math.acos(math.clamp(dot, -1, 1)))
-    return angle <= BlockConfig.TargetAngle
-end
-
 local function GetThreateningKillers()
     local killers = {}
-    local killersFolder = workspace:FindFirstChild("Killers") or (workspace:FindFirstChild("Players") and workspace.Players:FindFirstChild("Killers"))
-    if not killersFolder then return killers end
+    local possibleFolders = {
+        workspace:FindFirstChild("Killers"),
+        workspace:FindFirstChild("Enemies"),
+        workspace:FindFirstChild("Monsters"),
+        workspace:FindFirstChild("Players") and workspace.Players:FindFirstChild("Killers"),
+        workspace:FindFirstChild("NPCs") and workspace.NPCs:FindFirstChild("Hostile")
+    }
+
+    local targetFolder = nil
+    for _, folder in ipairs(possibleFolders) do
+        if folder then
+            targetFolder = folder
+            break
+        end
+    end
+    if not targetFolder then return killers end
+
     if not LocalPlayer.Character then return killers end
     local myRoot = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     if not myRoot then return killers end
 
-    for _, killer in ipairs(killersFolder:GetChildren()) do
-        if killer:IsA("Model") and killer:FindFirstChild("HumanoidRootPart") then
+    for _, killer in ipairs(targetFolder:GetChildren()) do
+        if killer:IsA("Model") and killer:FindFirstChildOfClass("Humanoid") and killer:FindFirstChild("HumanoidRootPart") then
             local killerRoot = killer.HumanoidRootPart
             local distance = (myRoot.Position - killerRoot.Position).Magnitude
-            local detRange = GetTotalDetectionRange(killer)
-            if distance <= detRange and HasTargetSound(killer) and IsTargetingMe(killer) then
+            local detectionRange = CombatConfig.BaseDistance + GetPingCompensation() * 5
+
+            if distance <= detectionRange then
                 table.insert(killers, killer)
             end
         end
     end
+
     return killers
 end
 
 local function PerformBlock()
     local now = os.clock()
-    local cooldown = math.max(0.05, BlockConfig.BlockCooldown - (GetPing() / 1000 * 0.5))
-    if now - lastBlockTime >= cooldown then
+    local adjustedCooldown = math.max(0.08, CombatConfig.BlockCooldown - (GetPing() / 1000 * 0.5))
+    
+    if CombatConfig.EnableBlock and now - lastBlockTime >= adjustedCooldown and RemoteEvent then
         pcall(function()
-            local ReplicatedStorage = game:GetService("ReplicatedStorage")
-            local networkRemote = ReplicatedStorage:WaitForChild("Modules", 5)
-                and ReplicatedStorage.Modules:WaitForChild("Network", 5)
-                and ReplicatedStorage.Modules.Network:WaitForChild("RemoteEvent", 5)
-            if networkRemote then
-                networkRemote:FireServer("UseActorAbility", { ["Block"] = true })
-                lastBlockTime = now
-            end
+            local blockArgs1 = { "UseActorAbility", { buffer.fromstring("\"Block\"") } }
+            local blockArgs2 = { "UseActorAbility", { Block = true } }
+            
+            RemoteEvent:FireServer(unpack(blockArgs1))
+            task.delay(0.01, function()
+                RemoteEvent:FireServer(unpack(blockArgs2))
+            end)
+            
+            lastBlockTime = now
+        end)
+    end
+end
+
+local function PerformSlash()
+    local now = os.clock()
+    local adjustedCooldown = math.max(0.15, CombatConfig.SlashCooldown - (GetPing() / 1000 * 0.3))
+    
+    if CombatConfig.EnableSlash and now - lastSlashTime >= adjustedCooldown and RemoteEvent then
+        pcall(function()
+            local slashArgs1 = { "UseActorAbility", { buffer.fromstring("\"Slash\"") } }
+            local slashArgs2 = { "UseActorAbility", { Slash = true } }
+            
+            RemoteEvent:FireServer(unpack(slashArgs1))
+            task.delay(0.01, function()
+                RemoteEvent:FireServer(unpack(slashArgs2))
+            end)
+            
+            lastSlashTime = now
         end)
     end
 end
 
 local function CombatLoop()
     local currentTime = os.clock()
-    if currentTime - lastScanTime >= BlockConfig.ScanInterval then
+    if currentTime - lastScanTime >= CombatConfig.ScanInterval then
         lastScanTime = currentTime
-        local threats = GetThreateningKillers()
-        if #threats > 0 then PerformBlock() end
+        local threateningKillers = GetThreateningKillers()
+        
+        if #threateningKillers > 0 then
+            PerformBlock()
+            PerformSlash()
+        end
     end
 end
 
-local BlockTab = Window:AddTab('自动格挡')
-local BlockBaseGroup = BlockTab:AddLeftGroupbox('基础设置')
-local BlockAdvGroup = BlockTab:AddRightGroupbox('高级设置')
+local CombatTab = Window:AddTab('自动攻防')
+local CombatBaseGroup = CombatTab:AddLeftGroupbox('基础控制')
+local CombatCooldownGroup = CombatTab:AddRightGroupbox('冷却调节')
 
-BlockBaseGroup:AddToggle("BlockMainToggle", {
-    Text = "开启自动格挡",
-    Default = BlockConfig.Enabled,
+CombatBaseGroup:AddToggle("CombatMainToggle", {
+    Text = "开启自动攻防（格挡+挥砍）",
+    Default = CombatConfig.EnableCombat,
     Callback = function(enabled)
-        BlockConfig.Enabled = enabled
+        CombatConfig.EnableCombat = enabled
         local RunService = game:GetService("RunService")
 
         if combatConnection then combatConnection:Disconnect() end
@@ -321,102 +304,118 @@ BlockBaseGroup:AddToggle("BlockMainToggle", {
             combatConnection = RunService.Stepped:Connect(function()
                 pcall(CombatLoop)
             end)
-           
-            if BlockConfig.ShowVisualization then
+            if CombatConfig.ShowVisualization then
                 CreateVisualization()
             end
         else
-           
             for _, part in ipairs(visualizationParts) do part:Destroy() end
             visualizationParts = {}
         end
 
         local function onCharacterAdded(Character)
-            if BlockConfig.Enabled then
+            if CombatConfig.EnableCombat then
                 if combatConnection then combatConnection:Disconnect() end
                 combatConnection = RunService.Stepped:Connect(function()
                     pcall(CombatLoop)
                 end)
-                if BlockConfig.ShowVisualization then
+                if CombatConfig.ShowVisualization then
                     CreateVisualization()
                 end
             end
         end
-        if LocalPlayer.Character then
-            onCharacterAdded(LocalPlayer.Character)
-        end
+        if LocalPlayer.Character then onCharacterAdded(LocalPlayer.Character) end
         LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
     end
 })
 
-BlockBaseGroup:AddSlider("BlockDistanceSlider", {
-    Text = "检测距离（ studs）",
-    Min = 5,
-    Max = 30,
-    Default = BlockConfig.BaseDistance,
-    Rounding = 1,
-    Callback = function(value)
-        BlockConfig.BaseDistance = value
+CombatBaseGroup:AddToggle("CombatBlockToggle", {
+    Text = "启用自动格挡",
+    Default = CombatConfig.EnableBlock,
+    Callback = function(enabled)
+        CombatConfig.EnableBlock = enabled
     end
 })
 
-BlockBaseGroup:AddSlider("BlockAngleSlider", {
+CombatBaseGroup:AddToggle("CombatSlashToggle", {
+    Text = "启用自动挥砍",
+    Default = CombatConfig.EnableSlash,
+    Callback = function(enabled)
+        CombatConfig.EnableSlash = enabled
+    end
+})
+
+CombatBaseGroup:AddSlider("CombatDistanceSlider", {
+    Text = "检测距离（ studs）",
+    Min = 5,
+    Max = 40,
+    Default = CombatConfig.BaseDistance,
+    Rounding = 1,
+    Callback = function(value)
+        CombatConfig.BaseDistance = value
+    end
+})
+
+CombatBaseGroup:AddSlider("CombatAngleSlider", {
     Text = "朝向检测角度（度）",
     Min = 10,
     Max = 180,
-    Default = BlockConfig.TargetAngle,
+    Default = CombatConfig.TargetAngle,
     Rounding = 1,
     Callback = function(value)
-        BlockConfig.TargetAngle = value
+        CombatConfig.TargetAngle = value
     end
 })
 
-BlockBaseGroup:AddToggle("BlockVisToggle", {
+CombatBaseGroup:AddToggle("CombatVisToggle", {
     Text = "显示检测范围（绿色）",
-    Default = BlockConfig.ShowVisualization,
+    Default = CombatConfig.ShowVisualization,
     Callback = function(enabled)
-        BlockConfig.ShowVisualization = enabled
+        CombatConfig.ShowVisualization = enabled
         if enabled then
             CreateVisualization()
         else
-           
             for _, part in ipairs(visualizationParts) do part:Destroy() end
             visualizationParts = {}
         end
     end
 })
 
-BlockAdvGroup:AddSlider("BlockCooldownSlider", {
+CombatCooldownGroup:AddSlider("CombatBlockCooldownSlider", {
     Text = "格挡冷却时间（秒）",
-    Min = 0.01,
+    Min = 0.05,
     Max = 0.5,
-    Default = BlockConfig.BlockCooldown,
+    Default = CombatConfig.BlockCooldown,
     Rounding = 0.01,
     Callback = function(value)
-        BlockConfig.BlockCooldown = value
+        CombatConfig.BlockCooldown = value
     end
 })
 
-BlockAdvGroup:AddToggle("BlockPredictionToggle", {
-    Text = "开启敌人位置预测",
-    Default = BlockConfig.EnablePrediction,
-    Callback = function(enabled)
-        BlockConfig.EnablePrediction = enabled
+CombatCooldownGroup:AddSlider("CombatSlashCooldownSlider", {
+    Text = "挥砍冷却时间（秒）",
+    Min = 0.1,
+    Max = 1,
+    Default = CombatConfig.SlashCooldown,
+    Rounding = 0.01,
+    Callback = function(value)
+        CombatConfig.SlashCooldown = value
     end
 })
 
-BlockAdvGroup:AddButton("BlockEmergencyStop", {
-    Text = "紧急停止格挡",
+CombatCooldownGroup:AddButton("CombatEmergencyStop", {
+    Text = "紧急停止自动攻防",
     Func = function()
-        BlockConfig.Enabled = false
+        CombatConfig.EnableCombat = false
+        CombatConfig.ShowVisualization = false
         if combatConnection then combatConnection:Disconnect() end
         for _, part in ipairs(visualizationParts) do part:Destroy() end
         visualizationParts = {}
-        BlockBaseGroup:SetValue("BlockMainToggle", false)
-        BlockBaseGroup:SetValue("BlockVisToggle", false)
+        CombatBaseGroup:SetValue("CombatMainToggle", false)
+        CombatBaseGroup:SetValue("CombatVisToggle", false)
     end
 })
 
-BlockBaseGroup:SetValue("BlockDistanceSlider", BlockConfig.BaseDistance)
-BlockBaseGroup:SetValue("BlockAngleSlider", BlockConfig.TargetAngle)
-BlockAdvGroup:SetValue("BlockCooldownSlider", BlockConfig.BlockCooldown)
+CombatBaseGroup:SetValue("CombatDistanceSlider", CombatConfig.BaseDistance)
+CombatBaseGroup:SetValue("CombatAngleSlider", CombatConfig.TargetAngle)
+CombatCooldownGroup:SetValue("CombatBlockCooldownSlider", CombatConfig.BlockCooldown)
+CombatCooldownGroup:SetValue("CombatSlashCooldownSlider", CombatConfig.SlashCooldown)

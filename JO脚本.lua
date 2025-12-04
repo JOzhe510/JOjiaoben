@@ -119,7 +119,13 @@ end)
         loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Permanent-Headless-And-korblox-Script-4140"))()
         end)
         
-        
+        credits:Button(
+        "解锁聊天框(在不显示聊天框的游戏使用",
+        function()
+        local TextChatService = game:GetService("TextChatService")
+local ChatWindowConfiguration = TextChatService.ChatWindowConfiguration
+    ChatWindowConfiguration.Enabled = true
+        end)
         
         credits:Button(
         "R15变R6",
@@ -316,6 +322,11 @@ end
         loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Aimlock-45467"))()
         end)
         
+        credits:Button(
+        "自瞄3",
+        function()
+        loadstring(game:HttpGet("https://pastefy.app/YiGY38uo/raw"))()
+        end)
 
 credits:Button(
         "踏空行走",
@@ -324,9 +335,15 @@ credits:Button(
         end)
         
         credits:Button(
-        "动作脚本",
+        "r15动作脚本",
         function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/Gazer-Ha/Free-emote/refs/heads/main/Delta%20mad%20stuffs"))()
+        end)
+        
+        credits:Button(
+        "r6动作脚本",
+        function()
+        loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-R6-Animations-Menu-By-Me-19427"))()
         end)
 
 credits:Button(
@@ -393,6 +410,12 @@ credits:Button(
         function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/XNEOFF/FlyGuiV3/main/FlyGuiV3.txt"))()
 end)
+
+credits:Button(
+        "飞行2",
+        function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/JOzhe510/JOjiaoben/main/飞行.lua"))()
+        end)
 
 credits:Button(
         "飞车",
@@ -644,7 +667,7 @@ end
 credits:Button(
         "单个甩人",
         function()
-        loadstring(game:HttpGet('https://raw.githubusercontent.com/ScpGuest666/Random-Roblox-script/refs/heads/main/Roblox%20fling%20script'))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/JOzhe510/JOjiaoben/main/甩飞.lua"))()
         end)
         
         credits:Button(
@@ -664,6 +687,19 @@ credits:Button(
         function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/AhmadV99/Speed-Hub-X/main/Speed%20Hub%20X.lua", true))()
         end)
+        
+        credits:Button(
+        "创建私服，全游戏通用(不可保存任何人都进不来，点击即可，复制的代码如果好友也有注入器，让他复制下面的脚本放入(这里填私服代码即可加入",
+        function()
+        TX = "TX Script"
+Script = "免费获取任何服务器私服"
+loadstring(game:HttpGet("https://raw.githubusercontent.com/JsYb666/Item/refs/heads/main/%E8%87%AA%E5%8A%A8%E8%8E%B7%E5%8F%96%E7%A7%81%E6%9C%8D.lua"))()
+end)
+
+bin:Button("复制脚本", function()
+    setclipboard("_G.accessCode = "这里填私服代码"
+loadstring(game:HttpGet("https://raw.githubusercontent.com/JsYb666/Item/refs/heads/main/%E8%8E%B7%E5%8F%96%E7%A7%81%E6%9C%8D"))()")
+end)
 
 credits:Button(
         "防甩飞",
@@ -886,7 +922,7 @@ print("FOV强制锁定已启用")
 end)
 
 credits:Button(
-        "更改",
+        "更改105",
         function()
         local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")

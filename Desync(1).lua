@@ -272,18 +272,18 @@ local function switchMode()
     
     if currentMode == "Flag" then
         currentMode = "Special"
-        modeBtn.Text = "切换到Flag模式"
+        modeBtn.Text = "切换到普通模式"
         modeBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
         infoLabel.Text = "特殊游戏方法\n网络延迟 + 物理欺骗"
     else
         currentMode = "Flag"
         modeBtn.Text = "切换到特殊模式"
         modeBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
-        infoLabel.Text = "你的Flag方法\nenabled = not enabled"
+        infoLabel.Text = "普通方法"
     end
     
     -- 更新UI
-    modeLabel.Text = "模式: " .. (currentMode == "Flag" and "Flag方法" or "特殊方法")
+    modeLabel.Text = "模式: " .. (currentMode == "Flag" and "普通方法" or "特殊方法")
     updateUIDisabled()
     
     print("切换到模式: " .. currentMode)
@@ -294,9 +294,9 @@ local function updateUIEnabled()
     if currentMode == "Flag" then
         toggleBtn.Text = "Desync ON (Flag)"
         toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-        statusLabel.Text = "状态: Flag模式已启用"
+        statusLabel.Text = "状态: 普通模式已启用"
         statusLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
-        infoLabel.Text = "Flag方法已启用\n别人看你卡在冻结位置"
+        infoLabel.Text = "普通方法已启用\n别人看你卡在冻结位置"
     else
         toggleBtn.Text = "Desync ON (Special)"
         toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
@@ -318,7 +318,7 @@ local function updateUIDisabled()
     flagStatusLabel.TextColor3 = getgenv().enabled and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(255, 100, 100)
     
     if syncAttempts >= 2 and currentMode == "Flag" then
-        infoLabel.Text = "⚠️ Flag模式可能需要重进\n建议切换到特殊模式"
+        infoLabel.Text = "普通模式可能需要重生一次"
     end
 end
 
@@ -478,7 +478,7 @@ local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -20, 0, 50)
 title.Position = UDim2.new(0, 10, 0, 10)
 title.BackgroundTransparency = 1
-title.Text = "🔥 Hybrid Desync 2025"
+title.Text = "Desync"
 title.TextColor3 = Color3.fromRGB(0, 255, 255)
 title.Font = Enum.Font.GothamBlack
 title.TextSize = 24
@@ -490,7 +490,7 @@ local modeLabel = Instance.new("TextLabel")
 modeLabel.Size = UDim2.new(1, -20, 0, 25)
 modeLabel.Position = UDim2.new(0, 10, 0, 65)
 modeLabel.BackgroundTransparency = 1
-modeLabel.Text = "模式: Flag方法"
+modeLabel.Text = "模式: 普通方法"
 modeLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
 modeLabel.Font = Enum.Font.GothamBold
 modeLabel.TextSize = 16
@@ -502,7 +502,7 @@ local flagStatusLabel = Instance.new("TextLabel")
 flagStatusLabel.Size = UDim2.new(1, -20, 0, 25)
 flagStatusLabel.Position = UDim2.new(0, 10, 0, 95)
 flagStatusLabel.BackgroundTransparency = 1
-flagStatusLabel.Text = "Flag状态: " .. tostring(getgenv().enabled)
+flagStatusLabel.Text = "状态: " .. tostring(getgenv().enabled)
 flagStatusLabel.TextColor3 = getgenv().enabled and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(255, 100, 100)
 flagStatusLabel.Font = Enum.Font.Gotham
 flagStatusLabel.TextSize = 14
@@ -570,7 +570,7 @@ local infoLabel = Instance.new("TextLabel")
 infoLabel.Size = UDim2.new(1, -20, 0, 70)
 infoLabel.Position = UDim2.new(0, 10, 0, 245)
 infoLabel.BackgroundTransparency = 1
-infoLabel.Text = "你的Flag方法\nenabled = not enabled"
+infoLabel.Text = "你的方法"
 infoLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
 infoLabel.Font = Enum.Font.Gotham
 infoLabel.TextSize = 16
@@ -672,6 +672,6 @@ updateUIDisabled()
 print("🔥 Hybrid Desync 2025 已加载!")
 print("📌 F键: 开关Desync")
 print("📌 G键: 切换模式")
-print("🎮 模式1: 你的Flag方法 (蓝色)")
+print("🎮 模式1: 你的方法 (蓝色)")
 print("🎮 模式2: 特殊游戏方法 (橙色)")
 print("💡 当前Flag状态: " .. tostring(getgenv().enabled))

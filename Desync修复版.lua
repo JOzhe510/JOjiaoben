@@ -236,7 +236,7 @@ local function switchMode()
     
     if currentMode == "Flag" then
         currentMode = "Special"
-        modeBtn.Text = "切换到Flag模式"
+        modeBtn.Text = "切换到普通模式"
         modeBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
     else
         currentMode = "Flag"
@@ -255,10 +255,10 @@ function updateUIEnabled()
     if currentMode == "Flag" then
         toggleBtn.Text = "Desync ON (Flag)"
         toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-        statusLabel.Text = "状态: Flag模式已启用"
+        statusLabel.Text = "状态: 普通模式已启用"
         statusLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
-        modeLabel.Text = "模式: Flag方法"
-        infoLabel.Text = "Flag方法已启用\n别人看你卡在冻结位置"
+        modeLabel.Text = "模式: 普通方法"
+        infoLabel.Text = "普通方法已启用\n别人看你卡在启用时的位置"
         flagStatusLabel.Text = "Flag: " .. tostring(getgenv().enabled)
         flagStatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
     else
@@ -280,7 +280,7 @@ function updateUIDisabled()
     statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
     
     if currentMode == "Flag" then
-        modeLabel.Text = "模式: Flag方法"
+        modeLabel.Text = "模式: 普通方法"
         infoLabel.Text = "你的Flag方法\nenabled = not enabled"
     else
         modeLabel.Text = "模式: 特殊方法"
@@ -454,7 +454,7 @@ function createUI()
     title.Size = UDim2.new(1, -20, 0, 50)
     title.Position = UDim2.new(0, 10, 0, 10)
     title.BackgroundTransparency = 1
-    title.Text = "🔥 Hybrid Desync 2025"
+    title.Text = "Desync"
     title.TextColor3 = Color3.fromRGB(0, 255, 255)
     title.Font = Enum.Font.GothamBlack
     title.TextSize = 24
@@ -466,7 +466,7 @@ function createUI()
     modeLabel.Size = UDim2.new(1, -20, 0, 25)
     modeLabel.Position = UDim2.new(0, 10, 0, 65)
     modeLabel.BackgroundTransparency = 1
-    modeLabel.Text = "模式: Flag方法"
+    modeLabel.Text = "模式: 普通方法"
     modeLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
     modeLabel.Font = Enum.Font.GothamBold
     modeLabel.TextSize = 16
@@ -546,7 +546,7 @@ function createUI()
     infoLabel.Size = UDim2.new(1, -20, 0, 70)
     infoLabel.Position = UDim2.new(0, 10, 0, 245)
     infoLabel.BackgroundTransparency = 1
-    infoLabel.Text = "你的Flag方法\nenabled = not enabled"
+    infoLabel.Text = "普通方法"
     infoLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
     infoLabel.Font = Enum.Font.Gotham
     infoLabel.TextSize = 16
@@ -650,9 +650,9 @@ end)
 -- 初始UI状态
 updateUIDisabled()
 
-print("🔥 Hybrid Desync 2025 已加载!")
+print("Desync已加载!")
 print("📌 F键: 开关Desync")
 print("📌 G键: 切换模式")
-print("🎮 模式1: 你的Flag方法 (蓝色)")
+print("🎮 模式1: 普通方法 (蓝色)")
 print("🎮 模式2: 特殊方法 (橙色)")
-print("💡 当前Flag状态: " .. tostring(getgenv().enabled))
+print("💡 当前Desync状态: " .. tostring(getgenv().enabled))

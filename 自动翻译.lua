@@ -1,332 +1,347 @@
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/1379qpalzmtygvezimaliexcvbnqplasdfg/199/refs/heads/main/%E4%BA%91Ul.txt"))()
+local Window = Library:new("绿虫虫绿damn")
+
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 local CoreGui = game:GetService("CoreGui")
-local LocalPlayer = Players.LocalPlayer
 
--- 全局控制变量
-local TranslationEnabled = true
-local TranslatedObjects = {}
-local BlacklistedInstances = {}
-local UIExpanded = true
+local TARGET_LANGUAGE = "zh-CN" -- 固定翻译成简体中文
+local SCAN_INTERVAL = 2 -- 每2秒扫描一次
+local MAX_TEXT_LENGTH = 50000000 -- 最大文本长度限制
 
--- 创建控制UI
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TranslationUI_"..tostring(math.random(1000,9999))
-ScreenGui.Parent = CoreGui
-ScreenGui.ResetOnSpawn = false
+local translatedCache = {}
+local translatedObjects = {}
+local isTranslationEnabled = false
+local connection = nil
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 280, 0, 180)
-MainFrame.Position = UDim2.new(0, 10, 0, 10)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
+-- 危险指令列表
+local DANGEROUS_COMMANDS = {
+    "neon", "shine", "ghost", "gold", "spin", 
+    "bighead", "smallhead", "giantdwarf", "squash"
+}
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 8)
-UICorner.Parent = MainFrame
+-- 支持的UI元素类型
+local SUPPORTED_UI_TYPES = {
+    "TextLabel", "TextButton", "TextBox", "TextLabel", 
+    "Frame", "ScrollingFrame", "ImageButton", "ImageLabel"
+}
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Text = "🔤 实时翻译控制面板"
-Title.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Font = Enum.Font.GothamBold
-Title.Parent = MainFrame
+-- 语言检测模式
+local LANGUAGE_PATTERNS = {
+    -- 中文 (简体)
+    ["zh-CN"] = {
+        pattern = "[\199-\244][\128-\191]*[\128-\191]",
+        exclude = "[\227][\128-\191][\128-\191]" -- 排除繁体中文特征
+    },
+    -- 中文 (繁体)
+    ["zh-TW"] = {
+        pattern = "[\227][\128-\191][\128-\191]"
+    },
+    -- 日语
+    ["ja"] = {
+        pattern = "[\123-\125]|[\199-\244][\128-\191]*[\128-\191]",
+        exclude = "[\199-\244][\128-\191]*[\128-\191]" -- 排除中文特征
+    },
+    -- 韩语
+    ["ko"] = {
+        pattern = "[\234-\235][\128-\191][\128-\191]|[\236-\237][\128-\191][\128-\191]"
+    },
+    -- 阿拉伯语
+    ["ar"] = {
+        pattern = "[\216-\219][\128-\191]"
+    },
+    -- 俄语
+    ["ru"] = {
+        pattern = "[\208-\209][\128-\191]"
+    },
+    -- 泰语
+    ["th"] = {
+        pattern = "[\224-\231][\128-\191]"
+    },
+    -- 默认英语
+    ["en"] = {
+        pattern = "[A-Za-z]",
+        exclude = "[\199-\244][\128-\191]*[\128-\191]" -- 排除非拉丁字符
+    }
+}
 
-local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Size = UDim2.new(0.8, 0, 0, 40)
-ToggleBtn.Position = UDim2.new(0.1, 0, 0.2, 0)
-ToggleBtn.Text = "🟢 翻译开启"
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 80)
-ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleBtn.Font = Enum.Font.GothamBold
-ToggleBtn.Parent = MainFrame
-
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(0.8, 0, 0, 20)
-StatusLabel.Position = UDim2.new(0.1, 0, 0.5, 0)
-StatusLabel.Text = "状态: 监控中..."
-StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.Parent = MainFrame
-
-local RevertBtn = Instance.new("TextButton")
-RevertBtn.Size = UDim2.new(0.8, 0, 0, 30)
-RevertBtn.Position = UDim2.new(0.1, 0, 0.7, 0)
-RevertBtn.Text = "↩️ 恢复原文"
-RevertBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
-RevertBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-RevertBtn.Font = Enum.Font.Gotham
-RevertBtn.Parent = MainFrame
-
-local ToggleUIBtn = Instance.new("TextButton")
-ToggleUIBtn.Size = UDim2.new(0, 30, 0, 30)
-ToggleUIBtn.Position = UDim2.new(1, -30, 0, 0)
-ToggleUIBtn.Text = "−"
-ToggleUIBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-ToggleUIBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleUIBtn.Font = Enum.Font.GothamBold
-ToggleUIBtn.Parent = MainFrame
-
--- 动态翻译数据库
-local TranslationDB = {}
-local TranslationPatterns = {}
-
--- 智能词汇检测和翻译生成
-local function detectAndTranslate(text)
-    if not text or #text < 2 then return text end
-    
-    -- 检测文本特征
-    local words = {}
-    for word in text:gmatch("%S+") do
-        if #word > 1 then
-            table.insert(words, word:lower())
+-- 检查是否为危险文本
+local function isDangerousText(text)
+    if not text or type(text) ~= "string" then return false end
+    local lowerText = text:lower()
+    for _, cmd in ipairs(DANGEROUS_COMMANDS) do
+        if lowerText:find(cmd) then
+            return true
         end
     end
+    return false
+end
+
+-- 检查是否需要跳过翻译
+local function shouldSkipTranslation(text)
+    if not text or text == "" or translatedCache[text] then
+        return true
+    end
     
-    -- 分析文本模式
-    local isQuestion = text:match("%?$") and true or false
-    local isExclamation = text:match("!$") and true or false
-    local hasNumbers = text:match("%d")
-    local wordCount = #words
+    -- 跳过纯数字、特殊字符和过长的文本
+    if text:match("^%s*$") or 
+       text:match("^[0-9%.%s,:/]+$") or 
+       #text > MAX_TEXT_LENGTH or
+       isDangerousText(text) then
+        translatedCache[text] = text
+        return true
+    end
     
-    -- 根据特征生成智能翻译
-    local translated = ""
+    return false
+end
+
+-- 增强的语言检测函数
+local function detectLanguage(text)
+    if not text or type(text) ~= "string" or text == "" then
+        return "en" -- 默认英语
+    end
     
-    if wordCount == 1 then
-        -- 单个单词
-        local word = words[1]
-        if not TranslationDB[word] then
-            -- 生成智能翻译
-            if word:match("ing$") then
-                TranslationDB[word] = word:sub(1, -4) .. "中"
-            elseif word:match("ed$") then
-                TranslationDB[word] = word:sub(1, -3) .. "了"
-            elseif word:match("s$") and #word > 2 then
-                TranslationDB[word] = word:sub(1, -2) .. "们"
-            else
-                -- 根据词性生成翻译
-                if word:match("^[aeiou]") then
-                    TranslationDB[word] = "爱" .. word:sub(2)
-                else
-                    TranslationDB[word] = word:gsub("[aeiou]", function(v)
-                        return {"阿","伊","乌","埃","奥"}[v:byte() - 96] or v
-                    end)
-                end
-            end
-        end
-        translated = TranslationDB[word]
+    -- 检查是否是中文
+    if text:match(LANGUAGE_PATTERNS["zh-CN"].pattern) and 
+       (not LANGUAGE_PATTERNS["zh-CN"].exclude or not text:match(LANGUAGE_PATTERNS["zh-CN"].exclude)) then
+        return "zh-CN"
+    end
+    
+    -- 检查是否是繁体中文
+    if text:match(LANGUAGE_PATTERNS["zh-TW"].pattern) then
+        return "zh-TW"
+    end
+    
+    -- 检查是否是日语
+    if text:match(LANGUAGE_PATTERNS["ja"].pattern) and 
+       (not LANGUAGE_PATTERNS["ja"].exclude or not text:match(LANGUAGE_PATTERNS["ja"].exclude)) then
+        return "ja"
+    end
+    
+    -- 检查是否是韩语
+    if text:match(LANGUAGE_PATTERNS["ko"].pattern) then
+        return "ko"
+    end
+    
+    -- 检查是否是阿拉伯语
+    if text:match(LANGUAGE_PATTERNS["ar"].pattern) then
+        return "ar"
+    end
+    
+    -- 检查是否是俄语
+    if text:match(LANGUAGE_PATTERNS["ru"].pattern) then
+        return "ru"
+    end
+    
+    -- 检查是否是泰语
+    if text:match(LANGUAGE_PATTERNS["th"].pattern) then
+        return "th"
+    end
+    
+    -- 默认认为是英语
+    return "en"
+end
+
+-- 翻译函数
+local function translate(text)
+    if shouldSkipTranslation(text) then
+        return translatedCache[text] or text
+    end
+
+    -- 检测源语言
+    local sourceLang = detectLanguage(text)
+    
+    -- 如果检测到已经是中文，直接返回
+    if sourceLang == "zh-CN" or sourceLang == "zh-TW" then
+        translatedCache[text] = text
+        return text
+    end
+
+    -- 使用备选翻译API（如果Google翻译失败）
+    local function tryAlternativeAPI()
+        local success, response = pcall(function()
+            return game:HttpGet(
+                ("https://api.mymemory.translated.net/get?q=%s&langpair=%s|%s")
+                :format(HttpService:UrlEncode(text), sourceLang, TARGET_LANGUAGE)
+            )
+        end)
         
-    elseif wordCount == 2 then
-        -- 两个单词
-        local key = table.concat(words, " ")
-        if not TranslationDB[key] then
-            TranslationDB[key] = (TranslationDB[words[1]] or words[1]) .. "的" .. (TranslationDB[words[2]] or words[2])
-        end
-        translated = TranslationDB[key]
-        
-    else
-        -- 多个单词
-        for i, word in ipairs(words) do
-            if i == 1 then
-                translated = TranslationDB[word] or word
-            else
-                translated = translated .. " " .. (TranslationDB[word] or word)
+        if success and response then
+            local ok, data = pcall(HttpService.JSONDecode, HttpService, response)
+            if ok and data and data.responseData and data.responseData.translatedText then
+                return data.responseData.translatedText
             end
         end
+        return nil
     end
-    
-    -- 添加语气词
-    if isQuestion then
-        translated = translated .. "吗？"
-    elseif isExclamation then
-        translated = translated .. "！"
-    end
-    
-    -- 处理数字
-    if hasNumbers then
-        translated = translated:gsub("%d", function(d)
-            local numMap = {["0"]="零",["1"]="一",["2"]="二",["3"]="三",["4"]="四",
-                           ["5"]="五",["6"]="六",["7"]="七",["8"]="八",["9"]="九"}
-            return numMap[d] or d
-        end)
-    end
-    
-    return translated ~= text and translated or text
-end
 
--- 中文检测
-local function isChinese(text)
-    return text and text:match("[\228-\233][\128-\191]")
-end
+    -- 尝试使用Google翻译API，但指定明确的源语言
+    local success, response = pcall(function()
+        return game:HttpGet(
+            ("https://translate.googleapis.com/translate_a/single?client=gtx&sl=%s&tl=%s&dt=t&q=%s")
+            :format(sourceLang, TARGET_LANGUAGE, HttpService:UrlEncode(text))
+        )
+    end)
 
--- 英文检测
-local function isEnglish(text)
-    if not text then return false end
-    local hasEnglish = text:match("%a")
-    local hasChinese = text:match("[\228-\233][\128-\191]")
-    return hasEnglish and not hasChinese
-end
-
--- 翻译逻辑
-local function translateTextElement(element)
-    if not TranslationEnabled or BlacklistedInstances[element] then return end
-    
-    local originalText = element.Text
-    if originalText and #originalText > 1 and isEnglish(originalText) and not TranslatedObjects[element] then
-        local translated = detectAndTranslate(originalText)
-        if translated ~= originalText then
-            TranslatedObjects[element] = {
-                Original = originalText,
-                Translated = translated
-            }
-            element.Text = translated
-        end
-    end
-end
-
--- 恢复原文
-local function revertAllTranslations()
-    for element, data in pairs(TranslatedObjects) do
-        if element and element.Parent then
-            element.Text = data.Original
-        end
-    end
-    TranslatedObjects = {}
-end
-
--- 监控函数
-local function monitorUI()
-    while TranslationEnabled do
-        pcall(function()
-            -- 监控所有UI容器
-            local targets = {
-                CoreGui,
-                LocalPlayer:WaitForChild("PlayerGui"),
-                game:GetService("StarterGui")
-            }
-            
-            for _, target in ipairs(targets) do
-                if target then
-                    for _, gui in ipairs(target:GetDescendants()) do
-                        if (gui:IsA("TextLabel") or gui:IsA("TextButton") or gui:IsA("TextBox")) then
-                            translateTextElement(gui)
-                        end
-                    end
-                end
-            end
-        end)
-        task.wait(0.5)
-    end
-end
-
--- UI控制事件
-ToggleBtn.MouseButton1Click:Connect(function()
-    TranslationEnabled = not TranslationEnabled
-    if TranslationEnabled then
-        ToggleBtn.Text = "🟢 翻译开启"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 80)
-        StatusLabel.Text = "状态: 监控中..."
-        task.spawn(monitorUI)
-    else
-        ToggleBtn.Text = "🔴 翻译关闭"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 60, 80)
-        StatusLabel.Text = "状态: 已暂停"
-    end
-end)
-
-RevertBtn.MouseButton1Click:Connect(function()
-    revertAllTranslations()
-    StatusLabel.Text = "状态: 已恢复原文"
-end)
-
-ToggleUIBtn.MouseButton1Click:Connect(function()
-    UIExpanded = not UIExpanded
-    if UIExpanded then
-        MainFrame.Size = UDim2.new(0, 280, 0, 180)
-        ToggleUIBtn.Text = "−"
-        ToggleBtn.Visible = true
-        StatusLabel.Visible = true
-        RevertBtn.Visible = true
-    else
-        MainFrame.Size = UDim2.new(0, 280, 0, 30)
-        ToggleUIBtn.Text = "+"
-        ToggleBtn.Visible = false
-        StatusLabel.Visible = false
-        RevertBtn.Visible = false
-    end
-end)
-
--- 监控新元素
-game.DescendantAdded:Connect(function(descendant)
-    if TranslationEnabled and (descendant:IsA("TextLabel") or descendant:IsA("TextButton") or descendant:IsA("TextBox")) then
-        task.delay(0.3, function()
-            pcall(translateTextElement, descendant)
-        end)
-    end
-end)
-
--- 右键黑名单
-local UserInputService = game:GetService("UserInputService")
-UserInputService.InputBegan:Connect(function(input, processed)
-    if not processed and input.UserInputType == Enum.UserInputType.MouseButton2 then
-        local target = UserInputService:GetMouseTarget()
-        if target and (target:IsA("TextLabel") or target:IsA("TextButton") or target:IsA("TextBox")) then
-            BlacklistedInstances[target] = true
-            if TranslatedObjects[target] then
-                target.Text = TranslatedObjects[target].Original
-                TranslatedObjects[target] = nil
-            end
-            StatusLabel.Text = "状态: 已屏蔽 "..target.Name
-        end
-    end
-end)
-
--- 学习模式：自动分析并改进翻译
-local function learnFromPatterns()
-    for element, data in pairs(TranslatedObjects) do
-        if data.Original and data.Translated then
-            local words = {}
-            for word in data.Original:gmatch("%S+") do
-                if #word > 1 then
-                    table.insert(words, word:lower())
+    if success and response then
+        local ok, data = pcall(HttpService.JSONDecode, HttpService, response)
+        if ok and data and data[1] then
+            local translatedText = ""
+            for _, segment in ipairs(data[1]) do
+                if segment[1] then
+                    translatedText = translatedText .. segment[1]
                 end
             end
             
-            if #words > 0 then
-                for _, word in ipairs(words) do
-                    if not TranslationDB[word] then
-                        -- 从上下文中学习单词含义
-                        local chineseParts = {}
-                        for part in data.Translated:gmatch("[^%s]+") do
-                            if #part > 1 then
-                                table.insert(chineseParts, part)
-                            end
-                        end
-                        
-                        if #chineseParts >= #words then
-                            TranslationDB[word] = chineseParts[#chineseParts]
-                        end
-                    end
+            if translatedText ~= "" and translatedText ~= text then
+                translatedCache[text] = translatedText
+                print("翻译: \"" .. text .. "\" -> \"" .. translatedText .. "\"")
+                return translatedText
+            end
+        end
+    end
+
+    -- 尝试备选API
+    local altTranslation = tryAlternativeAPI()
+    if altTranslation then
+        translatedCache[text] = altTranslation
+        print("备选API翻译: \"" .. text .. "\" -> \"" .. altTranslation .. "\"")
+        return altTranslation
+    end
+
+    translatedCache[text] = text
+    return text -- 出错时返回原文
+end
+
+-- 检查UI元素是否有文本内容
+local function hasTextContent(gui)
+    if gui:IsA("TextLabel") or gui:IsA("TextButton") or gui:IsA("TextBox") then
+        return gui.Text and gui.Text ~= ""
+    elseif gui:IsA("ImageButton") or gui:IsA("ImageLabel") then
+        return gui:GetAttribute("Text") or gui.Name ~= ""
+    end
+    return false
+end
+
+-- 获取UI元素的文本内容
+local function getTextContent(gui)
+    if gui:IsA("TextLabel") or gui:IsA("TextButton") or gui:IsA("TextBox") then
+        return gui.Text
+    elseif gui:IsA("ImageButton") or gui:IsA("ImageLabel") then
+        return gui:GetAttribute("Text") or gui.Name
+    end
+    return nil
+end
+
+-- 设置UI元素的文本内容
+local function setTextContent(gui, text)
+    if gui:IsA("TextLabel") or gui:IsA("TextButton") or gui:IsA("TextBox") then
+        gui.Text = text
+    elseif gui:IsA("ImageButton") or gui:IsA("ImageLabel") then
+        gui:SetAttribute("OriginalText", getTextContent(gui))
+        gui:SetAttribute("Text", text)
+    end
+end
+
+-- 扫描并翻译UI元素
+local function scanAndTranslate()
+    local count = 0
+    
+    -- 扫描PlayerGui
+    for _, gui in ipairs(playerGui:GetDescendants()) do
+        if not translatedObjects[gui] and hasTextContent(gui) then
+            local text = getTextContent(gui)
+            if text and text ~= "" then
+                translatedObjects[gui] = true
+                local translatedText = translate(text)
+                if getTextContent(gui) == text then -- 确保文本没有被修改过
+                    setTextContent(gui, translatedText)
+                    count = count + 1
                 end
             end
         end
     end
+    
+    -- 扫描CoreGui（游戏界面元素）
+    for _, gui in ipairs(CoreGui:GetDescendants()) do
+        if not translatedObjects[gui] and hasTextContent(gui) then
+            local text = getTextContent(gui)
+            if text and text ~= "" then
+                translatedObjects[gui] = true
+                local translatedText = translate(text)
+                if getTextContent(gui) == text then -- 确保文本没有被修改过
+                    setTextContent(gui, translatedText)
+                    count = count + 1
+                end
+            end
+        end
+    end
+    
+    return count
 end
 
--- 启动监控和学习
-task.spawn(monitorUI)
+local Tab9994 = Window:Tab("翻译", '5436396975')
+local Section7891 = Tab9994:section("汉化", true)
+
+-- 修复了Toggle回调函数的问题
+Section7891:Toggle("自动翻译", "NightVision", false, function(state)
+    isTranslationEnabled = state
+    if state then
+        print("自动翻译已开启，每" .. SCAN_INTERVAL .. "秒扫描一次")
+        
+        -- 关闭之前的连接（如果有）
+        if connection then
+            connection:Disconnect()
+            connection = nil
+        end
+        
+        -- 立即扫描一次
+        local count = scanAndTranslate()
+        if count > 0 then
+            print("初始扫描翻译了 " .. count .. " 个文本")
+        end
+        
+        -- 创建新的定时扫描
+        connection = RunService.Heartbeat:Connect(function()
+            if isTranslationEnabled then
+                local count = scanAndTranslate()
+                if count > 0 then
+                    print("自动扫描翻译了 " .. count .. " 个文本")
+                end
+                -- 使用task.wait而不是wait
+                task.wait(SCAN_INTERVAL)
+            end
+        end)
+    else
+        -- 关闭定时扫描
+        if connection then
+            connection:Disconnect()
+            connection = nil
+        end
+        print("自动翻译已关闭")
+    end
+end)
+
+-- 添加手动扫描按钮
+Section7891:Button("立即扫描翻译", function()
+    local count = scanAndTranslate()
+    Library:Notification("扫描完成", "翻译了 " .. count .. " 个文本", 5)
+end)
+
+-- 添加清空缓存按钮
+Section7891:Button("清空翻译缓存", function()
+    translatedCache = {}
+    translatedObjects = {}
+    Library:Notification("缓存已清空", "下次扫描将重新翻译所有文本", 5)
+end)
+
 task.spawn(function()
-    while true do
-        task.wait(10)
-        if TranslationEnabled then
-            learnFromPatterns()
-        end
+    task.wait(3)
+    local count = scanAndTranslate()
+    if count > 0 then
+        print("初始扫描翻译了 " .. count .. " 个文本")
     end
 end)
-
-print("AI翻译系统已加载 - 智能词汇检测 | 动态学习 | 实时翻译")

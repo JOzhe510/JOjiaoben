@@ -1,15 +1,22 @@
 local player = game.Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
-local CFSpeed = 50
-local CFLoop = nil
+-- 飞行相关变量
+local flySpeed = 50
+local flyConnection = nil
+local isFlying = false
+local flyBodyVelocity = nil
+local flyBodyGyro = nil
+
+-- 平台相关变量
 local platformPart = nil
-local platformLoop = nil
+local platformConnection = nil
 local isPlatformActive = false
-local platformHeightOffset = 4 -- 平台在玩家下方的固定高度差
-local platformLiftForce = 10 -- 平台向上的推力
+local platformHeightOffset = 4
 
+-- UI部分保持不变（只修改功能部分）
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "VoidTeleportUI"
 screenGui.ResetOnSpawn = false
@@ -146,7 +153,7 @@ applySpeedButton.Size = UDim2.new(0.3, 0, 0.7, 0)
 applySpeedButton.Position = UDim2.new(0.67, 0, 0.15, 0)
 applySpeedButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
 applySpeedButton.BorderSizePixel = 0
-applySpeedButton.Text = "应用飞行速度"
+applySpeedButton.Text = "应用"
 applySpeedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 applySpeedButton.Font = Enum.Font.Gotham
 applySpeedButton.TextSize = 13
@@ -189,151 +196,170 @@ local openCorner = Instance.new("UICorner")
 openCorner.CornerRadius = UDim.new(0, 8)
 openCorner.Parent = openUIButton
 
-local function StartCFly()
-    local speaker = game.Players.LocalPlayer
-    local character = speaker.Character
+-- ==================== 真正的飞行功能 ====================
+
+local function CleanupFlight()
+    -- 清理飞行相关的所有东西
+    if flyBodyVelocity and flyBodyVelocity.Parent then
+        flyBodyVelocity:Destroy()
+    end
+    if flyBodyGyro and flyBodyGyro.Parent then
+        flyBodyGyro:Destroy()
+    end
+    if flyConnection then
+        flyConnection:Disconnect()
+        flyConnection = nil
+    end
+    flyBodyVelocity = nil
+    flyBodyGyro = nil
+end
+
+local function StartRealFly()
+    local character = player.Character
     if not character then return end
     
-    local humanoid = character:FindFirstChildOfClass('Humanoid')
-    local head = character:WaitForChild("Head")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
     
-    if not humanoid or not head then return end
+    if not humanoid or not rootPart then return end
     
+    -- 先清理旧的
+    CleanupFlight()
+    
+    -- 设置角色状态
     humanoid.PlatformStand = true
-    head.Anchored = true
+    humanoid.AutoRotate = false
     
-    if CFLoop then 
-        CFLoop:Disconnect() 
-        CFLoop = nil
-    end
+    -- 创建BodyVelocity用于移动
+    flyBodyVelocity = Instance.new("BodyVelocity")
+    flyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    flyBodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)
+    flyBodyVelocity.P = 1250
+    flyBodyVelocity.Parent = rootPart
     
-    CFLoop = RunService.Heartbeat:Connect(function(deltaTime)
-        if not character or not humanoid or not head then 
-            if CFLoop then 
-                CFLoop:Disconnect() 
-                CFLoop = nil
-            end
-            return 
+    -- 创建BodyGyro用于控制朝向
+    flyBodyGyro = Instance.new("BodyGyro")
+    flyBodyGyro.MaxTorque = Vector3.new(4000, 4000, 4000)
+    flyBodyGyro.P = 2000
+    flyBodyGyro.D = 500
+    flyBodyGyro.CFrame = rootPart.CFrame
+    flyBodyGyro.Parent = rootPart
+    
+    -- 飞行循环
+    flyConnection = RunService.Heartbeat:Connect(function()
+        if not character or not rootPart or not humanoid then
+            CleanupFlight()
+            return
         end
         
-        local moveDirection = humanoid.MoveDirection * (CFSpeed * deltaTime)
-        local headCFrame = head.CFrame
+        -- 获取移动方向和相机朝向
+        local moveDirection = humanoid.MoveDirection
         local camera = workspace.CurrentCamera
         local cameraCFrame = camera.CFrame
-        local cameraOffset = headCFrame:ToObjectSpace(cameraCFrame).Position
-        cameraCFrame = cameraCFrame * CFrame.new(-cameraOffset.X, -cameraOffset.Y, -cameraOffset.Z + 1)
-        local cameraPosition = cameraCFrame.Position
-        local headPosition = headCFrame.Position
-
-        local objectSpaceVelocity = CFrame.new(cameraPosition, Vector3.new(headPosition.X, cameraPosition.Y, headPosition.Z)):VectorToObjectSpace(moveDirection)
-        head.CFrame = CFrame.new(headPosition) * (cameraCFrame - cameraPosition) * CFrame.new(objectSpaceVelocity)
+        
+        -- 计算飞行速度向量
+        if moveDirection.Magnitude > 0 then
+            -- 根据相机方向移动
+            local velocity = (cameraCFrame:VectorToObjectSpace(moveDirection) * flySpeed)
+            flyBodyVelocity.Velocity = velocity
+        else
+            -- 不移动时停止
+            flyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        end
+        
+        -- 控制朝向（看向相机方向）
+        local lookVector = cameraCFrame.LookVector
+        flyBodyGyro.CFrame = CFrame.new(rootPart.Position, rootPart.Position + lookVector)
     end)
 end
 
-local function StopCFly()
-    local speaker = game.Players.LocalPlayer
-    local character = speaker.Character
-    
-    if CFLoop then
-        CFLoop:Disconnect()
-        CFLoop = nil
-    end
-    
+local function StopRealFly()
+    local character = player.Character
     if character then
-        local humanoid = character:FindFirstChildOfClass('Humanoid')
-        local head = character:FindFirstChild("Head")
-        
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
         if humanoid then
             humanoid.PlatformStand = false
-        end
-        if head then
-            head.Anchored = false
+            humanoid.AutoRotate = true
         end
     end
+    
+    CleanupFlight()
 end
 
-local function CreatePlatform()
-    local character = game.Players.LocalPlayer.Character
+-- ==================== 平台功能优化 ====================
+
+local function StartPlatform()
+    local character = player.Character
     if not character then return end
     
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then return end
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
     
+    -- 清理旧的平台
     if platformPart then
         platformPart:Destroy()
-        platformPart = nil
     end
     
+    if platformConnection then
+        platformConnection:Disconnect()
+        platformConnection = nil
+    end
+    
+    -- 创建初始平台
     platformPart = Instance.new("Part")
     platformPart.Name = "FlightPlatform"
-    platformPart.Size = Vector3.new(8, 0.2, 8) 
+    platformPart.Size = Vector3.new(8, 0.5, 8)
     platformPart.Anchored = true
     platformPart.CanCollide = true
     platformPart.Material = Enum.Material.Neon
     platformPart.BrickColor = BrickColor.new("Bright violet")
-    platformPart.Transparency = 0.2
-    
-    local position = humanoidRootPart.Position - Vector3.new(0, platformHeightOffset, 0)
-    platformPart.CFrame = CFrame.new(position)
+    platformPart.Transparency = 0.3
     platformPart.Parent = workspace
-end
-
-local function StartPlatform()
-    if platformLoop then 
-        platformLoop:Disconnect()
-        platformLoop = nil
-    end
     
-    CreatePlatform()
-    
-    platformLoop = RunService.Heartbeat:Connect(function()
-        local character = game.Players.LocalPlayer.Character
-        if not character then return end
-        
-        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-        if not humanoidRootPart then return end
-        
-        -- 持续在玩家脚底生成平台
-        if platformPart then
-            platformPart:Destroy()
+    -- 平台跟随循环
+    platformConnection = RunService.Heartbeat:Connect(function()
+        if not character or not rootPart then
+            StopPlatform()
+            return
         end
         
-        platformPart = Instance.new("Part")
-        platformPart.Name = "FlightPlatform"
-        platformPart.Size = Vector3.new(8, 0.2, 8) 
-        platformPart.Anchored = true
-        platformPart.CanCollide = true
-        platformPart.Material = Enum.Material.Neon
-        platformPart.BrickColor = BrickColor.new("Bright violet")
-        platformPart.Transparency = 0.2
+        -- 更新平台位置（保持在玩家脚下）
+        local targetPosition = rootPart.Position - Vector3.new(0, 3, 0)
+        platformPart.CFrame = CFrame.new(targetPosition)
         
-        -- 在玩家脚底位置创建平台
-        local position = humanoidRootPart.Position - Vector3.new(0, platformHeightOffset, 0)
-        platformPart.CFrame = CFrame.new(position)
-        platformPart.Parent = workspace
+        -- 添加向上的力让玩家浮在平台上
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.PlatformStand = true
+        end
         
-        -- 给玩家一个向上的推力
-        local bodyVelocity = Instance.new("BodyVelocity")
-        bodyVelocity.Velocity = Vector3.new(0, platformLiftForce, 0)
-        bodyVelocity.MaxForce = Vector3.new(0, 10000, 0)
-        bodyVelocity.Parent = humanoidRootPart
-        
-        -- 短暂延迟后移除推力，避免过度加速
-        game:GetService("Debris"):AddItem(bodyVelocity, 0.1)
+        -- 轻推玩家向上防止掉下去
+        rootPart.Velocity = Vector3.new(rootPart.Velocity.X, 5, rootPart.Velocity.Z)
     end)
 end
 
 local function StopPlatform()
-    if platformLoop then
-        platformLoop:Disconnect()
-        platformLoop = nil
+    if platformConnection then
+        platformConnection:Disconnect()
+        platformConnection = nil
     end
     
     if platformPart then
         platformPart:Destroy()
         platformPart = nil
     end
+    
+    -- 恢复角色状态
+    local character = player.Character
+    if character then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid and not isFlying then
+            humanoid.PlatformStand = false
+        end
+    end
 end
+
+-- ==================== UI事件绑定 ====================
 
 local function setupButtonHover(button)
     local originalColor = button.BackgroundColor3
@@ -363,47 +389,60 @@ openUIButton.MouseButton1Click:Connect(function()
 end)
 
 deleteButton.MouseButton1Click:Connect(function()
-    StopCFly()
-    StopPlatform()
+    if isFlying then
+        StopRealFly()
+    end
+    if isPlatformActive then
+        StopPlatform()
+    end
     screenGui:Destroy()
 end)
 
 applySpeedButton.MouseButton1Click:Connect(function()
     local inputSpeed = tonumber(speedTextBox.Text)
     if inputSpeed and inputSpeed >= 1 and inputSpeed <= 200 then
-        CFSpeed = inputSpeed
-        speedLabel.Text = "飞行速度: " .. CFSpeed
-        speedTextBox.Text = tostring(CFSpeed)
+        flySpeed = inputSpeed
+        speedLabel.Text = "飞行速度: " .. flySpeed
+        speedTextBox.Text = tostring(flySpeed)
     else
-        speedTextBox.Text = tostring(CFSpeed)
+        speedTextBox.Text = tostring(flySpeed)
     end
 end)
 
 speedTextBox.FocusLost:Connect(function(enterPressed)
     local inputSpeed = tonumber(speedTextBox.Text)
     if inputSpeed and inputSpeed >= 1 and inputSpeed <= 200 then
-        CFSpeed = inputSpeed
-        speedLabel.Text = "飞行速度: " .. CFSpeed
+        flySpeed = inputSpeed
+        speedLabel.Text = "飞行速度: " .. flySpeed
     else
-        speedTextBox.Text = tostring(CFSpeed)
+        speedTextBox.Text = tostring(flySpeed)
     end
 end)
 
-local isFlying = false
+-- 飞行按钮
 flyToggleButton.MouseButton1Click:Connect(function()
     if isFlying then
-        StopCFly()
+        StopRealFly()
         flyToggleButton.Text = "开启飞行"
         flyToggleButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
         isFlying = false
     else
-        StartCFly()
+        -- 如果平台开着，先关掉
+        if isPlatformActive then
+            StopPlatform()
+            platformToggleButton.Text = "开启平台"
+            platformToggleButton.BackgroundColor3 = Color3.fromRGB(120, 80, 200)
+            isPlatformActive = false
+        end
+        
+        StartRealFly()
         flyToggleButton.Text = "关闭飞行"
         flyToggleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
         isFlying = true
     end
 end)
 
+-- 平台按钮
 platformToggleButton.MouseButton1Click:Connect(function()
     if isPlatformActive then
         StopPlatform()
@@ -411,6 +450,14 @@ platformToggleButton.MouseButton1Click:Connect(function()
         platformToggleButton.BackgroundColor3 = Color3.fromRGB(120, 80, 200)
         isPlatformActive = false
     else
+        -- 如果飞行开着，先关掉
+        if isFlying then
+            StopRealFly()
+            flyToggleButton.Text = "开启飞行"
+            flyToggleButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
+            isFlying = false
+        end
+        
         StartPlatform()
         platformToggleButton.Text = "关闭平台"
         platformToggleButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
@@ -418,7 +465,25 @@ platformToggleButton.MouseButton1Click:Connect(function()
     end
 end)
 
+-- 角色重生时自动停止功能
+player.CharacterAdded:Connect(function()
+    if isFlying then
+        isFlying = false
+        flyToggleButton.Text = "开启飞行"
+        flyToggleButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
+    end
+    
+    if isPlatformActive then
+        isPlatformActive = false
+        platformToggleButton.Text = "开启平台"
+        platformToggleButton.BackgroundColor3 = Color3.fromRGB(120, 80, 200)
+    end
+    
+    CleanupFlight()
+    StopPlatform()
+end)
+
 screenGui.Parent = playerGui
 
-print("飞行控制面板已加载！")
-print("平台功能已加载！")
+print("真正的飞行控制面板已加载！")
+print("现在飞行是真实的，其他玩家也能看到！")

@@ -1,10 +1,9 @@
 --[[
-	ZenAim Pro v7.0 - 全面增强版
-	新增：
-	1. 队伍检测开关
-	2. FOV显示开关
-	3. 新增3个部位：脖子(Neck)、胸口(UpperTorso偏上)、腹部(LowerTorso)
-	4. ESP全面优化：方框、骨骼线、名称显示、武器显示
+	ZenAim Pro v7.0 - ESP优化版
+	更新内容：
+	1. 添加队伍检测开关
+	2. 新增"胸口"部位选择（4个部位：Head/UpperTorso/LowerTorso/HumanoidRootPart）
+	3. ESP全面优化：方框/血条/距离/名字/背敌指示器
 ]]
 
 local Players = game:GetService("Players")
@@ -13,13 +12,14 @@ local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
+-- 设备检测
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 local ViewportSize = Camera.ViewportSize
 
+-- 设置系统
 local Settings = {
 	CameraSens = 1.0,
 	Aimbot = true,
-	ShowFOV = true,
 	FOV = 120,
 	AimStrength = 0.5,
 	LockMode = "磁吸锁定",
@@ -28,7 +28,7 @@ local Settings = {
 	PredictionStrength = 0.7,
 	VisibilityCheck = true,
 	DynamicFOV = true,
-	TeamCheck = true,
+	TeamCheck = false,
 	MaxDistance = 1000,
 	StickyLock = true,
 	ESP = true,
@@ -36,17 +36,18 @@ local Settings = {
 	ESP_ShowHealth = true,
 	ESP_ShowDistance = true,
 	ESP_ShowName = true,
-	ESP_ShowSkeleton = true,
-	ESP_ShowWeapon = true,
 	ESP_ShowDirection = true,
-	ESP_MaxDistance = 500
+	ESP_MaxDistance = 500,
+	ESP_BoxType = "2D方框"
 }
 
+-- UI状态
 local MainFrame = nil
 local isDragging = false
 local dragOffset = Vector2.zero
 local isMinimized = false
 
+-- 锁定系统
 local LockSystem = {
 	lockedPlayer = nil,
 	lockedPart = nil,
@@ -56,18 +57,18 @@ local LockSystem = {
 	targetHistory = {},
 	historyIndex = 0,
 	velocitySamples = {},
-	sampleIndex = 0,
-	lastScanTime = 0
+	sampleIndex = 0
 }
 
+-- 武器检测
 local WeaponDetection = {
 	bulletSpeed = 600,
 	weaponType = "hitscan",
 	lastFireTime = 0,
-	fireRate = 0.1,
 	distanceCompensation = 1.0
 }
 
+-- 射线参数
 local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Blacklist
 rayParams.IgnoreWater = true
@@ -75,112 +76,64 @@ rayParams.IgnoreWater = true
 -- ==================== ESP绘制系统（全面优化） ====================
 local ESPObjects = {}
 
--- 部位映射（用于骨骼绘制）
-local skeletonParts = {
-	"Head", "UpperTorso", "LowerTorso",
-	"LeftUpperArm", "LeftLowerArm", "LeftHand",
-	"RightUpperArm", "RightLowerArm", "RightHand",
-	"LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
-	"RightUpperLeg", "RightLowerLeg", "RightFoot"
-}
-
 local function createESP(player)
 	if player == LocalPlayer then return end
 	
 	local esp = {
 		player = player,
 		-- 方框
-		boxLines = {},
+		boxTop = Drawing.new("Line"),
+		boxBottom = Drawing.new("Line"),
+		boxLeft = Drawing.new("Line"),
+		boxRight = Drawing.new("Line"),
 		-- 血条
-		healthBar = Drawing.new("Line"),
 		healthBg = Drawing.new("Line"),
-		healthFill = Drawing.new("Line"),
-		-- 距离
-		distance = Drawing.new("Text"),
-		-- 名称
-		name = Drawing.new("Text"),
-		-- 武器
-		weapon = Drawing.new("Text"),
-		-- 骨骼
-		skeletonLines = {},
+		healthBar = Drawing.new("Line"),
+		-- 文字
+		nameText = Drawing.new("Text"),
+		distText = Drawing.new("Text"),
 		-- 背敌指示器
-		direction = Drawing.new("Triangle"),
-		-- 头部圆点
-		headDot = Drawing.new("Circle")
+		direction = Drawing.new("Triangle")
 	}
 	
-	-- 方框4条线
-	for i = 1, 4 do
-		local line = Drawing.new("Line")
+	-- 方框线条
+	for _, line in pairs({esp.boxTop, esp.boxBottom, esp.boxLeft, esp.boxRight}) do
 		line.Visible = false
 		line.Color = Color3.fromRGB(255, 255, 255)
 		line.Thickness = 1.5
-		line.Transparency = 0.8
-		esp.boxLines[i] = line
+		line.Transparency = 0.3
 	end
 	
 	-- 血条背景
 	esp.healthBg.Visible = false
 	esp.healthBg.Color = Color3.fromRGB(30, 30, 30)
-	esp.healthBg.Thickness = 5
+	esp.healthBg.Thickness = 4
 	
-	-- 血条填充
-	esp.healthFill.Visible = false
-	esp.healthFill.Color = Color3.fromRGB(0, 255, 0)
-	esp.healthFill.Thickness = 3
-	
-	-- 血条边框
+	-- 血条
 	esp.healthBar.Visible = false
-	esp.healthBar.Color = Color3.fromRGB(255, 255, 255)
-	esp.healthBar.Thickness = 1
+	esp.healthBar.Thickness = 3
 	
-	-- 距离文本
-	esp.distance.Visible = false
-	esp.distance.Color = Color3.fromRGB(200, 200, 200)
-	esp.distance.Size = 13
-	esp.distance.Center = true
-	esp.distance.Outline = true
-	esp.distance.OutlineColor = Color3.fromRGB(0, 0, 0)
+	-- 名字
+	esp.nameText.Visible = false
+	esp.nameText.Color = Color3.fromRGB(255, 255, 255)
+	esp.nameText.Size = 14
+	esp.nameText.Center = true
+	esp.nameText.Outline = true
+	esp.nameText.OutlineColor = Color3.fromRGB(0, 0, 0)
 	
-	-- 名称文本
-	esp.name.Visible = false
-	esp.name.Color = Color3.fromRGB(255, 255, 255)
-	esp.name.Size = 13
-	esp.name.Center = true
-	esp.name.Outline = true
-	esp.name.OutlineColor = Color3.fromRGB(0, 0, 0)
+	-- 距离
+	esp.distText.Visible = false
+	esp.distText.Color = Color3.fromRGB(200, 200, 200)
+	esp.distText.Size = 13
+	esp.distText.Center = true
+	esp.distText.Outline = true
+	esp.distText.OutlineColor = Color3.fromRGB(0, 0, 0)
 	
-	-- 武器文本
-	esp.weapon.Visible = false
-	esp.weapon.Color = Color3.fromRGB(255, 200, 100)
-	esp.weapon.Size = 12
-	esp.weapon.Center = true
-	esp.weapon.Outline = true
-	esp.weapon.OutlineColor = Color3.fromRGB(0, 0, 0)
-	
-	-- 骨骼连线
-	for i = 1, 14 do
-		local line = Drawing.new("Line")
-		line.Visible = false
-		line.Color = Color3.fromRGB(255, 255, 255)
-		line.Thickness = 1
-		line.Transparency = 0.6
-		esp.skeletonLines[i] = line
-	end
-	
-	-- 背敌指示
+	-- 背敌指示器
 	esp.direction.Visible = false
 	esp.direction.Color = Color3.fromRGB(255, 60, 60)
-	esp.direction.Thickness = 1.5
+	esp.direction.Thickness = 1
 	esp.direction.Filled = true
-	
-	-- 头部圆点
-	esp.headDot.Visible = false
-	esp.headDot.Color = Color3.fromRGB(255, 50, 50)
-	esp.headDot.Filled = true
-	esp.headDot.Radius = 4
-	esp.headDot.NumSides = 16
-	esp.headDot.Transparency = 0.5
 	
 	ESPObjects[player] = esp
 	return esp
@@ -188,67 +141,44 @@ end
 
 local function removeESP(player)
 	if ESPObjects[player] then
-		local esp = ESPObjects[player]
-		for _, v in pairs(esp) do
-			if typeof(v) == "table" then
-				for _, obj in pairs(v) do
-					if typeof(obj) ~= "table" then
-						pcall(function() obj:Remove() end)
-					end
+		for _, drawing in pairs(ESPObjects[player]) do
+			if typeof(drawing) == "Instance" then
+				drawing:Remove()
+			elseif type(drawing) == "table" then
+				for _, d in pairs(drawing) do
+					if typeof(d) == "Instance" then d:Remove() end
 				end
-			elseif typeof(v) ~= "table" then
-				pcall(function() v:Remove() end)
 			end
 		end
 		ESPObjects[player] = nil
 	end
 end
 
-local function getBoundingBox(character)
-	local hrp = character:FindFirstChild("HumanoidRootPart")
-	local head = character:FindFirstChild("Head")
-	if not hrp or not head then return nil end
-	
-	-- 计算包围盒
-	local minY = hrp.Position.Y - 2.5
-	local maxY = head.Position.Y + 0.5
-	local width = 2
-	
-	local positions = {
-		Vector3.new(hrp.Position.X - width, maxY, hrp.Position.Z),
-		Vector3.new(hrp.Position.X + width, maxY, hrp.Position.Z),
-		Vector3.new(hrp.Position.X - width, minY, hrp.Position.Z),
-		Vector3.new(hrp.Position.X + width, minY, hrp.Position.Z)
-	}
-	
-	local screenPositions = {}
-	for _, pos in ipairs(positions) do
-		local screenPos, onScreen = Camera:WorldToScreenPoint(pos)
-		screenPositions[#screenPositions + 1] = screenPos
+-- 获取血量颜色
+local function getHealthColor(percent)
+	if percent > 0.7 then
+		return Color3.fromRGB(0, 255, 80)
+	elseif percent > 0.5 then
+		return Color3.fromRGB(180, 255, 0)
+	elseif percent > 0.3 then
+		return Color3.fromRGB(255, 200, 0)
+	else
+		return Color3.fromRGB(255, 40, 40)
 	end
-	
-	return {
-		topLeft = screenPositions[1],
-		topRight = screenPositions[2],
-		bottomLeft = screenPositions[3],
-		bottomRight = screenPositions[4]
-	}
 end
 
 local function updateESP()
 	if not Settings.ESP then
 		for _, esp in pairs(ESPObjects) do
-			for _, v in pairs(esp) do
-				if typeof(v) == "table" then
-					for _, obj in pairs(v) do
-						if typeof(obj) ~= "table" then
-							obj.Visible = false
-						end
-					end
-				elseif typeof(v) ~= "table" then
-					v.Visible = false
-				end
-			end
+			esp.boxTop.Visible = false
+			esp.boxBottom.Visible = false
+			esp.boxLeft.Visible = false
+			esp.boxRight.Visible = false
+			esp.healthBg.Visible = false
+			esp.healthBar.Visible = false
+			esp.nameText.Visible = false
+			esp.distText.Visible = false
+			esp.direction.Visible = false
 		end
 		return
 	end
@@ -259,15 +189,11 @@ local function updateESP()
 	for player, esp in pairs(ESPObjects) do
 		local char = player.Character
 		if not char then
-			for _, v in pairs(esp) do
-				if typeof(v) == "table" then
-					for _, obj in pairs(v) do
-						if typeof(obj) ~= "table" then obj.Visible = false end
-					end
-				elseif typeof(v) ~= "table" then
-					v.Visible = false
-				end
-			end
+			esp.boxTop.Visible = false; esp.boxBottom.Visible = false
+			esp.boxLeft.Visible = false; esp.boxRight.Visible = false
+			esp.healthBg.Visible = false; esp.healthBar.Visible = false
+			esp.nameText.Visible = false; esp.distText.Visible = false
+			esp.direction.Visible = false
 			continue
 		end
 		
@@ -276,252 +202,144 @@ local function updateESP()
 		local head = char:FindFirstChild("Head")
 		
 		if not hum or not hrp or not head or hum.Health <= 0 then
-			for _, v in pairs(esp) do
-				if typeof(v) == "table" then
-					for _, obj in pairs(v) do
-						if typeof(obj) ~= "table" then obj.Visible = false end
-					end
-				elseif typeof(v) ~= "table" then
-					v.Visible = false
-				end
-			end
+			esp.boxTop.Visible = false; esp.boxBottom.Visible = false
+			esp.boxLeft.Visible = false; esp.boxRight.Visible = false
+			esp.healthBg.Visible = false; esp.healthBar.Visible = false
+			esp.nameText.Visible = false; esp.distText.Visible = false
+			esp.direction.Visible = false
+			continue
+		end
+		
+		-- 队伍检测
+		if Settings.TeamCheck and player.Team == LocalPlayer.Team then
+			esp.boxTop.Visible = false; esp.boxBottom.Visible = false
+			esp.boxLeft.Visible = false; esp.boxRight.Visible = false
+			esp.healthBg.Visible = false; esp.healthBar.Visible = false
+			esp.nameText.Visible = false; esp.distText.Visible = false
+			esp.direction.Visible = false
 			continue
 		end
 		
 		local targetPos = hrp.Position
 		local dist = (targetPos - camPos).Magnitude
 		
-		if Settings.TeamCheck and player.Team == LocalPlayer.Team then
-			for _, v in pairs(esp) do
-				if typeof(v) == "table" then
-					for _, obj in pairs(v) do
-						if typeof(obj) ~= "table" then obj.Visible = false end
-					end
-				elseif typeof(v) ~= "table" then
-					v.Visible = false
-				end
-			end
-			continue
-		end
-		
 		if dist > Settings.ESP_MaxDistance then
-			for _, v in pairs(esp) do
-				if typeof(v) == "table" then
-					for _, obj in pairs(v) do
-						if typeof(obj) ~= "table" then obj.Visible = false end
-					end
-				elseif typeof(v) ~= "table" then
-					v.Visible = false
-				end
-			end
+			esp.boxTop.Visible = false; esp.boxBottom.Visible = false
+			esp.boxLeft.Visible = false; esp.boxRight.Visible = false
+			esp.healthBg.Visible = false; esp.healthBar.Visible = false
+			esp.nameText.Visible = false; esp.distText.Visible = false
+			esp.direction.Visible = false
 			continue
 		end
 		
-		local headScreen, headOnScreen = Camera:WorldToScreenPoint(head.Position + Vector3.new(0, 0.3, 0))
-		local footScreen, footOnScreen = Camera:WorldToScreenPoint(hrp.Position - Vector3.new(0, 2.5, 0))
+		-- 计算屏幕坐标
+		local headPos, headOnScreen = Camera:WorldToScreenPoint(head.Position + Vector3.new(0, 0.5, 0))
+		local footPos = Camera:WorldToScreenPoint(hrp.Position - Vector3.new(0, 3, 0))
 		
-		if not headOnScreen and not footOnScreen then
-			-- 屏幕外，显示背敌指示器
-			if Settings.ESP_ShowDirection then
-				local direction = (Vector2.new(targetPos.X, targetPos.Z) - Vector2.new(camPos.X, camPos.Z)).Unit
-				local indicatorDist = math.min(ViewportSize.X, ViewportSize.Y) * 0.35
-				local indicatorPos = screenCenter + Vector2.new(direction.X, direction.Y) * indicatorDist
-				
-				esp.direction.Visible = true
-				-- 三角箭头指向屏幕外敌人
-				local perp = Vector2.new(-direction.Y, direction.X) * 10
-				esp.direction.PointA = indicatorPos + direction * 12
-				esp.direction.PointB = indicatorPos - direction * 6 + perp
-				esp.direction.PointC = indicatorPos - direction * 6 - perp
-			end
-			
-			-- 隐藏其他ESP
-			for i = 1, 4 do esp.boxLines[i].Visible = false end
-			esp.healthBar.Visible = false
-			esp.healthBg.Visible = false
-			esp.healthFill.Visible = false
-			esp.distance.Visible = false
-			esp.name.Visible = false
-			esp.weapon.Visible = false
-			for _, line in ipairs(esp.skeletonLines) do line.Visible = false end
-			esp.headDot.Visible = false
-		else
+		-- 计算方框尺寸
+		local boxHeight = math.abs(headPos.Y - footPos.Y)
+		local boxWidth = boxHeight * 0.55
+		local boxLeft = headPos.X - boxWidth / 2
+		local boxRight = headPos.X + boxWidth / 2
+		local boxTop = headPos.Y
+		local boxBottom = headPos.Y - boxHeight
+		
+		-- 屏幕外检测
+		local isOnScreen = headPos.Z > 0 and footPos.Z > 0
+		
+		if isOnScreen then
+			-- 隐藏背敌指示器
 			esp.direction.Visible = false
 			
 			-- 方框
 			if Settings.ESP_ShowBox then
-				local box = getBoundingBox(char)
-				if box then
-					local tl, tr, bl, br = box.topLeft, box.topRight, box.bottomLeft, box.bottomRight
-					
-					-- 根据血量设置方框颜色
-					local healthPercent = hum.Health / hum.MaxHealth
-					local boxColor
-					if healthPercent > 0.6 then
-						boxColor = Color3.fromRGB(255, 255, 255)
-					elseif healthPercent > 0.3 then
-						boxColor = Color3.fromRGB(255, 200, 50)
-					else
-						boxColor = Color3.fromRGB(255, 80, 80)
-					end
-					
-					for i = 1, 4 do
-						esp.boxLines[i].Visible = true
-						esp.boxLines[i].Color = boxColor
-						esp.boxLines[i].Thickness = 1.5
-						esp.boxLines[i].Transparency = 0.7
-					end
-					
-					esp.boxLines[1].From = Vector2.new(tl.X, tl.Y)
-					esp.boxLines[1].To = Vector2.new(tr.X, tr.Y)
-					esp.boxLines[2].From = Vector2.new(tr.X, tr.Y)
-					esp.boxLines[2].To = Vector2.new(br.X, br.Y)
-					esp.boxLines[3].From = Vector2.new(br.X, br.Y)
-					esp.boxLines[3].To = Vector2.new(bl.X, bl.Y)
-					esp.boxLines[4].From = Vector2.new(bl.X, bl.Y)
-					esp.boxLines[4].To = Vector2.new(tl.X, tl.Y)
-				end
+				esp.boxTop.Visible = true
+				esp.boxTop.From = Vector2.new(boxLeft, boxTop)
+				esp.boxTop.To = Vector2.new(boxRight, boxTop)
+				
+				esp.boxBottom.Visible = true
+				esp.boxBottom.From = Vector2.new(boxLeft, boxBottom)
+				esp.boxBottom.To = Vector2.new(boxRight, boxBottom)
+				
+				esp.boxLeft.Visible = true
+				esp.boxLeft.From = Vector2.new(boxLeft, boxTop)
+				esp.boxLeft.To = Vector2.new(boxLeft, boxBottom)
+				
+				esp.boxRight.Visible = true
+				esp.boxRight.From = Vector2.new(boxRight, boxTop)
+				esp.boxRight.To = Vector2.new(boxRight, boxBottom)
 			else
-				for i = 1, 4 do esp.boxLines[i].Visible = false end
+				esp.boxTop.Visible = false; esp.boxBottom.Visible = false
+				esp.boxLeft.Visible = false; esp.boxRight.Visible = false
 			end
 			
 			-- 血条
 			if Settings.ESP_ShowHealth then
 				local healthPercent = hum.Health / hum.MaxHealth
-				local barHeight = math.clamp(headScreen.Y - footScreen.Y, 30, 150)
-				local barX = footScreen.X - 15
-				local barTop = footScreen.Y
-				local barBottom = footScreen.Y - barHeight
+				local barX = boxLeft - 6
+				local barTop = boxTop
+				local barBottom = boxBottom
 				
-				-- 背景
 				esp.healthBg.Visible = true
 				esp.healthBg.From = Vector2.new(barX, barTop)
 				esp.healthBg.To = Vector2.new(barX, barBottom)
 				
-				-- 填充
-				local healthY = barTop + (barBottom - barTop) * (1 - healthPercent)
-				local healthColor
-				if healthPercent > 0.6 then
-					healthColor = Color3.fromRGB(0, 220, 0)
-				elseif healthPercent > 0.3 then
-					healthColor = Color3.fromRGB(220, 220, 0)
-				else
-					healthColor = Color3.fromRGB(220, 0, 0)
-				end
-				
-				esp.healthFill.Visible = true
-				esp.healthFill.Color = healthColor
-				esp.healthFill.From = Vector2.new(barX, barTop)
-				esp.healthFill.To = Vector2.new(barX, healthY)
-				
-				-- 边框
+				local healthHeight = (barTop - barBottom) * healthPercent
 				esp.healthBar.Visible = true
-				esp.healthBar.From = Vector2.new(barX - 1, barTop + 1)
-				esp.healthBar.To = Vector2.new(barX - 1, barBottom - 1)
-				esp.healthBar.Color = Color3.fromRGB(0, 0, 0)
-				esp.healthBar.Thickness = 7
+				esp.healthBar.Color = getHealthColor(healthPercent)
+				esp.healthBar.From = Vector2.new(barX, barTop)
+				esp.healthBar.To = Vector2.new(barX, barTop - healthHeight)
 			else
-				esp.healthBar.Visible = false
 				esp.healthBg.Visible = false
-				esp.healthFill.Visible = false
+				esp.healthBar.Visible = false
 			end
 			
-			-- 名称
+			-- 名字
 			if Settings.ESP_ShowName then
-				esp.name.Visible = true
-				esp.name.Position = Vector2.new(headScreen.X, headScreen.Y - 22)
-				esp.name.Text = player.Name
-				
-				-- 队伍颜色
-				if player.Team then
-					esp.name.Color = player.Team.TeamColor.Color
-				end
+				esp.nameText.Visible = true
+				esp.nameText.Position = Vector2.new(headPos.X, boxBottom + 18)
+				esp.nameText.Text = player.Name
 			else
-				esp.name.Visible = false
+				esp.nameText.Visible = false
 			end
 			
 			-- 距离
 			if Settings.ESP_ShowDistance then
-				esp.distance.Visible = true
-				esp.distance.Position = Vector2.new(headScreen.X, headScreen.Y - 38)
-				esp.distance.Text = string.format("[%.0fm]", dist)
+				esp.distText.Visible = true
+				esp.distText.Position = Vector2.new(headPos.X, boxBottom + 34)
+				esp.distText.Text = string.format("[%.0fm]", dist)
 			else
-				esp.distance.Visible = false
+				esp.distText.Visible = false
 			end
+		else
+			-- 目标在屏幕外
+			esp.boxTop.Visible = false; esp.boxBottom.Visible = false
+			esp.boxLeft.Visible = false; esp.boxRight.Visible = false
+			esp.healthBg.Visible = false; esp.healthBar.Visible = false
+			esp.nameText.Visible = false; esp.distText.Visible = false
 			
-			-- 武器
-			if Settings.ESP_ShowWeapon then
-				local tool = nil
-				for _, child in ipairs(char:GetChildren()) do
-					if child:IsA("Tool") then
-						tool = child
-						break
-					end
-				end
-				
-				if tool then
-					esp.weapon.Visible = true
-					esp.weapon.Position = Vector2.new(headScreen.X, footScreen.Y + 10)
-					esp.weapon.Text = "🔫 " .. tool.Name
-				else
-					esp.weapon.Visible = false
-				end
-			else
-				esp.weapon.Visible = false
-			end
-			
-			-- 骨骼
-			if Settings.ESP_ShowSkeleton then
-				local partPositions = {}
-				for _, partName in ipairs(skeletonParts) do
-					local part = char:FindFirstChild(partName)
-					if part then
-						local screenPos, onScreen = Camera:WorldToScreenPoint(part.Position)
-						if onScreen then
-							partPositions[partName] = screenPos
-						end
-					end
-				end
-				
-				-- 骨骼连线定义
-				local connections = {
-					{"Head", "UpperTorso"},
-					{"UpperTorso", "LowerTorso"},
-					{"UpperTorso", "LeftUpperArm"},
-					{"LeftUpperArm", "LeftLowerArm"},
-					{"LeftLowerArm", "LeftHand"},
-					{"UpperTorso", "RightUpperArm"},
-					{"RightUpperArm", "RightLowerArm"},
-					{"RightLowerArm", "RightHand"},
-					{"LowerTorso", "LeftUpperLeg"},
-					{"LeftUpperLeg", "LeftLowerLeg"},
-					{"LeftLowerLeg", "LeftFoot"},
-					{"LowerTorso", "RightUpperLeg"},
-					{"RightUpperLeg", "RightLowerLeg"},
-					{"RightLowerLeg", "RightFoot"}
-				}
-				
-				for i, conn in ipairs(connections) do
-					if partPositions[conn[1]] and partPositions[conn[2]] then
-						esp.skeletonLines[i].Visible = true
-						esp.skeletonLines[i].From = Vector2.new(partPositions[conn[1]].X, partPositions[conn[1]].Y)
-						esp.skeletonLines[i].To = Vector2.new(partPositions[conn[2]].X, partPositions[conn[2]].Y)
-					else
-						esp.skeletonLines[i].Visible = false
-					end
+			-- 背敌指示器
+			if Settings.ESP_ShowDirection then
+				local flatDir = Vector2.new(targetPos.X - camPos.X, targetPos.Z - camPos.Z)
+				if flatDir.Magnitude > 0 then
+					flatDir = flatDir.Unit
+					local indicatorDist = math.min(ViewportSize.X, ViewportSize.Y) * 0.25
+					local indicatorPos = screenCenter + flatDir * indicatorDist
+					local perpDir = Vector2.new(-flatDir.Y, flatDir.X) * 10
+					
+					esp.direction.Visible = true
+					esp.direction.PointA = indicatorPos + flatDir * 12
+					esp.direction.PointB = indicatorPos + perpDir - flatDir * 6
+					esp.direction.PointC = indicatorPos - perpDir - flatDir * 6
 				end
 			else
-				for _, line in ipairs(esp.skeletonLines) do line.Visible = false end
+				esp.direction.Visible = false
 			end
-			
-			-- 头部圆点
-			esp.headDot.Visible = true
-			esp.headDot.Position = Vector2.new(headScreen.X, headScreen.Y)
 		end
 	end
 end
 
--- ==================== FOV绘制系统 ====================
+-- ==================== FOV绘制 ====================
 local fovOuter = Drawing.new("Circle")
 fovOuter.Visible = true
 fovOuter.Color = Color3.fromRGB(255, 70, 70)
@@ -558,7 +376,7 @@ local function updateFOV()
 	
 	fovOuter.Position = center
 	fovOuter.Radius = fov
-	fovOuter.Visible = Settings.ShowFOV and Settings.Aimbot
+	fovOuter.Visible = Settings.Aimbot
 	
 	local crossLen = fov * 0.2
 	local gap = fov * 0.1
@@ -572,7 +390,7 @@ local function updateFOV()
 	for i = 1, 4 do
 		fovCrosshair[i].From = positions[i][1]
 		fovCrosshair[i].To = positions[i][2]
-		fovCrosshair[i].Visible = Settings.ShowFOV and Settings.Aimbot
+		fovCrosshair[i].Visible = Settings.Aimbot
 	end
 	
 	if LockSystem.lockedPlayer and Settings.Aimbot then
@@ -597,7 +415,7 @@ local function createUI()
 	MainFrame.BackgroundTransparency = 0.05
 	MainFrame.BorderSizePixel = 0
 	MainFrame.Size = UDim2.new(0, 230, 0, 520)
-	MainFrame.Position = UDim2.new(0.02, 0, 0.1, 0)
+	MainFrame.Position = UDim2.new(0.02, 0, 0.12, 0)
 	MainFrame.ClipsDescendants = true
 	MainFrame.ZIndex = 10
 	MainFrame.Parent = gui
@@ -675,7 +493,7 @@ local function createUI()
 	scroll.BorderSizePixel = 0
 	scroll.Size = UDim2.new(1, -6, 1, -44)
 	scroll.Position = UDim2.new(0, 3, 0, 42)
-	scroll.CanvasSize = UDim2.new(0, 0, 0, 900)
+	scroll.CanvasSize = UDim2.new(0, 0, 0, 800)
 	scroll.ScrollBarThickness = 2
 	scroll.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 150)
 	scroll.Parent = MainFrame
@@ -862,37 +680,6 @@ local function detectWeapon()
 	WeaponDetection.distanceCompensation = 1.0
 end
 
--- 目标部位映射
-local function getTargetPart(character)
-	local part = character:FindFirstChild(Settings.TargetPart)
-	if part then return part end
-	
-	-- 自定义部位映射
-	local customParts = {
-		["Neck"] = function(c) return c:FindFirstChild("Head") end,
-		["Chest"] = function(c)
-			local upper = c:FindFirstChild("UpperTorso")
-			if upper then
-				return upper
-			end
-			return c:FindFirstChild("Head")
-		end,
-		["Abdomen"] = function(c)
-			local lower = c:FindFirstChild("LowerTorso")
-			if lower then
-				return lower
-			end
-			return c:FindFirstChild("UpperTorso") or c:FindFirstChild("Head")
-		end
-	}
-	
-	if customParts[Settings.TargetPart] then
-		return customParts[Settings.TargetPart](character)
-	end
-	
-	return character:FindFirstChild("Head")
-end
-
 -- 目标锁定
 local function shouldSwitchTarget(newTarget)
 	if not LockSystem.lockedPlayer then return true end
@@ -909,31 +696,25 @@ local function shouldSwitchTarget(newTarget)
 		return true
 	end
 	
+	if Settings.TeamCheck and LockSystem.lockedPlayer.Team == LocalPlayer.Team then
+		LockSystem.lockedPlayer = nil
+		return true
+	end
+	
 	if newTarget and newTarget.player == LockSystem.lockedPlayer then
 		return false
 	end
 	
 	if Settings.StickyLock then
-		local currentPart = getTargetPart(LockSystem.lockedPlayer.Character)
+		local currentPart = LockSystem.lockedPlayer.Character:FindFirstChild(Settings.TargetPart)
+		if not currentPart then currentPart = LockSystem.lockedPlayer.Character:FindFirstChild("Head") end
+		
 		if currentPart then
 			local screenPos = Camera:WorldToScreenPoint(currentPart.Position)
 			local screenCenter = Vector2.new(ViewportSize.X / 2, ViewportSize.Y / 2)
 			local distFromCenter = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
 			
 			if distFromCenter < Settings.FOV * 1.4 then
-				return false
-			end
-		end
-	end
-	
-	if newTarget then
-		local screenCenter = Vector2.new(ViewportSize.X / 2, ViewportSize.Y / 2)
-		local currentPart = getTargetPart(LockSystem.lockedPlayer.Character)
-		if currentPart then
-			local currentScreenPos = Camera:WorldToScreenPoint(currentPart.Position)
-			local currentDist = (Vector2.new(currentScreenPos.X, currentScreenPos.Y) - screenCenter).Magnitude
-			
-			if newTarget.screenDist > currentDist * 0.65 then
 				return false
 			end
 		end
@@ -994,8 +775,6 @@ local function getAdaptivePrediction(target)
 	end
 	if count > 0 then avgVel = avgVel / count end
 	
-	local acceleration = (finalVel - avgVel) * 1.8
-	
 	local dist = (part.Position - Camera.CFrame.Position).Magnitude
 	local bulletSpeed = WeaponDetection.bulletSpeed
 	
@@ -1005,39 +784,15 @@ local function getAdaptivePrediction(target)
 		bulletSpeed = bulletSpeed + dist * 0.12
 	end
 	
-	local travelTime = (dist / bulletSpeed) * WeaponDetection.distanceCompensation
-	local predStrength = Settings.PredictionStrength
-	travelTime = travelTime * predStrength
+	local travelTime = (dist / bulletSpeed) * WeaponDetection.distanceCompensation * Settings.PredictionStrength
 	
 	local isJumping = hum and hum.FloorMaterial == Enum.Material.Air
 	local jumpCompensation = isJumping and 1.4 or 1.0
 	
-	local movementPattern = 1.0
-	if hum and hum.MoveDirection.Magnitude > 0 then
-		local prevDir = LockSystem.targetHistory[LockSystem.historyIndex - 2]
-		if prevDir then
-			local currentDir = hum.MoveDirection
-			local dirChange = currentDir:Dot(prevDir)
-			if dirChange < 0.3 then
-				movementPattern = 1.5
-			elseif dirChange > 0.8 then
-				movementPattern = 0.85
-			end
-		end
-	end
-	
-	LockSystem.historyIndex = (LockSystem.historyIndex % 10) + 1
-	if hum then
-		LockSystem.targetHistory[LockSystem.historyIndex] = hum.MoveDirection
-	end
-	
-	local predictedPos = part.Position + avgVel * travelTime * jumpCompensation * movementPattern * predStrength
-	predictedPos = predictedPos + acceleration * travelTime * travelTime * 0.6
-	
-	return predictedPos
+	return part.Position + avgVel * travelTime * jumpCompensation
 end
 
--- 目标获取
+-- 目标获取（支持4个部位）
 local function findTarget()
 	local screenCenter = Vector2.new(ViewportSize.X / 2, ViewportSize.Y / 2)
 	local camPos = Camera.CFrame.Position
@@ -1056,8 +811,13 @@ local function findTarget()
 		-- 队伍检测
 		if Settings.TeamCheck and player.Team == LocalPlayer.Team then continue end
 		
-		local part = getTargetPart(char)
-		if not part then continue end
+		local part = char:FindFirstChild(Settings.TargetPart)
+		if not part then
+			-- 回退：尝试其他部位
+			part = char:FindFirstChild("Head") or char:FindFirstChild("UpperTorso") or 
+			        char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("LowerTorso")
+			if not part then continue end
+		end
 		
 		local partPos = part.Position
 		local dist = (partPos - camPos).Magnitude
@@ -1094,13 +854,6 @@ local function findTarget()
 		score = score - (hum.Health / hum.MaxHealth) * 40
 		score = score + (dist / 100) * 3
 		
-		local theirLook = (partPos - camPos).Unit
-		local myDir = Camera.CFrame.LookVector
-		local threatAngle = theirLook:Dot(myDir)
-		if threatAngle > 0.7 then
-			score = score - 15
-		end
-		
 		if player == LockSystem.lockedPlayer then
 			score = score - 60
 		end
@@ -1114,8 +867,7 @@ local function findTarget()
 				hum = hum,
 				screenPos = screenPos,
 				screenDist = screenDist,
-				worldPos = partPos,
-				threatLevel = threatAngle
+				worldPos = partPos
 			}
 		end
 	end
@@ -1141,21 +893,23 @@ local function executeAimbot(deltaTime)
 			LockSystem.lockedPlayer = newTarget.player
 			LockSystem.lockedPart = newTarget.part
 			LockSystem.lockTime = tick()
-			LockSystem.lockPriority = newTarget.threatLevel or 0
 		else
 			LockSystem.lockedPlayer = nil
 			LockSystem.lockedPart = nil
 		end
 	end
 	
-	if not LockSystem.lockedPlayer or not LockSystem.lockedPlayer.Character then
-		return
-	end
+	if not LockSystem.lockedPlayer or not LockSystem.lockedPlayer.Character then return end
 	
-	local part = getTargetPart(LockSystem.lockedPlayer.Character)
+	local part = LockSystem.lockedPlayer.Character:FindFirstChild(Settings.TargetPart)
 	if not part then
-		LockSystem.lockedPlayer = nil
-		return
+		part = LockSystem.lockedPlayer.Character:FindFirstChild("Head") or 
+		        LockSystem.lockedPlayer.Character:FindFirstChild("UpperTorso") or
+		        LockSystem.lockedPlayer.Character:FindFirstChild("HumanoidRootPart")
+		if not part then
+			LockSystem.lockedPlayer = nil
+			return
+		end
 	end
 	
 	local hum = LockSystem.lockedPlayer.Character:FindFirstChildOfClass("Humanoid")
@@ -1173,7 +927,6 @@ local function executeAimbot(deltaTime)
 	}
 	
 	local targetPos = getAdaptivePrediction(target)
-	
 	local camPos = Camera.CFrame.Position
 	local currentLook = Camera.CFrame.LookVector
 	local desiredLook = (targetPos - camPos).Unit
@@ -1217,7 +970,6 @@ Players.PlayerRemoving:Connect(function(player)
 	removeESP(player)
 end)
 
--- 初始化ESP
 for _, player in ipairs(Players:GetPlayers()) do
 	if player ~= LocalPlayer then
 		createESP(player)
@@ -1246,7 +998,7 @@ createSlider(scroll, "镜头灵敏度", 0.1, 2.5, Settings.CameraSens, function(
 y = y + 50
 createToggle(scroll, "自瞄开关", Settings.Aimbot, function(v) Settings.Aimbot = v end, y)
 y = y + 40
-createToggle(scroll, "显示FOV圈", Settings.ShowFOV, function(v) Settings.ShowFOV = v end, y)
+createToggle(scroll, "队伍检测", Settings.TeamCheck, function(v) Settings.TeamCheck = v end, y)
 y = y + 40
 createSlider(scroll, "FOV半径", 30, 350, Settings.FOV, function(v) Settings.FOV = v end, y, 0)
 y = y + 50
@@ -1259,10 +1011,7 @@ end, y)
 y = y + 54
 createSlider(scroll, "吸附强度", 0.1, 1.0, Settings.AimStrength, function(v) Settings.AimStrength = v end, y, 2)
 y = y + 50
-createDropdown(scroll, "目标部位", {
-	"Head", "Neck", "Chest", "Abdomen", 
-	"UpperTorso", "HumanoidRootPart"
-}, Settings.TargetPart, function(v) Settings.TargetPart = v end, y)
+createDropdown(scroll, "目标部位", {"Head", "UpperTorso", "LowerTorso", "HumanoidRootPart"}, Settings.TargetPart, function(v) Settings.TargetPart = v end, y)
 y = y + 54
 createToggle(scroll, "智能预判", Settings.Prediction, function(v) Settings.Prediction = v end, y)
 y = y + 40
@@ -1272,12 +1021,10 @@ createToggle(scroll, "动态FOV", Settings.DynamicFOV, function(v) Settings.Dyna
 y = y + 40
 createToggle(scroll, "粘性锁定", Settings.StickyLock, function(v) Settings.StickyLock = v end, y)
 y = y + 40
-createToggle(scroll, "队伍检测", Settings.TeamCheck, function(v) Settings.TeamCheck = v end, y)
-y = y + 40
 createToggle(scroll, "掩体检测", Settings.VisibilityCheck, function(v) Settings.VisibilityCheck = v end, y)
 y = y + 40
 
--- ESP分区
+-- ESP分区标题
 local espLabel = Instance.new("TextLabel")
 espLabel.BackgroundTransparency = 1
 espLabel.Size = UDim2.new(1, -20, 0, 18)
@@ -1292,17 +1039,13 @@ y = y + 22
 
 createToggle(scroll, "ESP开关", Settings.ESP, function(v) Settings.ESP = v end, y)
 y = y + 40
-createToggle(scroll, "方框显示", Settings.ESP_ShowBox, function(v) Settings.ESP_ShowBox = v end, y)
+createToggle(scroll, "显示方框", Settings.ESP_ShowBox, function(v) Settings.ESP_ShowBox = v end, y)
 y = y + 40
-createToggle(scroll, "血量显示", Settings.ESP_ShowHealth, function(v) Settings.ESP_ShowHealth = v end, y)
+createToggle(scroll, "显示血条", Settings.ESP_ShowHealth, function(v) Settings.ESP_ShowHealth = v end, y)
 y = y + 40
-createToggle(scroll, "距离显示", Settings.ESP_ShowDistance, function(v) Settings.ESP_ShowDistance = v end, y)
+createToggle(scroll, "显示距离", Settings.ESP_ShowDistance, function(v) Settings.ESP_ShowDistance = v end, y)
 y = y + 40
-createToggle(scroll, "名称显示", Settings.ESP_ShowName, function(v) Settings.ESP_ShowName = v end, y)
-y = y + 40
-createToggle(scroll, "骨骼显示", Settings.ESP_ShowSkeleton, function(v) Settings.ESP_ShowSkeleton = v end, y)
-y = y + 40
-createToggle(scroll, "武器显示", Settings.ESP_ShowWeapon, function(v) Settings.ESP_ShowWeapon = v end, y)
+createToggle(scroll, "显示名字", Settings.ESP_ShowName, function(v) Settings.ESP_ShowName = v end, y)
 y = y + 40
 createToggle(scroll, "背敌指向", Settings.ESP_ShowDirection, function(v) Settings.ESP_ShowDirection = v end, y)
 y = y + 40
@@ -1311,4 +1054,4 @@ createSlider(scroll, "ESP距离", 100, 1000, Settings.ESP_MaxDistance, function(
 scroll.CanvasSize = UDim2.new(0, 0, 0, y + 60)
 
 print("ZenAim Pro v7.0 已启动")
-print("队伍检测 | FOV开关 | 6部位选择 | 全面ESP优化")
+print("队伍检测 | 4部位选择 | ESP优化方框/血条/名字/距离")

@@ -62,17 +62,30 @@ end
 local function HasCover(startPos, endPos)
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Blacklist
-    params.FilterDescendantsInstances = {LocalPlayer.Character}
+    params.FilterDescendantsInstances = {LocalPlayer.Character, workspace.CurrentCamera}
     params.IgnoreWater = true
     
-    local rayResult = Workspace:Raycast(startPos, (endPos - startPos), params)
+    local direction = (endPos - startPos)
+    local distance = direction.Magnitude
+    local rayResult = Workspace:Raycast(startPos, direction, params)
     
     if rayResult then
         local hit = rayResult.Instance
-        if hit and hit.Parent and hit.Parent:FindFirstChild("Humanoid") then
-            return false
+        local hitParent = hit and hit.Parent
+        if hitParent then
+            local humanoid = hitParent:FindFirstChild("Humanoid")
+            if humanoid then
+                return false
+            end
+            local head = hitParent:FindFirstChild("Head")
+            if head then
+                return false
+            end
         end
-        return true
+        if distance > 10 and rayResult.Distance < distance - 2 then
+            return true
+        end
+        return false
     end
     return false
 end
@@ -113,12 +126,8 @@ local function GetBestEnemy()
                 continue
             end
             
-            
             if HasCover(currentPos, head.Position) then
-                
-                if distance > 50 then
-                    continue
-                end
+                continue
             end
             
             if distance < bestDistance then
@@ -136,14 +145,7 @@ local function GetTargetPositions()
     local target, targetPos, distance = GetBestEnemy()
     
     if target and targetPos then
-        
-        local pos1 = targetPos + Vector3.new(
-            math.random(-1, 1) * 0.1,
-            math.random(-1, 1) * 0.1,
-            math.random(-1, 1) * 0.1
-        )
-        local pos2 = targetPos + Vector3.new(0, 0.3, 0)
-        return pos1, pos2, true
+        return targetPos, targetPos + Vector3.new(0, 0.3, 0), true
     end
     
     return nil, nil, false
@@ -177,7 +179,6 @@ local function FireShootEvent()
     if not hold then
         return
     end
-    
     
     local ammoCapacity, fireDelay = GetToolStats(tool)
     
@@ -279,7 +280,7 @@ local function FireShootEvent()
     )
 end
 
-while wait(0.1) do
+while wait(0.05) do
     pcall(function()
         FireShootEvent()
     end)

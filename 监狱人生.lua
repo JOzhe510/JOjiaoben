@@ -14,7 +14,7 @@ local IslandYPos = IsMobile and 5 or 10
 local Window = nil
 local ShowIslandNotification = nil
 local DynamicIsland = Instance.new("ScreenGui")
-DynamicIsland.Name = "OPAI_DynamicIsland"
+DynamicIsland.Name = "lvch_DynamicIsland"
 DynamicIsland.ResetOnSpawn = false
 DynamicIsland.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 DynamicIsland.Parent = PlayerGui
@@ -38,7 +38,7 @@ Logo.Name = "Logo"
 Logo.Size = UDim2.new(0, IsMobile and 60 or 80, 1, 0)
 Logo.Position = UDim2.new(0, IsMobile and 8 or 10, 0, 0)
 Logo.BackgroundTransparency = 1
-Logo.Text = "Online_Go-监狱人生测试版"
+Logo.Text = "绿虫-监狱人生"
 Logo.TextColor3 = Color3.fromRGB(255, 255, 255)
 Logo.TextSize = IsMobile and 14 or 16
 Logo.Font = Enum.Font.GothamBold
@@ -209,7 +209,7 @@ NotifContent.Font = Enum.Font.Gotham
 NotifContent.TextXAlignment = Enum.TextXAlignment.Left
 NotifContent.TextTruncate = Enum.TextTruncate.AtEnd
 NotifContent.Parent = NotifTextContainer
-local function ShowIslandNotification(title, content, notifType)
+function ShowIslandNotification(title, content, notifType)
 	if IsShowingNotification then
 		table.insert(NotificationQueue, {title = title, content = content, notifType = notifType or "info"})
 		return
@@ -303,299 +303,266 @@ task.spawn(function()
 		TweenService:Create(StatusDot, TweenInfo.new(0.5), {BackgroundTransparency = 0}):Play()
 	end
 end)
+
 local function CreateDesktopUI()
 	Window = UILibrary.new({
-		Name = "OPAI HUB",
+		Name = "绿虫",
 		Keybind = "K",
 		TextSize = 15,
 	})
 	Window:DrawCategory({Name = "━━━ 主菜单 ━━━"})
-local HomeTab = Window:DrawTab({Name = "主页", Icon = "home", EnableScrolling = true});
-local PrisonTab = Window:DrawTab({Name = "监狱人生", Icon = "alert-octagon", EnableScrolling = true});
-local SettingsTab = Window:DrawTab({Name = "设置", Icon = "settings", EnableScrolling = true});
-local WelcomeSection = HomeTab:DrawSection({Name = "━━━ OPAI HUB v1.0 ━━━"});
-local InfoSection = HomeTab:DrawSection({Name = "━━━ 开发信息 ━━━"});
-local AdSection = HomeTab:DrawSection({Name = "━━━ 加群获取最新版本 ━━━"});
-local ThanksSection = HomeTab:DrawSection({Name = "━━━ 感谢支持 ━━━"});
+	local HomeTab = Window:DrawTab({Name = "主页", Icon = "home", EnableScrolling = true});
+	local PrisonTab = Window:DrawTab({Name = "监狱人生", Icon = "alert-octagon", EnableScrolling = true});
+	local SettingsTab = Window:DrawTab({Name = "设置", Icon = "settings", EnableScrolling = true});
+	local WelcomeSection = HomeTab:DrawSection({Name = "━━━ 绿虫 ━━━"});
+	local InfoSection = HomeTab:DrawSection({Name = "━━━ 开发信息 ━━━"});
+	local AdSection = HomeTab:DrawSection({Name = "━━━ 加群获取最新版本 ━━━"});
+	local ThanksSection = HomeTab:DrawSection({Name = "━━━ 感谢支持 ━━━"});
+	
+	local WeaponSection = PrisonTab:DrawSection({Name = "武器传送"});
 
--- 武器传送功能
-local WeaponSection = PrisonTab:DrawSection({Name = "武器传送"});
+	WeaponSection:AddButton({
+		Name = "获取喷子",
+		Callback = function()
+			local character = LocalPlayer.Character
+			if not character then return end
+			local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+			local humanoid = character:FindFirstChild("Humanoid")
+			if not humanoidRootPart then return end
+			humanoidRootPart.CFrame = CFrame.new(820.33, 100.88, 2216.97)
+			if humanoid then humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end
+			ShowIslandNotification("传送成功", "已传送到 喷子 位置", "success")
+		end
+	})
 
-WeaponSection:AddButton({
-	Name = "获取喷子",
-	Callback = function()
+	WeaponSection:AddButton({
+		Name = "获取M9",
+		Callback = function()
+			local character = LocalPlayer.Character
+			if not character then return end
+			local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+			local humanoid = character:FindFirstChild("Humanoid")
+			if not humanoidRootPart then return end
+			humanoidRootPart.CFrame = CFrame.new(813.25, 101.00, 2217.21)
+			if humanoid then humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end
+			ShowIslandNotification("传送成功", "已传送到 M9 位置", "success")
+		end
+	})
+
+	WeaponSection:AddButton({
+		Name = "获取AK",
+		Callback = function()
+			local character = LocalPlayer.Character
+			if not character then return end
+			local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+			local humanoid = character:FindFirstChild("Humanoid")
+			if not humanoidRootPart then return end
+			humanoidRootPart.CFrame = CFrame.new(-931.53, 94.31, 2038.86)
+			if humanoid then humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end
+			ShowIslandNotification("传送成功", "已传送到 AK 位置", "success")
+		end
+	})
+	
+	
+	local ShootSection = PrisonTab:DrawSection({Name = "自动射击"});
+	
+	local autoShootActive = false
+	local runThread = nil
+
+	
+	local function IsHoldingGun()
 		local character = LocalPlayer.Character
-		if not character then return end
+		if not character then return false end
+		local tool = character:FindFirstChildOfClass("Tool")
+		if not tool then return false end
 		
-		local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-		local humanoid = character:FindFirstChild("Humanoid")
-		if not humanoidRootPart then return end
 		
-		humanoidRootPart.CFrame = CFrame.new(820.33, 100.88, 2216.97)
+		local gunNames = {["M9"] = true, ["Remington 870"] = true, ["AK-47"] = true, ["Sniper"] = true}
+		if gunNames[tool.Name] or tool:FindFirstChild("Muzzle") or tool:FindFirstChild("GunStates") then
+			return true
+		end
+		return false
+	end
+
+	
+	local function CreateRealisticLightning(startPos, endPos)
+		local Workspace = game:GetService("Workspace")
+		local Debris = game:GetService("Debris")
 		
-		if humanoid then
-			humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+		local folder = Instance.new("Folder", Workspace)
+		folder.Name = "Lightning"
+	   
+		local s = Instance.new("Part", folder); s.Anchored=true; s.Transparency=1; s.CanCollide=false; s.Size=Vector3.new(0.05,0.05,0.05); s.Position=startPos
+		local e = Instance.new("Part", folder); e.Anchored=true; e.Transparency=1; e.CanCollide=false; e.Size=Vector3.new(0.05,0.05,0.05); e.Position=endPos
+		local a0 = Instance.new("Attachment", s)
+		local a1 = Instance.new("Attachment", e)
+		
+		
+		for i = 1, 2 do
+			local b = Instance.new("Beam", folder)
+			b.Attachment0 = a0; b.Attachment1 = a1
+			b.Width0 = 0.02 + i*0.015
+			b.Width1 = 0.01 + i*0.01
+			b.Color = ColorSequence.new(Color3.fromRGB(0, 180, 255), Color3.fromRGB(150, 240, 255))
+			b.Texture = "rbxassetid://241509122"
+			b.TextureSpeed = 16
+			b.LightEmission = 1
+			b.Transparency = NumberSequence.new(0.2, 0.5)
 		end
 		
-		ShowIslandNotification("传送成功", "已传送到 喷子 位置", "success")
-	end
-})
-
-WeaponSection:AddButton({
-	Name = "获取M9",
-	Callback = function()
-		local character = LocalPlayer.Character
-		if not character then return end
 		
-		local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-		local humanoid = character:FindFirstChild("Humanoid")
-		if not humanoidRootPart then return end
-		
-		humanoidRootPart.CFrame = CFrame.new(813.25, 101.00, 2217.21)
-		
-		if humanoid then
-			humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+		for i = 1, math.random(3, 5) do
+			task.spawn(function()
+				task.wait(math.random() * 0.02)
+				local p = Instance.new("Part", folder); p.Anchored=true; p.Transparency=1; p.CanCollide=false
+				p.Position = startPos:Lerp(endPos, math.random(25, 75)/100) + Vector3.new(math.random(-1.5, 1.5), math.random(-0.5, 2), math.random(-1.5, 1.5))
+				local a2 = Instance.new("Attachment", p)
+				local bb = Instance.new("Beam", folder)
+				bb.Attachment0 = a0; bb.Attachment1 = a2; bb.Width0 = 0.015; bb.Width1 = 0.002
+				bb.Color = ColorSequence.new(Color3.fromRGB(0, 130, 255))
+				bb.Texture = "rbxassetid://241509122"
+				bb.LightEmission = 1
+				Debris:AddItem(p, 0.08)
+			end)
 		end
 		
-		ShowIslandNotification("传送成功", "已传送到 M9 位置", "success")
+		
+		local sound = Instance.new("Sound", Workspace)
+		sound.SoundId = "rbxassetid://4817809188"
+		sound.Volume = 0.7
+		sound.Pitch = 1.0 + math.random()*0.2
+		sound.Position = endPos
+		sound:Play()
+		
+		Debris:AddItem(sound, 1.5)
+		Debris:AddItem(folder, 0.1)
 	end
-})
 
-WeaponSection:AddButton({
-	Name = "获取AK",
-	Callback = function()
-		local character = LocalPlayer.Character
-		if not character then return end
+	
+	local function IsVisible(startPos, endPos, targetChar)
+		local Workspace = game:GetService("Workspace")
+		local raycastParams = RaycastParams.new()
+		raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+		raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetChar}
+		raycastParams.IgnoreWater = true
 		
-		local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-		local humanoid = character:FindFirstChild("Humanoid")
-		if not humanoidRootPart then return end
+		local direction = endPos - startPos
+		local result = Workspace:Raycast(startPos, direction, raycastParams)
+		return result == nil
+	end
+
+	
+	local function GetNearestVisibleEnemy()
+		local myCharacter = LocalPlayer.Character
+		if not myCharacter or not myCharacter:FindFirstChild("HumanoidRootPart") then return nil end
 		
-		humanoidRootPart.CFrame = CFrame.new(-931.53, 94.31, 2038.86)
+		local myPos = myCharacter.HumanoidRootPart.Position + Vector3.new(0, 1.5, 0)
+		local nearestDistance = 500
+		local targetData = nil
 		
-		if humanoid then
-			humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+		for _, player in ipairs(Players:GetPlayers()) do
+			if player ~= LocalPlayer and player.Character then
+				if LocalPlayer.Team and player.Team and LocalPlayer.Team == player.Team then 
+					continue 
+				end
+				
+				local enemyChar = player.Character
+				local humanoid = enemyChar:FindFirstChild("Humanoid")
+				local head = enemyChar:FindFirstChild("Head")
+				
+				if humanoid and humanoid.Health > 0 and head then
+					local distance = (myPos - head.Position).Magnitude
+					if distance < nearestDistance then
+						if IsVisible(myPos, head.Position, enemyChar) then
+							nearestDistance = distance
+							targetData = {
+								HeadInstance = head,
+								Position = head.Position
+							}
+						end
+					end
+				end
+			end
 		end
-		
-		ShowIslandNotification("传送成功", "已传送到 AK 位置", "success")
+		return targetData
 	end
-})
 
--- 自动射击功能
-local ShootSection = PrisonTab:DrawSection({Name = "自动射击"});
+	
+	local function ExecuteShootTick()
+		
+		if not IsHoldingGun() then return end
 
-local autoShootEnabled = false
-local shootLoop
+		local ShootEvent = ReplicatedStorage:FindFirstChild("GunRemotes") and ReplicatedStorage.GunRemotes:FindFirstChild("ShootEvent")
+		if not ShootEvent then return end
 
-local function getNearestHead()
-    local nearestDistance = 500
-    local nearestHead = nil
-    local nearestPlayer = nil
-    
-    local localHead = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
-    if not localHead then return end
-    
-    for _, player in pairs(Players:GetPlayers()) do
-        if player == LocalPlayer then continue end
-        if not player.Character then continue end
-        
-        local head = player.Character:FindFirstChild("Head")
-        if not head then continue end
-        
-        local distance = (localHead.Position - head.Position).Magnitude
-        if distance <= 500 and distance < nearestDistance then
-            nearestDistance = distance
-            nearestHead = head
-            nearestPlayer = player
-        end
-    end
-    
-    return nearestHead, nearestPlayer
-end
+		local myCharacter = LocalPlayer.Character
+		if not myCharacter or not myCharacter:FindFirstChild("HumanoidRootPart") then return end
+		
+		local enemy = GetNearestVisibleEnemy()
+		if not enemy then return end
+		
+		local myCurrentPos = myCharacter.HumanoidRootPart.Position + Vector3.new(0, 1.5, 0)
+		local cf = CFrame.new(myCurrentPos, enemy.Position)
+		
+		
+		ShootEvent:FireServer({
+			{
+				myCurrentPos,
+				enemy.Position,
+				enemy.HeadInstance,
+				cf
+			}
+		})
+		
+		
+		task.spawn(function()
+			CreateRealisticLightning(myCurrentPos, enemy.Position)
+		end)
+	end
 
-ShootSection:AddToggle({
-	Name = "枪械ragebot",
-	Default = false,
-	Flag = "AutoShoot",
-	Callback = function(state)
-		autoShootEnabled = state
-		if state then
-			if shootLoop then
-				shootLoop:Disconnect()
-				shootLoop = nil
+	
+	ShootSection:AddToggle({
+		Name = "枪械ragebot",
+		Default = false,
+		Flag = "AutoShoot",
+		Callback = function(state)
+			autoShootActive = state
+			
+			if runThread then
+				runThread = nil
 			end
 			
-			local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Debris = game:GetService("Debris")
-
-local me = Players.LocalPlayer
-local ShootEvent = ReplicatedStorage:FindFirstChild("GunRemotes"):FindFirstChild("ShootEvent")
-
-local hasHadWeapon = false
-local lastWeaponCount = 0
-local weaponUsed = false
-local lastShootTime = 0
-local SHOOT_INTERVAL = 0.03
-
-local function getMuzzlePosition()
-    local char = me.Character
-    if not char then return nil end
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool then
-        local m = tool:FindFirstChild("Muzzle") or tool:FindFirstChild("GunMuzzle") or tool:FindFirstChild("Barrel") or tool:FindFirstChild("Handle")
-        if m then return m.Position + m.CFrame.LookVector * 0.5 end
-    end
-    return char.HumanoidRootPart.Position + char.HumanoidRootPart.CFrame.LookVector * 3
-end
-
-local function isValidTarget(head)
-    local hum = head.Parent:FindFirstChildOfClass("Humanoid")
-    if not hum or hum.Health <= 0 then return false end
-
-    local start = getMuzzlePosition() or me.Character.HumanoidRootPart.Position
-    local direction = (head.Position - start)
-    local distance = direction.Magnitude
-    
-    if distance > 2000 then return false end
-    
-    local dir = direction.Unit * 2000
-    local params = RaycastParams.new()
-    params.FilterDescendantsInstances = {me.Character}
-    params.FilterType = Enum.RaycastFilterType.Blacklist
-    
-    local result = Workspace:Raycast(start, dir, params)
-    if not result then return true end
-    return result.Instance == head or result.Instance:IsDescendantOf(head.Parent)
-end
-
-local function createRealisticLightning(startPos, endPos)
-    local folder = Instance.new("Folder", workspace)
-    folder.Name = "Lightning"
-    local s = Instance.new("Part", folder); s.Anchored=true; s.Transparency=1; s.CanCollide=false; s.Size=Vector3.new(0.1,0.1,0.1); s.Position=startPos
-    local e = Instance.new("Part", folder); e.Anchored=true; e.Transparency=1; e.CanCollide=false; e.Size=Vector3.new(0.1,0.1,0.1); e.Position=endPos
-    local a0 = Instance.new("Attachment", s)
-    local a1 = Instance.new("Attachment", e)
-    for i = 1, 3 do
-        local b = Instance.new("Beam", folder)
-        b.Attachment0 = a0; b.Attachment1 = a1
-        b.Width0 = 0.04 + i*0.02
-        b.Width1 = 0.02 + i*0.015
-        b.Color = ColorSequence.new(Color3.fromRGB(100,200,255), Color3.fromRGB(200,255,255))
-        b.Texture = "rbxassetid://241509122"
-        b.TextureSpeed = 12
-        b.LightEmission = 1
-    end
-    for i = 1, math.random(6,10) do
-        spawn(function()
-            wait(math.random()*0.05)
-            local p = Instance.new("Part", folder); p.Anchored=true; p.Transparency=1; p.CanCollide=false
-            p.Position = startPos:Lerp(endPos, math.random(20,80)/100) + Vector3.new(math.random(-3,3), math.random(-1,4), math.random(-3,3))
-            local a2 = Instance.new("Attachment", p)
-            local bb = Instance.new("Beam", folder)
-            bb.Attachment0 = a0; bb.Attachment1 = a2; bb.Width0 = 0.03; bb.Width1 = 0.005
-            Debris:AddItem(p, 0.35)
-        end)
-    end
-    local sound = Instance.new("Sound", workspace)
-    sound.SoundId = "rbxassetid://4817809188"
-    sound.Volume = 0.7
-    sound.Pitch = 0.9 + math.random()*0.3
-    sound:Play()
-    Debris:AddItem(sound, 2)
-    Debris:AddItem(folder, 0.45)
-end
-
-local function getWeaponCount()
-    local backpack = me:FindFirstChild("Backpack")
-    if not backpack then return 0 end
-    local count = 0
-    for _, item in backpack:GetChildren() do
-        if item:IsA("Tool") then
-            local n = item.Name:lower()
-            if n:find("m9") or n:find("870") or n:find("ak") or n:find("taser") then
-                count += 1
-            end
-        end
-    end
-    return count
-end
-
-RunService.Heartbeat:Connect(function()
-    local char = me.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Head") then return end
-    local root = char.HumanoidRootPart
-    local muzzlePos = getMuzzlePosition() or root.Position
-
-    local targetHead = nil
-    local best = 99999
-
-    for _, p in Players:GetPlayers() do
-        if p ~= me and p.Character and p.Character:FindFirstChild("Head") then
-            local th = p.Character.Head
-            if not (me.Team and p.Team and me.Team == p.Team) then
-                if isValidTarget(th) then
-                    local d = (char.Head.Position - th.Position).Magnitude
-                    if d < best then
-                        best = d
-                        targetHead = th
-                    end
-                end
-            end
-        end
-    end
-
-    if targetHead and tick() - lastShootTime >= SHOOT_INTERVAL then
-        lastShootTime = tick()
-
-        local cf = CFrame.new(root.Position, targetHead.Position)
-        ShootEvent:FireServer({{root.Position, targetHead.Position, targetHead, cf}})
-
-        local cur = getWeaponCount()
-        if not hasHadWeapon and cur > 0 then
-            hasHadWeapon = true; lastWeaponCount = cur; weaponUsed = false
-        elseif hasHadWeapon and cur < lastWeaponCount then
-            weaponUsed = true; lastWeaponCount = cur
-        elseif hasHadWeapon and cur > lastWeaponCount then
-            weaponUsed = false; lastWeaponCount = cur
-        end
-        lastWeaponCount = cur
-
-        if hasHadWeapon and weaponUsed then
-            createRealisticLightning(muzzlePos, targetHead.Position)
-        end
-    end
-end)			
-			ShowIslandNotification("枪械ragebot", "已开启 - 带闪电轨迹", "success")
-		else
-			if shootLoop then
-				shootLoop:Disconnect()
-				shootLoop = nil
+			if state then
+				task.spawn(function()
+					runThread = true
+					while autoShootActive and runThread do
+						pcall(ExecuteShootTick)
+						task.wait(0.05)
+					end
+				end)
+				ShowIslandNotification("枪械ragebot", "已开启 - 智能持枪检测精细版", "success")
+			else
+				ShowIslandNotification("枪械ragebot", "已关闭", "info")
 			end
-			
-			ShowIslandNotification("枪械ragebot", "已关闭", "info")
 		end
-	end
-})
+	})
 
-task.wait(1)
-if IsMobile then
-	ShowIslandNotification("Online_Go", "手机版v1.0 - 开发者: OPAI工作室 - XiaoMao", "success")
-	task.wait(3.5)
-	ShowIslandNotification("QQ群", "154919631 加群获取源码和最新版", "info")
-	task.wait(3.5)
-	ShowIslandNotification("欢迎", "手机版加载成功 点击灵动岛打开菜单", "success")
-	task.wait(1.5)
-	ShowIslandNotification("提示", "已添加武器传送和自动射击功能", "info")
-else
-	ShowIslandNotification("Online_Go", "电脑版v1.0 - 开发者: OPAI工作室 - XiaoMao", "success")
-	task.wait(3.5)
-	ShowIslandNotification("QQ群", "154919631 加群获取源码和最新版", "info")
-	task.wait(3.5)
-	ShowIslandNotification("欢迎", "v1.0 加载成功 按K键或点击灵动岛", "success")
-end
+	task.wait(1)
+	if IsMobile then
+		ShowIslandNotification("绿虫", "手机版v1.0 - 开发者: 滚木 - 绿虫虫绿", "success")
+		task.wait(3.5)
+		ShowIslandNotification("QQ群", "154919631 加群获取源码和最新版", "info")
+		task.wait(3.5)
+		ShowIslandNotification("欢迎", "手机版加载成功 点击灵动岛打开菜单", "success")
+		task.wait(1.5)
+		ShowIslandNotification("提示", "已添加武器传送和自动射击功能", "info")
+	else
+		ShowIslandNotification("绿虫", "v1.0 - 开发者: 绿虫工作室 - 绿虫虫绿", "success")
+		task.wait(3.5)
+		ShowIslandNotification("QQ群", "154919631 加群获取源码和最新版", "info")
+		task.wait(3.5)
+		ShowIslandNotification("欢迎", "v1.0 加载成功 按K键或点击灵动岛", "success")
+	end
 end
 
 CreateDesktopUI()
